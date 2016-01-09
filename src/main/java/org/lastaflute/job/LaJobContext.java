@@ -20,4 +20,6 @@ package org.lastaflute.job;
  * @since 0.1.0 (2016/01/09 Saturday)
  */
 public interface LaJobContext {
+
+    // #thinking: what kind of methods need?
 }

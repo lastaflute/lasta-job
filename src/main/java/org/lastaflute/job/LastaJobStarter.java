@@ -52,7 +52,7 @@ public class LastaJobStarter {
                 derivedNameList.add(schedulerName);
                 final Class<?> schedulerType;
                 try {
-                    schedulerType = forScheduling(schedulerName);
+                    schedulerType = forSchedulerName(schedulerName);
                 } catch (ClassNotFoundException ignored) {
                     continue;
                 }
@@ -87,21 +87,25 @@ public class LastaJobStarter {
     //                                            Scheduling
     //                                            ----------
     protected String buildSchedulerName(String root) {
-        return root + ".job." + getSchedulingPureName();
+        return root + "." + getSchedulerPackage() + "." + getSchedulerPureName();
     }
 
-    protected String getSchedulingPureName() {
+    protected String getSchedulerPackage() {
+        return "job";
+    }
+
+    protected String getSchedulerPureName() {
         return "AllJobScheduler";
     }
 
-    protected Class<?> forScheduling(String schedulingName) throws ClassNotFoundException {
+    protected Class<?> forSchedulerName(String schedulingName) throws ClassNotFoundException {
         return Class.forName(schedulingName, false, Thread.currentThread().getContextClassLoader());
     }
 
     protected LaScheduler createScheduler(Class<?> schedulingType) {
         final Object schedulerObj = DfReflectionUtil.newInstance(schedulingType);
         if (!(schedulerObj instanceof LaScheduler)) {
-            throw new IllegalStateException("Application scheduler should implement LaScheduler: " + schedulerObj);
+            throw new IllegalStateException("Your scheduler should implement LaScheduler: " + schedulerObj);
         }
         return (LaScheduler) schedulerObj;
     }

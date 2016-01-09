@@ -17,14 +17,10 @@ package org.lastaflute.job.cron4j;
 
 import java.util.function.Supplier;
 
-import org.dbflute.util.DfReflectionUtil;
-import org.lastaflute.core.magic.async.AsyncManager;
-import org.lastaflute.core.util.ContainerUtil;
-import org.lastaflute.di.core.smart.hot.HotdeployLock;
-import org.lastaflute.di.core.smart.hot.HotdeployUtil;
 import org.lastaflute.job.LaCron;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobContext;
+import org.lastaflute.job.LaJobRunner;
 
 import it.sauronsoftware.cron4j.Scheduler;
 import it.sauronsoftware.cron4j.Task;
@@ -48,51 +44,22 @@ public class LaCronCron4j implements LaCron {
     }
 
     protected Task createCron4jTask(Supplier<Class<? extends LaJob>> jobTypeSupplier) {
-        return new Task() { // similar to LastaPrepareFilter
+        return new Task() { // adapter task
             public void execute(TaskExecutionContext context) throws RuntimeException {
-                if (!HotdeployUtil.isHotdeploy()) { // e.g. production, unit-test
-                    runJob(jobTypeSupplier, context);
-                }
-                synchronized (HotdeployLock.class) {
-                    HotdeployUtil.start();
-                    try {
-                        runJob(jobTypeSupplier, context);
-                    } finally {
-                        HotdeployUtil.stop();
-                    }
-                }
+                runJob(jobTypeSupplier, context);
             }
         };
     }
 
     protected void runJob(Supplier<Class<? extends LaJob>> jobTypeSupplier, TaskExecutionContext context) {
-        getAsyncManager().async(() -> { // #thinking: orignal error handling
-            createJob(jobTypeSupplier.get()).run(createContext(context));
-        });
+        createJobRunner(jobTypeSupplier, context).run();
+    }
+
+    protected LaJobRunner createJobRunner(Supplier<Class<? extends LaJob>> jobTypeSupplier, TaskExecutionContext context) {
+        return new LaJobRunner(jobTypeSupplier, createContext(context));
     }
 
     protected LaJobContext createContext(TaskExecutionContext context) {
         return new LaJobContextCron4j(context);
-    }
-
-    protected LaJob createJob(Class<? extends LaJob> jobType) {
-        final LaJob job = newJob(jobType);
-        inject(job);
-        return job;
-    }
-
-    protected LaJob newJob(Class<? extends LaJob> jobType) {
-        return (LaJob) DfReflectionUtil.newInstance(jobType);
-    }
-
-    // ===================================================================================
-    //                                                                           Component
-    //                                                                           =========
-    protected AsyncManager getAsyncManager() {
-        return ContainerUtil.getComponent(AsyncManager.class);
-    }
-
-    protected void inject(Object target) {
-        ContainerUtil.injectSimply(target);
     }
 }

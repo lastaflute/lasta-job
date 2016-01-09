@@ -21,5 +21,5 @@ package org.lastaflute.job;
  */
 public interface LaScheduler {
 
-    void schedule(LaCron scheduler);
+    void schedule(LaCron cron);
 }
