@@ -19,19 +19,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.dbflute.util.DfReflectionUtil;
-import org.lastaflute.core.magic.async.AsyncManager;
 import org.lastaflute.core.util.ContainerUtil;
 import org.lastaflute.di.core.smart.hot.HotdeployUtil;
 import org.lastaflute.di.naming.NamingConvention;
-import org.lastaflute.job.cron4j.LaCronCron4j;
+import org.lastaflute.job.cron4j.Cron4jCron;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import it.sauronsoftware.cron4j.Scheduler;
 
 /**
  * @author jflute
- * @since 0.1.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/09 Saturday)
  */
 public class LastaJobStarter {
+
+    // ===================================================================================
+    //                                                                          Definition
+    //                                                                          ==========
+    private static final Logger logger = LoggerFactory.getLogger(LastaJobStarter.class);
 
     // ===================================================================================
     //                                                                               Start
@@ -41,29 +47,15 @@ public class LastaJobStarter {
         if (needsHot) {
             HotdeployUtil.start();
         }
-        final Scheduler cron4jScheduler = createCron4jScheduler();
-        final LaCron cron = createCronScheduler(cron4jScheduler);
+        final Scheduler cron4jScheduler;
         try {
-            final List<LaScheduler> schedulerList = new ArrayList<LaScheduler>(); // to check not found
-            final List<String> derivedNameList = new ArrayList<String>(); // for exception message
-            final NamingConvention convention = getNamingConvention();
-            for (String root : convention.getRootPackageNames()) {
-                final String schedulerName = buildSchedulerName(root);
-                derivedNameList.add(schedulerName);
-                final Class<?> schedulerType;
-                try {
-                    schedulerType = forSchedulerName(schedulerName);
-                } catch (ClassNotFoundException ignored) {
-                    continue;
-                }
-                final LaScheduler scheduler = createScheduler(schedulerType);
-                schedulerList.add(scheduler);
-                inject(scheduler);
-                scheduler.schedule(cron);
-            }
-            if (schedulerList.isEmpty()) {
-                throw new IllegalStateException("Not found scheduling object: " + derivedNameList);
-            }
+            final LaJobScheduler scheduler = findScheduler();
+            inject(scheduler);
+            final LaJobRunner jobRunner = scheduler.createRunner();
+            inject(jobRunner);
+            cron4jScheduler = createCron4jScheduler(jobRunner);
+            scheduler.schedule(createCron(cron4jScheduler, jobRunner));
+            showBoot(scheduler, jobRunner, cron4jScheduler);
         } finally {
             if (needsHot) {
                 HotdeployUtil.stop();
@@ -72,15 +64,49 @@ public class LastaJobStarter {
         startCron(cron4jScheduler);
     }
 
+    protected void showBoot(LaJobScheduler scheduler, LaJobRunner jobRunner, Scheduler cron4jScheduler) {
+        logger.info("[Job Scheduling]");
+        logger.info(" scheduler: {}", scheduler);
+        logger.info(" jobRunner: {}", jobRunner);
+        logger.info(" cron4j: {}", cron4jScheduler);
+    }
+
     // -----------------------------------------------------
-    //                                        Cron Scheduler
+    //                                        Find Scheduler
     //                                        --------------
-    protected Scheduler createCron4jScheduler() {
+    protected LaJobScheduler findScheduler() {
+        final List<LaJobScheduler> schedulerList = new ArrayList<LaJobScheduler>(); // to check not found
+        final List<String> derivedNameList = new ArrayList<String>(); // for exception message
+        final NamingConvention convention = getNamingConvention();
+        for (String root : convention.getRootPackageNames()) {
+            final String schedulerName = buildSchedulerName(root);
+            derivedNameList.add(schedulerName);
+            final Class<?> schedulerType;
+            try {
+                schedulerType = forSchedulerName(schedulerName);
+            } catch (ClassNotFoundException ignored) {
+                continue;
+            }
+            final LaJobScheduler scheduler = createScheduler(schedulerType);
+            schedulerList.add(scheduler);
+        }
+        if (schedulerList.isEmpty()) {
+            throw new IllegalStateException("Not found the scheduler object: " + derivedNameList);
+        } else if (schedulerList.size() >= 2) {
+            throw new IllegalStateException("Duplicate scheduler object: " + schedulerList);
+        }
+        return schedulerList.get(0);
+    }
+
+    // -----------------------------------------------------
+    //                                      Cron4j Scheduler
+    //                                      ----------------
+    protected Scheduler createCron4jScheduler(LaJobRunner jobRunner) {
         return new Scheduler();
     }
 
-    protected LaCron createCronScheduler(Scheduler cron4jScheduler) {
-        return new LaCronCron4j(cron4jScheduler);
+    protected LaCron createCron(Scheduler scheduler, LaJobRunner runner) {
+        return new Cron4jCron(scheduler, runner);
     }
 
     // -----------------------------------------------------
@@ -102,33 +128,33 @@ public class LastaJobStarter {
         return Class.forName(schedulingName, false, Thread.currentThread().getContextClassLoader());
     }
 
-    protected LaScheduler createScheduler(Class<?> schedulingType) {
+    protected LaJobScheduler createScheduler(Class<?> schedulingType) {
         final Object schedulerObj = DfReflectionUtil.newInstance(schedulingType);
-        if (!(schedulerObj instanceof LaScheduler)) {
+        if (!(schedulerObj instanceof LaJobScheduler)) {
             throw new IllegalStateException("Your scheduler should implement LaScheduler: " + schedulerObj);
         }
-        return (LaScheduler) schedulerObj;
+        return (LaJobScheduler) schedulerObj;
     }
 
     // -----------------------------------------------------
     //                                            Start Cron
     //                                            ----------
     protected void startCron(Scheduler cron4jScheduler) {
-        getAsyncManager().async(() -> {
+        new Thread(() -> { // use plain thread for silent asynchronous
             try {
                 Thread.sleep(3000L); // delay to wait for finishing application boot
             } catch (InterruptedException ignored) {}
-            cron4jScheduler.start();
-        });
+            try {
+                cron4jScheduler.start();
+            } catch (Throwable cause) {
+                logger.error("Failed to start job scheduling: " + cron4jScheduler, cause);
+            }
+        }).start();
     }
 
     // ===================================================================================
     //                                                                           Component
     //                                                                           =========
-    protected AsyncManager getAsyncManager() {
-        return ContainerUtil.getComponent(AsyncManager.class);
-    }
-
     protected NamingConvention getNamingConvention() {
         return ContainerUtil.getComponent(NamingConvention.class);
     }

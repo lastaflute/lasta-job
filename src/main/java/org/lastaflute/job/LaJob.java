@@ -17,9 +17,12 @@ package org.lastaflute.job;
 
 /**
  * @author jflute
- * @since 0.1.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/09 Saturday)
  */
 public interface LaJob {
 
-    void run(LaJobContext context);
+    /**
+     * @param runtime The runtime information of the current job. (NotNull)
+     */
+    void run(LaJobRuntime runtime);
 }

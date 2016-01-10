@@ -19,9 +19,17 @@ import java.util.function.Supplier;
 
 /**
  * @author jflute
- * @since 0.1.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/09 Saturday)
  */
 public interface LaCron {
 
+    /**
+     * Register job with scheduling.
+     * <pre>
+     * cron.register("* * * * *", () -&gt; SeaJob.class); // per one minute
+     * </pre>
+     * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
+     * @param noArgInLambda The supplier of job type. (NotNull)
+     */
     void register(String cronExp, Supplier<Class<? extends LaJob>> noArgInLambda);
 }

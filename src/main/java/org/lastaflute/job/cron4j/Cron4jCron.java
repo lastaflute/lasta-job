@@ -19,8 +19,8 @@ import java.util.function.Supplier;
 
 import org.lastaflute.job.LaCron;
 import org.lastaflute.job.LaJob;
-import org.lastaflute.job.LaJobContext;
 import org.lastaflute.job.LaJobRunner;
+import org.lastaflute.job.LaJobRuntime;
 
 import it.sauronsoftware.cron4j.Scheduler;
 import it.sauronsoftware.cron4j.Task;
@@ -28,38 +28,51 @@ import it.sauronsoftware.cron4j.TaskExecutionContext;
 
 /**
  * @author jflute
- * @since 0.1.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/09 Saturday)
  */
-public class LaCronCron4j implements LaCron {
+public class Cron4jCron implements LaCron {
 
     protected final Scheduler scheduler;
+    protected final LaJobRunner runner;
 
-    public LaCronCron4j(Scheduler scheduler) {
+    public Cron4jCron(Scheduler scheduler, LaJobRunner runner) {
         this.scheduler = scheduler;
+        this.runner = runner;
     }
 
     @Override
     public void register(String cronExp, Supplier<Class<? extends LaJob>> noArgInLambda) {
+        if (cronExp == null) {
+            throw new IllegalArgumentException("The argument 'cronExp' should not be null.");
+        }
+        if (noArgInLambda == null) {
+            throw new IllegalArgumentException("The argument 'noArgInLambda' should not be null.");
+        }
         scheduler.schedule(cronExp, createCron4jTask(noArgInLambda));
     }
 
     protected Task createCron4jTask(Supplier<Class<? extends LaJob>> jobTypeSupplier) {
         return new Task() { // adapter task
             public void execute(TaskExecutionContext context) throws RuntimeException {
+                adjustThreadNameIfNeeds();
                 runJob(jobTypeSupplier, context);
             }
         };
     }
 
-    protected void runJob(Supplier<Class<? extends LaJob>> jobTypeSupplier, TaskExecutionContext context) {
-        createJobRunner(jobTypeSupplier, context).run();
+    protected void adjustThreadNameIfNeeds() { // because of too long name of cron4j
+        final Thread currentThread = Thread.currentThread();
+        final String adjustedName = "cron4j_" + Integer.toHexString(currentThread.hashCode());
+        if (!adjustedName.equals(currentThread.getName())) { // first time
+            currentThread.setName(adjustedName);
+        }
     }
 
-    protected LaJobRunner createJobRunner(Supplier<Class<? extends LaJob>> jobTypeSupplier, TaskExecutionContext context) {
-        return new LaJobRunner(jobTypeSupplier, createContext(context));
+    protected void runJob(Supplier<Class<? extends LaJob>> jobTypeSupplier, TaskExecutionContext cron4jContext) {
+        runner.run(jobTypeSupplier, jobType -> createJobRuntime(jobType, cron4jContext));
     }
 
-    protected LaJobContext createContext(TaskExecutionContext context) {
-        return new LaJobContextCron4j(context);
+    protected LaJobRuntime createJobRuntime(Class<? extends LaJob> jobType, TaskExecutionContext cron4jContext) {
+        return new Cron4jJobRuntime(jobType, cron4jContext);
     }
 }

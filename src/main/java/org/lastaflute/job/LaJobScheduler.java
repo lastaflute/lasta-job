@@ -17,9 +17,13 @@ package org.lastaflute.job;
 
 /**
  * @author jflute
- * @since 0.1.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/09 Saturday)
  */
-public interface LaJobContext {
+public interface LaJobScheduler {
 
-    // #thinking: what kind of methods need?
+    void schedule(LaCron cron);
+
+    default LaJobRunner createRunner() {
+        return new LaJobRunner();
+    }
 }

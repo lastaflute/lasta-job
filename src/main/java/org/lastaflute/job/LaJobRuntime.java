@@ -13,25 +13,19 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.cron4j;
+package org.lastaflute.job;
 
-import org.lastaflute.job.LaJobContext;
-
-import it.sauronsoftware.cron4j.TaskExecutionContext;
+import java.lang.reflect.Method;
 
 /**
  * @author jflute
- * @since 0.1.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/09 Saturday)
  */
-public class LaJobContextCron4j implements LaJobContext {
+public interface LaJobRuntime {
 
-    protected final TaskExecutionContext context;
+    Class<? extends LaJob> getJobType();
 
-    public LaJobContextCron4j(TaskExecutionContext context) {
-        this.context = context;
-    }
+    Method getRunMethod();
 
-    public TaskExecutionContext getContext() {
-        return context;
-    }
+    // #thinking: what kind of methods need?
 }
