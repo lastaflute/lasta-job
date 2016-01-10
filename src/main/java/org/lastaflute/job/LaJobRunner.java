@@ -158,6 +158,7 @@ public class LaJobRunner {
             if (cause != null) {
                 sb.append(LF).append(" cause: ").append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
             }
+            sb.append(LF).append(LF); // to separate from job logging
             logger.info(sb.toString());
         }
     }
@@ -221,7 +222,11 @@ public class LaJobRunner {
     }
 
     protected SqlStringFilter createSqlStringFilter(LaJobRuntime runtime) {
-        return newRomanticTraceableSqlStringFilter(runtime.getRunMethod(), () -> "");
+        return newRomanticTraceableSqlStringFilter(runtime.getRunMethod(), () -> buildSqlMarkingAdditionalInfo());
+    }
+
+    protected String buildSqlMarkingAdditionalInfo() {
+        return null; // no additional info as default
     }
 
     protected RomanticTraceableSqlStringFilter newRomanticTraceableSqlStringFilter(Method actionMethod,
