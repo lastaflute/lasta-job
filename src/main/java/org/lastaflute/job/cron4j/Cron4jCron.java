@@ -15,12 +15,14 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import org.lastaflute.job.LaCron;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
-import org.lastaflute.job.LaJobRuntime;
+import org.lastaflute.job.LaScheduledJob;
 
 import it.sauronsoftware.cron4j.Scheduler;
 import it.sauronsoftware.cron4j.Task;
@@ -32,30 +34,51 @@ import it.sauronsoftware.cron4j.TaskExecutionContext;
  */
 public class Cron4jCron implements LaCron {
 
-    protected final Scheduler scheduler;
-    protected final LaJobRunner runner;
+    // ===================================================================================
+    //                                                                           Attribute
+    //                                                                           =========
+    protected final Scheduler cron4jScheduler;
+    protected final LaJobRunner jobRunner;
+    protected final Cron4jNow cron4jNow;
 
-    public Cron4jCron(Scheduler scheduler, LaJobRunner runner) {
-        this.scheduler = scheduler;
-        this.runner = runner;
+    // ===================================================================================
+    //                                                                         Constructor
+    //                                                                         ===========
+    public Cron4jCron(Scheduler cron4jScheduler, LaJobRunner jobRunner, Cron4jNow cron4jNow) {
+        this.cron4jScheduler = cron4jScheduler;
+        this.jobRunner = jobRunner;
+        this.cron4jNow = cron4jNow;
+    }
+
+    // ===================================================================================
+    //                                                                            Register
+    //                                                                            ========
+    @Override
+    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType) {
+        assertArgumentNotNull("cronExp", cronExp);
+        assertArgumentNotNull("jobType", jobType);
+        return doRegister(cronExp, jobType, () -> Collections.emptyMap());
     }
 
     @Override
-    public void register(String cronExp, Supplier<Class<? extends LaJob>> noArgInLambda) {
-        if (cronExp == null) {
-            throw new IllegalArgumentException("The argument 'cronExp' should not be null.");
-        }
-        if (noArgInLambda == null) {
-            throw new IllegalArgumentException("The argument 'noArgInLambda' should not be null.");
-        }
-        scheduler.schedule(cronExp, createCron4jTask(noArgInLambda));
+    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, Supplier<Map<String, Object>> noArgLambda) {
+        assertArgumentNotNull("cronExp", cronExp);
+        assertArgumentNotNull("jobType", jobType);
+        assertArgumentNotNull("noArgLambda (parameterSupplier)", noArgLambda);
+        return doRegister(cronExp, jobType, noArgLambda);
     }
 
-    protected Task createCron4jTask(Supplier<Class<? extends LaJob>> jobTypeSupplier) {
+    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, Supplier<Map<String, Object>> parameterSupplier) {
+        final Task cron4jTask = createCron4jTask(cronExp, jobType, parameterSupplier);
+        final String jobKey = cron4jScheduler.schedule(cronExp, cron4jTask);
+        return cron4jNow.saveJob(jobKey, cronExp, cron4jTask);
+    }
+
+    protected Task createCron4jTask(String cronExp, Class<? extends LaJob> jobType, Supplier<Map<String, Object>> parameterSupplier) {
         return new Task() { // adapter task
             public void execute(TaskExecutionContext context) throws RuntimeException {
                 adjustThreadNameIfNeeds();
-                runJob(jobTypeSupplier, context);
+                runJob(cronExp, jobType, parameterSupplier, context);
             }
         };
     }
@@ -68,11 +91,25 @@ public class Cron4jCron implements LaCron {
         }
     }
 
-    protected void runJob(Supplier<Class<? extends LaJob>> jobTypeSupplier, TaskExecutionContext cron4jContext) {
-        runner.run(jobTypeSupplier, jobType -> createJobRuntime(jobType, cron4jContext));
+    protected void runJob(String cronExp, Class<? extends LaJob> jobType, Supplier<Map<String, Object>> parameterSupplier,
+            TaskExecutionContext cron4jContext) {
+        jobRunner.run(jobType, () -> createCron4jRuntime(cronExp, jobType, parameterSupplier, cron4jContext));
     }
 
-    protected LaJobRuntime createJobRuntime(Class<? extends LaJob> jobType, TaskExecutionContext cron4jContext) {
-        return new Cron4jJobRuntime(jobType, cron4jContext);
+    protected Cron4jRuntime createCron4jRuntime(String cronExp, Class<? extends LaJob> jobType,
+            Supplier<Map<String, Object>> parameterSupplier, TaskExecutionContext cron4jContext) {
+        return new Cron4jRuntime(cronExp, jobType, parameterSupplier.get(), cron4jContext);
+    }
+
+    // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    protected void assertArgumentNotNull(String variableName, Object value) {
+        if (variableName == null) {
+            throw new IllegalArgumentException("The variableName should not be null.");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
+        }
     }
 }

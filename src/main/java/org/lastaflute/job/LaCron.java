@@ -15,6 +15,7 @@
  */
 package org.lastaflute.job;
 
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -29,7 +30,20 @@ public interface LaCron {
      * cron.register("* * * * *", () -&gt; SeaJob.class); // per one minute
      * </pre>
      * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
-     * @param noArgInLambda The supplier of job type. (NotNull)
+     * @param jobType The type of registered job that implements the provided interface. (NotNull)
+     * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    void register(String cronExp, Supplier<Class<? extends LaJob>> noArgInLambda);
+    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType);
+
+    /**
+     * Register job with scheduling.
+     * <pre>
+     * cron.register("* * * * *", () -&gt; SeaJob.class); // per one minute
+     * </pre>
+     * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
+     * @param jobType The type of registered job that implements the provided interface. (NotNull)
+     * @param noArgLambda The supplier of job parameter. (NotNull)
+     * @return The registered job which is scheduled by the cron. (NotNull)
+     */
+    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, Supplier<Map<String, Object>> noArgLambda);
 }

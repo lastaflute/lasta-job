@@ -20,7 +20,6 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.annotation.Resource;
@@ -88,25 +87,23 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                                Run
     //                                                                               =====
-    public void run(Supplier<Class<? extends LaJob>> jobTypeSupplier, Function<Class<? extends LaJob>, LaJobRuntime> jobRuntimeFactory) {
+    public void run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         if (!HotdeployUtil.isHotdeploy()) { // e.g. production, unit-test
-            doRun(jobTypeSupplier, jobRuntimeFactory);
+            doRun(jobType, runtimeSupplier);
         }
         synchronized (HotdeployLock.class) { // #thiking: cannot hotdeploy, why?
             HotdeployUtil.start();
             try {
-                doRun(jobTypeSupplier, jobRuntimeFactory);
+                doRun(jobType, runtimeSupplier);
             } finally {
                 HotdeployUtil.stop();
             }
         }
     }
 
-    protected void doRun(Supplier<Class<? extends LaJob>> jobTypeSupplier,
-            Function<Class<? extends LaJob>, LaJobRuntime> jobRuntimeFactory) {
+    protected void doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         // simplar to async manager's process
-        final Class<? extends LaJob> jobType = jobTypeSupplier.get();
-        final LaJobRuntime runtime = jobRuntimeFactory.apply(jobType);
+        final LaJobRuntime runtime = runtimeSupplier.get();
         arrangeThreadCacheContext(runtime);
         arrangePreparedAccessContext(runtime);
         arrangeCallbackContext(runtime);
@@ -137,7 +134,7 @@ public class LaJobRunner {
     //                                                                            ========
     protected long showRunning(LaJobRuntime runtime) {
         if (logger.isInfoEnabled()) {
-            logger.info("#flow #job ...Running job: {}", runtime);
+            logger.info("#flow #job ...Running job: {}", runtime.toCronMethodDisp());
         }
         return System.currentTimeMillis();
     }
@@ -146,7 +143,7 @@ public class LaJobRunner {
         if (logger.isInfoEnabled()) {
             final long after = System.currentTimeMillis();
             final StringBuilder sb = new StringBuilder();
-            sb.append("#flow #job ...Finishing job: ").append(runtime);
+            sb.append("#flow #job ...Finishing job: ").append(runtime.toMethodDisp());
             sb.append(LF).append("[Job Result]");
             sb.append(LF).append(" performanceView: ").append(toPerformanceView(before, after));
             extractSqlCount().ifPresent(counter -> {
@@ -155,6 +152,7 @@ public class LaJobRunner {
             extractMailCount().ifPresent(counter -> {
                 sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
             });
+            sb.append(LF).append(" runtime: ").append(runtime);
             if (cause != null) {
                 sb.append(LF).append(" cause: ").append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
             }

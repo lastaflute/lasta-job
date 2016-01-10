@@ -15,38 +15,42 @@
  */
 package org.lastaflute.job.cron4j;
 
-import java.lang.reflect.Method;
-
 import org.dbflute.util.DfTypeUtil;
-import org.lastaflute.job.LaJob;
-import org.lastaflute.job.LaJobRuntime;
+import org.lastaflute.job.LaScheduledJob;
 
-import it.sauronsoftware.cron4j.TaskExecutionContext;
+import it.sauronsoftware.cron4j.Scheduler;
+import it.sauronsoftware.cron4j.Task;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/11 Monday)
  */
-public class Cron4jJobRuntime implements LaJobRuntime {
+public class Cron4jJob implements LaScheduledJob {
 
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Class<? extends LaJob> jobType;
-    protected final Method runMethod;
-    protected final TaskExecutionContext cron4jContext;
+    protected final String jobKey;
+    protected final String cronExp;
+    protected final Task cron4jTask;
+    protected final Scheduler cron4jScheduler;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJobRuntime(Class<? extends LaJob> jobType, TaskExecutionContext cron4jContext) {
-        this.jobType = jobType;
-        try {
-            this.runMethod = jobType.getMethod("run", new Class<?>[] { LaJobRuntime.class });
-        } catch (Exception e) { // no way
-            throw new IllegalStateException("Not found the run method in the job: " + jobType, e);
-        }
-        this.cron4jContext = cron4jContext;
+    public Cron4jJob(String jobKey, String cronExp, Task cron4jTask, Scheduler cron4jScheduler) {
+        this.jobKey = jobKey;
+        this.cronExp = cronExp;
+        this.cron4jTask = cron4jTask;
+        this.cron4jScheduler = cron4jScheduler;
+    }
+
+    // ===================================================================================
+    //                                                                          Launch Now
+    //                                                                          ==========
+    @Override
+    public void launchNow() {
+        cron4jScheduler.launch(cron4jTask);
     }
 
     // ===================================================================================
@@ -54,28 +58,28 @@ public class Cron4jJobRuntime implements LaJobRuntime {
     //                                                                      ==============
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append(DfTypeUtil.toClassTitle(this));
-        sb.append(":{").append(jobType.getSimpleName()).append("@").append(runMethod.getName()).append("()");
-        sb.append(", ").append(cron4jContext);
-        sb.append("}@").append(Integer.toHexString(hashCode()));
-        return sb.toString();
+        final String hash = Integer.toHexString(hashCode());
+        return DfTypeUtil.toClassTitle(this) + ":{" + jobKey + ", " + cronExp + ", " + cron4jTask + "}@" + hash;
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
     @Override
-    public Class<? extends LaJob> getJobType() {
-        return jobType;
+    public String getJobKey() {
+        return jobKey;
     }
 
     @Override
-    public Method getRunMethod() {
-        return runMethod;
+    public String getCronExp() {
+        return cronExp;
     }
 
-    public TaskExecutionContext getCron4jContext() {
-        return cron4jContext;
+    public Task getCron4jTask() {
+        return cron4jTask;
+    }
+
+    public Scheduler getCron4jScheduler() {
+        return cron4jScheduler;
     }
 }

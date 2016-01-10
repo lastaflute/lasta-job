@@ -15,24 +15,15 @@
  */
 package org.lastaflute.job;
 
-import java.lang.reflect.Method;
-import java.util.Map;
-
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface LaJobRuntime {
+public interface LaScheduledJob {
 
-    Class<? extends LaJob> getJobType(); // not null
+    String getJobKey();
 
-    Method getRunMethod(); // not null
+    String getCronExp();
 
-    Map<String, Object> getParameterMap(); // not null, read-only
-
-    String toCronMethodDisp();
-
-    String toMethodDisp();
-
-    // #thinking: what kind of methods need?
+    void launchNow();
 }

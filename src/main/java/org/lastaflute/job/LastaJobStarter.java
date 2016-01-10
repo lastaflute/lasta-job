@@ -23,6 +23,7 @@ import org.lastaflute.core.util.ContainerUtil;
 import org.lastaflute.di.core.smart.hot.HotdeployUtil;
 import org.lastaflute.di.naming.NamingConvention;
 import org.lastaflute.job.cron4j.Cron4jCron;
+import org.lastaflute.job.cron4j.Cron4jNow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,39 +43,47 @@ public class LastaJobStarter {
     // ===================================================================================
     //                                                                               Start
     //                                                                               =====
-    public void start() {
+    public LaSchedulingNow start() {
         final boolean needsHot = !HotdeployUtil.isAlreadyHotdeploy(); // just in case
         if (needsHot) {
             HotdeployUtil.start();
         }
-        final Scheduler cron4jScheduler;
         try {
-            final LaJobScheduler scheduler = findScheduler();
-            inject(scheduler);
-            final LaJobRunner jobRunner = scheduler.createRunner();
+            final LaJobScheduler appScheduler = findAppScheduler();
+            inject(appScheduler);
+            final LaJobRunner jobRunner = appScheduler.createRunner();
             inject(jobRunner);
-            cron4jScheduler = createCron4jScheduler(jobRunner);
-            scheduler.schedule(createCron(cron4jScheduler, jobRunner));
-            showBoot(scheduler, jobRunner, cron4jScheduler);
+            final Scheduler cron4jScheduler = createCron4jScheduler(jobRunner);
+            final Cron4jNow cron4jNow = createCron4jNow(cron4jScheduler, jobRunner);
+            final Cron4jCron cron4jCron = createCron4jCron(cron4jScheduler, jobRunner, cron4jNow);
+            appScheduler.schedule(cron4jCron);
+            showBoot(appScheduler, jobRunner, cron4jScheduler, cron4jNow);
+            startCron(cron4jScheduler);
+            return cron4jNow;
         } finally {
             if (needsHot) {
                 HotdeployUtil.stop();
             }
         }
-        startCron(cron4jScheduler);
     }
 
-    protected void showBoot(LaJobScheduler scheduler, LaJobRunner jobRunner, Scheduler cron4jScheduler) {
+    protected void showBoot(LaJobScheduler scheduler, LaJobRunner jobRunner, Scheduler cron4jScheduler, Cron4jNow cron4jNow) {
         logger.info("[Job Scheduling]");
         logger.info(" scheduler: {}", scheduler);
         logger.info(" jobRunner: {}", jobRunner);
         logger.info(" cron4j: {}", cron4jScheduler);
+        final List<LaScheduledJob> jobList = cron4jNow.getJobList();
+        int entryNumber = 1;
+        for (LaScheduledJob job : jobList) {
+            logger.info(" {}: {}", entryNumber, job);
+            ++entryNumber;
+        }
     }
 
     // -----------------------------------------------------
-    //                                        Find Scheduler
-    //                                        --------------
-    protected LaJobScheduler findScheduler() {
+    //                                         App Scheduler
+    //                                         -------------
+    protected LaJobScheduler findAppScheduler() {
         final List<LaJobScheduler> schedulerList = new ArrayList<LaJobScheduler>(); // to check not found
         final List<String> derivedNameList = new ArrayList<String>(); // for exception message
         final NamingConvention convention = getNamingConvention();
@@ -105,8 +114,12 @@ public class LastaJobStarter {
         return new Scheduler();
     }
 
-    protected LaCron createCron(Scheduler scheduler, LaJobRunner runner) {
-        return new Cron4jCron(scheduler, runner);
+    protected Cron4jNow createCron4jNow(Scheduler cron4jScheduler, LaJobRunner jobRunner) {
+        return new Cron4jNow(cron4jScheduler, jobRunner);
+    }
+
+    protected Cron4jCron createCron4jCron(Scheduler scheduler, LaJobRunner runner, Cron4jNow cron4jNow) {
+        return new Cron4jCron(scheduler, runner, cron4jNow);
     }
 
     // -----------------------------------------------------
@@ -140,16 +153,7 @@ public class LastaJobStarter {
     //                                            Start Cron
     //                                            ----------
     protected void startCron(Scheduler cron4jScheduler) {
-        new Thread(() -> { // use plain thread for silent asynchronous
-            try {
-                Thread.sleep(3000L); // delay to wait for finishing application boot
-            } catch (InterruptedException ignored) {}
-            try {
-                cron4jScheduler.start();
-            } catch (Throwable cause) {
-                logger.error("Failed to start job scheduling: " + cron4jScheduler, cause);
-            }
-        }).start();
+        cron4jScheduler.start();
     }
 
     // ===================================================================================
