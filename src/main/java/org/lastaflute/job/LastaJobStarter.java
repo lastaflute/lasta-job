@@ -73,9 +73,8 @@ public class LastaJobStarter {
         logger.info(" scheduler: {}", scheduler);
         logger.info(" jobRunner: {}", jobRunner);
         logger.info(" cron4j: {}", cron4jScheduler);
-        final List<LaScheduledJob> jobList = cron4jNow.getJobList();
         int entryNumber = 1;
-        for (LaScheduledJob job : jobList) {
+        for (LaScheduledJob job : cron4jNow.getJobList()) {
             logger.info(" {}: {}", entryNumber, job);
             ++entryNumber;
         }

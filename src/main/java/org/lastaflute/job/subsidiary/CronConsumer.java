@@ -13,30 +13,16 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job;
+package org.lastaflute.job.subsidiary;
 
-import java.util.List;
-
-import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUniqueCode;
-import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.job.LaCron;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface LaSchedulingNow {
+@FunctionalInterface
+public interface CronConsumer {
 
-    OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey);
-
-    OptionalThing<? extends LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode);
-
-    List<? extends LaScheduledJob> getJobList();
-
-    void registerJob(CronConsumer oneArgLambda);
-
-    void clearClosedJob();
-
-    void destroySchedule();
+    void consume(LaCron cron);
 }

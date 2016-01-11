@@ -22,6 +22,9 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.subsidiary.CronConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,20 +91,32 @@ public class SimpleJobManager implements JobManager {
     //                                                                         Control Job
     //                                                                         ===========
     @Override
-    public synchronized OptionalThing<LaScheduledJob> findJobByKey(String jobKey) {
+    public OptionalThing<LaScheduledJob> findJobByKey(LaJobKey jobKey) {
         assertArgumentNotNull("jobKey", jobKey);
-        return schedulingNow.findJobByKey(jobKey);
+        @SuppressWarnings("unchecked")
+        final OptionalThing<LaScheduledJob> job = (OptionalThing<LaScheduledJob>) schedulingNow.findJobByKey(jobKey);
+        return job;
     }
 
     @Override
-    public synchronized List<LaScheduledJob> getJobList() {
-        return schedulingNow.getJobList();
+    public OptionalThing<LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode) {
+        assertArgumentNotNull("uniqueCode", uniqueCode);
+        @SuppressWarnings("unchecked")
+        final OptionalThing<LaScheduledJob> job = (OptionalThing<LaScheduledJob>) schedulingNow.findJobByUniqueCode(uniqueCode);
+        return job;
     }
 
     @Override
-    public synchronized void rescheduleAll() {
-        destroySchedule();
-        schedulingNow = createStarter().start();
+    public List<LaScheduledJob> getJobList() {
+        @SuppressWarnings("unchecked")
+        final List<LaScheduledJob> jobList = (List<LaScheduledJob>) schedulingNow.getJobList();
+        return jobList;
+    }
+
+    @Override
+    public void registerJob(CronConsumer oneArgLambda) {
+        assertArgumentNotNull("oneArgLambda", oneArgLambda);
+        schedulingNow.registerJob(oneArgLambda);
     }
 
     @Override
@@ -120,7 +135,12 @@ public class SimpleJobManager implements JobManager {
         return new LaSchedulingNow() {
 
             @Override
-            public OptionalThing<LaScheduledJob> findJobByKey(String jobKey) {
+            public OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey) {
+                return OptionalThing.empty();
+            }
+
+            @Override
+            public OptionalThing<? extends LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode) {
                 return OptionalThing.empty();
             }
 
@@ -130,7 +150,15 @@ public class SimpleJobManager implements JobManager {
             }
 
             @Override
+            public void registerJob(CronConsumer oneArgLambda) {
+            }
+
+            @Override
             public void destroySchedule() {
+            }
+
+            @Override
+            public void clearClosedJob() {
             }
         };
     }

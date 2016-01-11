@@ -13,70 +13,51 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.cron4j;
-
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.TaskExecutor;
+package org.lastaflute.job.key;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class Cron4jScheduler {
+public class LaJobUniqueCode {
 
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Scheduler nativeScheduler;
+    protected final String uniqueCode;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jScheduler(Scheduler cron4jScheduler) {
-        this.nativeScheduler = cron4jScheduler;
+    public LaJobUniqueCode(String uniqueCode) {
+        if (uniqueCode == null) {
+            throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
+        }
+        this.uniqueCode = uniqueCode;
     }
 
     // ===================================================================================
-    //                                                                              Facade
-    //                                                                              ======
-    public void start() {
-        nativeScheduler.start();
+    //                                                                      Basic Override
+    //                                                                      ==============
+    @Override
+    public int hashCode() {
+        return uniqueCode.hashCode();
     }
 
-    public String schedule(String cronExp, Cron4jTask cron4jTask) {
-        return nativeScheduler.schedule(cronExp, cron4jTask);
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof LaJobUniqueCode && uniqueCode.equals(((LaJobUniqueCode) obj).uniqueCode);
     }
 
-    public void deschedule(String jobKey) {
-        nativeScheduler.deschedule(jobKey);
-    }
-
-    public List<TaskExecutor> findExecutorList(Cron4jTask cron4jTask) {
-        return getExecutorList().stream().filter(executor -> {
-            return cron4jTask.equals(executor.getTask());
-        }).collect(Collectors.toList());
-    }
-
-    public List<TaskExecutor> getExecutorList() {
-        return Stream.of(nativeScheduler.getExecutingTasks()).collect(Collectors.toList());
-    }
-
-    public void launch(Cron4jTask cron4jTask) {
-        nativeScheduler.launch(cron4jTask);
-    }
-
-    public void stop() {
-        nativeScheduler.stop();
+    @Override
+    public String toString() {
+        return uniqueCode;
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public Scheduler getNativeScheduler() {
-        return nativeScheduler;
+    public String value() {
+        return uniqueCode;
     }
 }

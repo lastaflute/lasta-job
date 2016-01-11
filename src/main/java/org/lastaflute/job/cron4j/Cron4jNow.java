@@ -17,15 +17,17 @@ package org.lastaflute.job.cron4j;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJobRunner;
-import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.LaSchedulingNow;
+import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.subsidiary.CronConsumer;
 
 /**
  * @author jflute
@@ -38,8 +40,9 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                           =========
     protected final Cron4jScheduler cron4jScheduler;
     protected final LaJobRunner jobRunner;
-    protected final Map<String, Cron4jJob> jobKeyJobMap = new LinkedHashMap<String, Cron4jJob>();
-    protected final Map<Cron4jTask, Cron4jJob> taskJobMap = new LinkedHashMap<Cron4jTask, Cron4jJob>();
+    protected final Map<LaJobKey, Cron4jJob> jobKeyJobMap = new ConcurrentHashMap<LaJobKey, Cron4jJob>();
+    protected final Map<LaJobUniqueCode, Cron4jJob> uniqueCodeJobMap = new ConcurrentHashMap<LaJobUniqueCode, Cron4jJob>();
+    protected final Map<Cron4jTask, Cron4jJob> cron4jTaskJobMap = new ConcurrentHashMap<Cron4jTask, Cron4jJob>();
 
     // ===================================================================================
     //                                                                         Constructor
@@ -52,50 +55,115 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                            Save Job
     //                                                                            ========
-    public Cron4jJob saveJob(String jobKey, String cronExp, Cron4jTask cron4jTask) {
+    public synchronized Cron4jJob saveJob(LaJobKey jobKey, String cronExp, Cron4jTask cron4jTask) {
         assertArgumentNotNull("jobKey", jobKey);
         assertArgumentNotNull("cronExp", cronExp);
         assertArgumentNotNull("cron4jTask", cron4jTask);
         final Cron4jJob cron4jJob = createCron4jJob(jobKey, cronExp, cron4jTask);
+        assertDuplicateJobKey(jobKey);
         jobKeyJobMap.put(jobKey, cron4jJob);
-        taskJobMap.put(cron4jTask, cron4jJob); // task is unique in lasta-job world
+        cron4jTask.getUniqueCode().ifPresent(uniqueCode -> {
+            assertDuplicateUniqueCode(jobKey, uniqueCode);
+            uniqueCodeJobMap.put(uniqueCode, cron4jJob);
+        });
+        cron4jTaskJobMap.put(cron4jTask, cron4jJob); // task is unique in lasta-job world
         return cron4jJob;
     }
 
-    protected Cron4jJob createCron4jJob(String jobKey, String cronExp, Cron4jTask cron4jTask) {
+    protected Cron4jJob createCron4jJob(LaJobKey jobKey, String cronExp, Cron4jTask cron4jTask) {
         return new Cron4jJob(jobKey, cronExp, cron4jTask, cron4jScheduler);
+    }
+
+    protected void assertDuplicateJobKey(LaJobKey jobKey) {
+        if (jobKeyJobMap.containsKey(jobKey)) { // no way because of auto-generated, just in case
+            throw new IllegalStateException("Duplicate job key: " + jobKey + " existing=" + jobKeyJobMap);
+        }
+    }
+
+    protected void assertDuplicateUniqueCode(LaJobKey jobKey, LaJobUniqueCode uniqueCode) {
+        if (uniqueCodeJobMap.containsKey(uniqueCode)) { // application mistake
+            // simple message #for_now
+            throw new IllegalStateException("Duplicate unique code: " + jobKey + " existing=" + uniqueCodeJobMap);
+        }
+    }
+
+    protected void assertDuplicateTask(Cron4jTask cron4jTask) {
+        if (cron4jTaskJobMap.containsKey(cron4jTask)) { // no way just in case
+            throw new IllegalStateException("Duplicate task: " + cron4jTask + " existing=" + jobKeyJobMap);
+        }
     }
 
     // ===================================================================================
     //                                                                            Find Job
     //                                                                            ========
     @Override
-    public OptionalThing<LaScheduledJob> findJobByKey(String jobKey) {
+    public OptionalThing<Cron4jJob> findJobByKey(LaJobKey jobKey) {
         assertArgumentNotNull("jobKey", jobKey);
         final Cron4jJob found = jobKeyJobMap.get(jobKey);
         return OptionalThing.ofNullable(found, () -> {
-            throw new IllegalStateException("Not found the job by the key: " + jobKey + " existing=" + jobKeyJobMap.keySet());
+            String msg = "Not found the job by the key: " + jobKey + " existing=" + jobKeyJobMap.keySet();
+            throw new IllegalStateException(msg);
+        });
+    }
+
+    @Override
+    public OptionalThing<Cron4jJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode) {
+        assertArgumentNotNull("uniqueCode", uniqueCode);
+        final Cron4jJob found = uniqueCodeJobMap.get(uniqueCode);
+        return OptionalThing.ofNullable(found, () -> {
+            String msg = "Not found the job by the unique code: " + uniqueCode + " existing=" + uniqueCodeJobMap.keySet();
+            throw new IllegalStateException(msg);
         });
     }
 
     public OptionalThing<Cron4jJob> findJobByTask(Cron4jTask task) {
         assertArgumentNotNull("task", task);
-        final Cron4jJob found = taskJobMap.get(task);
+        final Cron4jJob found = cron4jTaskJobMap.get(task);
         return OptionalThing.ofNullable(found, () -> {
-            throw new IllegalStateException("Not found the job by the task: " + task + " existing=" + taskJobMap.keySet());
+            String msg = "Not found the job by the task: " + task + " existing=" + cron4jTaskJobMap.keySet();
+            throw new IllegalStateException(msg);
         });
     }
 
     @Override
-    public List<LaScheduledJob> getJobList() {
-        return Collections.unmodifiableList(new ArrayList<LaScheduledJob>(jobKeyJobMap.values()));
+    public List<Cron4jJob> getJobList() {
+        return Collections.unmodifiableList(new ArrayList<Cron4jJob>(jobKeyJobMap.values()));
+    }
+
+    public List<Cron4jJob> getCron4jJobList() {
+        return Collections.unmodifiableList(new ArrayList<Cron4jJob>(jobKeyJobMap.values()));
     }
 
     // ===================================================================================
-    //                                                                       Stop Schedule
-    //                                                                       =============
+    //                                                                        Register Job
+    //                                                                        ============
     @Override
-    public void destroySchedule() {
+    public synchronized void registerJob(CronConsumer oneArgLambda) {
+        assertArgumentNotNull("oneArgLambda", oneArgLambda);
+        oneArgLambda.consume(createCron4jCron());
+    }
+
+    protected Cron4jCron createCron4jCron() {
+        return new Cron4jCron(cron4jScheduler, jobRunner, this);
+    }
+
+    // ===================================================================================
+    //                                                                          Closed Job
+    //                                                                          ==========
+    @Override
+    public synchronized void clearClosedJob() {
+        getCron4jJobList().stream().filter(job -> job.isClosed()).forEach(job -> {
+            jobKeyJobMap.remove(job.getJobKey());
+            job.getUniqueCode().ifPresent(uniqueCode -> uniqueCodeJobMap.remove(uniqueCode));
+            cron4jTaskJobMap.remove(job.getCron4jTask());
+        });
+    }
+
+    // ===================================================================================
+    //                                                                    Destroy Schedule
+    //                                                                    ================
+    @Override
+    public synchronized void destroySchedule() {
         cron4jScheduler.stop();
     }
 
@@ -130,7 +198,15 @@ public class Cron4jNow implements LaSchedulingNow {
         return jobRunner;
     }
 
-    public Map<String, Cron4jJob> getCron4jJobMap() {
-        return jobKeyJobMap;
+    public Map<LaJobKey, Cron4jJob> getJobKeyJobMap() {
+        return Collections.unmodifiableMap(jobKeyJobMap);
+    }
+
+    public Map<LaJobUniqueCode, Cron4jJob> getUniqueCodeJobMap() {
+        return Collections.unmodifiableMap(uniqueCodeJobMap);
+    }
+
+    public Map<Cron4jTask, Cron4jJob> getTaskJobMap() {
+        return Collections.unmodifiableMap(cron4jTaskJobMap);
     }
 }

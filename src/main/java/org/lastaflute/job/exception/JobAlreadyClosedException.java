@@ -13,30 +13,17 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job;
-
-import java.util.List;
-
-import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUniqueCode;
-import org.lastaflute.job.subsidiary.CronConsumer;
+package org.lastaflute.job.exception;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface LaSchedulingNow {
+public class JobAlreadyClosedException extends Exception {
 
-    OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey);
+    private static final long serialVersionUID = 1L;
 
-    OptionalThing<? extends LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode);
-
-    List<? extends LaScheduledJob> getJobList();
-
-    void registerJob(CronConsumer oneArgLambda);
-
-    void clearClosedJob();
-
-    void destroySchedule();
+    public JobAlreadyClosedException(String msg) {
+        super(msg);
+    }
 }

@@ -15,8 +15,12 @@
  */
 package org.lastaflute.job;
 
+import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.exception.JobAlreadyClosedException;
 import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
 import org.lastaflute.job.exception.JobNoExecutingNowException;
+import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobUniqueCode;
 
 /**
  * @author jflute
@@ -24,13 +28,19 @@ import org.lastaflute.job.exception.JobNoExecutingNowException;
  */
 public interface LaScheduledJob {
 
-    String getJobKey();
+    LaJobKey getJobKey();
 
     String getCronExp();
 
+    OptionalThing<LaJobUniqueCode> getUniqueCode();
+
     boolean isExecutingNow();
 
-    void launchNow() throws JobAlreadyExecutingNowException;
+    void launchNow() throws JobAlreadyClosedException, JobAlreadyExecutingNowException;
 
     void stopNow() throws JobNoExecutingNowException;
+
+    void closeNow(); // executing job continues, so call stopNow() before if it needs
+
+    boolean isClosed();
 }

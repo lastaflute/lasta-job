@@ -15,10 +15,9 @@
  */
 package org.lastaflute.job;
 
-import java.util.Map;
-import java.util.function.Supplier;
-
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.subsidiary.ParamsSupplier;
 
 /**
  * @author jflute
@@ -29,7 +28,8 @@ public class LaCronOption {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected Supplier<Map<String, Object>> paramsSupplier;
+    protected LaJobUniqueCode uniqueCode;
+    protected ParamsSupplier paramsSupplier;
     protected AlreadyExecutingBehavior duplicateExecutingBehavior = AlreadyExecutingBehavior.WAIT;
 
     public enum AlreadyExecutingBehavior {
@@ -39,7 +39,22 @@ public class LaCronOption {
     // ===================================================================================
     //                                                                              Facade
     //                                                                              ======
-    public LaCronOption params(Supplier<Map<String, Object>> noArgLambda) {
+    public LaCronOption uniqueBy(String uniqueCode) {
+        if (uniqueCode == null) {
+            throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
+        }
+        this.uniqueCode = createUniqueCode(uniqueCode);
+        return this;
+    }
+
+    protected LaJobUniqueCode createUniqueCode(String uniqueCode) {
+        return new LaJobUniqueCode(uniqueCode);
+    }
+
+    public LaCronOption params(ParamsSupplier noArgLambda) {
+        if (noArgLambda == null) {
+            throw new IllegalArgumentException("The argument 'noArgLambda' should not be null.");
+        }
         paramsSupplier = noArgLambda;
         return this;
     }
@@ -59,14 +74,21 @@ public class LaCronOption {
     //                                                                      ==============
     @Override
     public String toString() {
+        final String uniqueExp = uniqueCode != null ? uniqueCode.value() : "noUnique";
         final String paramsExp = paramsSupplier != null ? "hasParams" : "noParams";
-        return "option:{" + paramsExp + ", " + duplicateExecutingBehavior + "}";
+        return "option:{" + uniqueExp + ", " + paramsExp + ", " + duplicateExecutingBehavior + "}";
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public OptionalThing<Supplier<Map<String, Object>>> getParamsSupplier() {
+    public OptionalThing<LaJobUniqueCode> getUniqueCode() {
+        return OptionalThing.ofNullable(uniqueCode, () -> {
+            throw new IllegalStateException("Not found the application unique code.");
+        });
+    }
+
+    public OptionalThing<ParamsSupplier> getParamsSupplier() {
         return OptionalThing.ofNullable(paramsSupplier, () -> {
             throw new IllegalStateException("Not found the parameters supplier.");
         });

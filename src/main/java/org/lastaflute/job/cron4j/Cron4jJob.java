@@ -17,10 +17,14 @@ package org.lastaflute.job.cron4j;
 
 import java.util.List;
 
+import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaScheduledJob;
+import org.lastaflute.job.exception.JobAlreadyClosedException;
 import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
 import org.lastaflute.job.exception.JobNoExecutingNowException;
+import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobUniqueCode;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -33,15 +37,16 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final String jobKey;
+    protected final LaJobKey jobKey;
     protected final String cronExp;
     protected final Cron4jTask cron4jTask;
     protected final Cron4jScheduler cron4jScheduler;
+    protected volatile boolean closed;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(String jobKey, String cronExp, Cron4jTask cron4jTask, Cron4jScheduler cron4jScheduler) {
+    public Cron4jJob(LaJobKey jobKey, String cronExp, Cron4jTask cron4jTask, Cron4jScheduler cron4jScheduler) {
         this.jobKey = jobKey;
         this.cronExp = cronExp;
         this.cron4jTask = cron4jTask;
@@ -64,7 +69,10 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          Launch Now
     //                                                                          ==========
     @Override
-    public void launchNow() throws JobAlreadyExecutingNowException {
+    public synchronized void launchNow() throws JobAlreadyClosedException, JobAlreadyExecutingNowException {
+        if (closed) {
+            throw new JobAlreadyClosedException("Already closed the job: " + toString());
+        }
         if (isExecutingNow()) {
             throw new JobAlreadyExecutingNowException("Already executing the job now: " + toString());
         }
@@ -76,13 +84,27 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            Stop Now
     //                                                                            ========
     @Override
-    public void stopNow() throws JobNoExecutingNowException {
+    public synchronized void stopNow() throws JobNoExecutingNowException {
         final List<TaskExecutor> executorList = findExecutorList();
         if (!executorList.isEmpty()) {
             executorList.forEach(executor -> executor.stop());
         } else {
             throw new JobNoExecutingNowException("No executing the job now: " + toString());
         }
+    }
+
+    // ===================================================================================
+    //                                                                           Close Now
+    //                                                                           =========
+    @Override
+    public synchronized void closeNow() {
+        cron4jScheduler.deschedule(jobKey.value());
+        closed = true;
+    }
+
+    @Override
+    public boolean isClosed() {
+        return closed;
     }
 
     // ===================================================================================
@@ -99,13 +121,18 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            Accessor
     //                                                                            ========
     @Override
-    public String getJobKey() {
+    public LaJobKey getJobKey() {
         return jobKey;
     }
 
     @Override
     public String getCronExp() {
         return cronExp;
+    }
+
+    @Override
+    public OptionalThing<LaJobUniqueCode> getUniqueCode() {
+        return cron4jTask.getUniqueCode();
     }
 
     public Cron4jTask getCron4jTask() {

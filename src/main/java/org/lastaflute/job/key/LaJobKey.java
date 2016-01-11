@@ -13,70 +13,51 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.cron4j;
-
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.TaskExecutor;
+package org.lastaflute.job.key;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class Cron4jScheduler {
+public class LaJobKey {
 
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Scheduler nativeScheduler;
+    protected final String jobKey;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jScheduler(Scheduler cron4jScheduler) {
-        this.nativeScheduler = cron4jScheduler;
+    public LaJobKey(String jobKey) {
+        if (jobKey == null) {
+            throw new IllegalArgumentException("The argument 'jobKey' should not be null.");
+        }
+        this.jobKey = jobKey;
     }
 
     // ===================================================================================
-    //                                                                              Facade
-    //                                                                              ======
-    public void start() {
-        nativeScheduler.start();
+    //                                                                      Basic Override
+    //                                                                      ==============
+    @Override
+    public int hashCode() {
+        return jobKey.hashCode();
     }
 
-    public String schedule(String cronExp, Cron4jTask cron4jTask) {
-        return nativeScheduler.schedule(cronExp, cron4jTask);
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof LaJobKey && jobKey.equals(((LaJobKey) obj).jobKey);
     }
 
-    public void deschedule(String jobKey) {
-        nativeScheduler.deschedule(jobKey);
-    }
-
-    public List<TaskExecutor> findExecutorList(Cron4jTask cron4jTask) {
-        return getExecutorList().stream().filter(executor -> {
-            return cron4jTask.equals(executor.getTask());
-        }).collect(Collectors.toList());
-    }
-
-    public List<TaskExecutor> getExecutorList() {
-        return Stream.of(nativeScheduler.getExecutingTasks()).collect(Collectors.toList());
-    }
-
-    public void launch(Cron4jTask cron4jTask) {
-        nativeScheduler.launch(cron4jTask);
-    }
-
-    public void stop() {
-        nativeScheduler.stop();
+    @Override
+    public String toString() {
+        return jobKey;
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public Scheduler getNativeScheduler() {
-        return nativeScheduler;
+    public String value() {
+        return jobKey;
     }
 }

@@ -15,7 +15,7 @@
  */
 package org.lastaflute.job;
 
-import java.util.function.Consumer;
+import org.lastaflute.job.subsidiary.CronOpCall;
 
 /**
  * @author jflute
@@ -41,8 +41,8 @@ public interface LaCron {
      * </pre>
      * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
      * @param jobType The type of registered job that implements the provided interface. (NotNull)
-     * @param opLambda The consumer of option for e.g. parameter. (NotNull)
+     * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
      * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, Consumer<LaCronOption> opLambda);
+    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, CronOpCall opLambda);
 }

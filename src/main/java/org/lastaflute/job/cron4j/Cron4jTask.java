@@ -23,12 +23,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.dbflute.helper.HandyDate;
+import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaCronOption.AlreadyExecutingBehavior;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
+import org.lastaflute.job.key.LaJobUniqueCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,7 +137,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected Map<String, Object> extractParameterMap() {
-        return option.getParamsSupplier().map(supplier -> supplier.get()).orElse(Collections.emptyMap());
+        return option.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
     }
 
     // ===================================================================================
@@ -144,6 +146,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     @Override
     public boolean canBeStopped() {
         return true; // #thiking fixedly true, all right?
+    }
+
+    public OptionalThing<LaJobUniqueCode> getUniqueCode() {
+        return option.getUniqueCode();
     }
 
     // ===================================================================================
