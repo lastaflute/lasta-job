@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import org.dbflute.optional.OptionalThing;
 import org.slf4j.Logger;
@@ -76,6 +77,14 @@ public class SimpleJobManager implements JobManager {
     }
 
     // ===================================================================================
+    //                                                                             Destroy
+    //                                                                             =======
+    @PreDestroy
+    public synchronized void destroy() {
+        destroySchedule();
+    }
+
+    // ===================================================================================
     //                                                                         Control Job
     //                                                                         ===========
     @Override
@@ -90,13 +99,13 @@ public class SimpleJobManager implements JobManager {
 
     @Override
     public synchronized void reschedule() {
-        stop();
+        destroySchedule();
         schedulingNow = createStarter().start();
     }
 
     @Override
-    public synchronized void stop() {
-        schedulingNow.stop();
+    public synchronized void destroySchedule() {
+        schedulingNow.destroySchedule();
     }
 
     // ===================================================================================
@@ -120,7 +129,7 @@ public class SimpleJobManager implements JobManager {
             }
 
             @Override
-            public void stop() {
+            public void destroySchedule() {
             }
         };
     }

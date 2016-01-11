@@ -31,5 +31,5 @@ public interface JobManager {
 
     void reschedule();
 
-    void stop();
+    void destroySchedule();
 }

@@ -90,7 +90,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                       Stop Schedule
     //                                                                       =============
     @Override
-    public void stop() {
+    public void destroySchedule() {
         cron4jScheduler.stop();
     }
 

@@ -29,5 +29,5 @@ public interface LaSchedulingNow {
 
     List<LaScheduledJob> getJobList();
 
-    void stop();
+    void destroySchedule();
 }
