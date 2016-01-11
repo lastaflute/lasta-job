@@ -53,6 +53,9 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                            Save Job
     //                                                                            ========
     public Cron4jJob saveJob(String jobKey, String cronExp, Cron4jTask cron4jTask) {
+        assertArgumentNotNull("jobKey", jobKey);
+        assertArgumentNotNull("cronExp", cronExp);
+        assertArgumentNotNull("cron4jTask", cron4jTask);
         final Cron4jJob cron4jJob = createCron4jJob(jobKey, cronExp, cron4jTask);
         jobKeyJobMap.put(jobKey, cron4jJob);
         taskJobMap.put(cron4jTask, cron4jJob); // task is unique in lasta-job world
@@ -68,6 +71,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                            ========
     @Override
     public OptionalThing<LaScheduledJob> findJobByKey(String jobKey) {
+        assertArgumentNotNull("jobKey", jobKey);
         final Cron4jJob found = jobKeyJobMap.get(jobKey);
         return OptionalThing.ofNullable(found, () -> {
             throw new IllegalStateException("Not found the job by the key: " + jobKey + " existing=" + jobKeyJobMap.keySet());
@@ -75,6 +79,7 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     public OptionalThing<Cron4jJob> findJobByTask(Cron4jTask task) {
+        assertArgumentNotNull("task", task);
         final Cron4jJob found = taskJobMap.get(task);
         return OptionalThing.ofNullable(found, () -> {
             throw new IllegalStateException("Not found the job by the task: " + task + " existing=" + taskJobMap.keySet());
@@ -92,6 +97,18 @@ public class Cron4jNow implements LaSchedulingNow {
     @Override
     public void destroySchedule() {
         cron4jScheduler.stop();
+    }
+
+    // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    protected void assertArgumentNotNull(String variableName, Object value) {
+        if (variableName == null) {
+            throw new IllegalArgumentException("The variableName should not be null.");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
+        }
     }
 
     // ===================================================================================

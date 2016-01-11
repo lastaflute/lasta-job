@@ -26,7 +26,7 @@ public interface LaCron {
     /**
      * Register job with scheduling.
      * <pre>
-     * cron.register("* * * * *", () -&gt; SeaJob.class); // per one minute
+     * cron.register("* * * * *", SeaJob.class); // per one minute
      * </pre>
      * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
      * @param jobType The type of registered job that implements the provided interface. (NotNull)
@@ -35,9 +35,9 @@ public interface LaCron {
     LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType);
 
     /**
-     * Register job with scheduling.
+     * Register job with scheduling with option.
      * <pre>
-     * cron.register("* * * * *", () -&gt; SeaJob.class); // per one minute
+     * cron.register("* * * * *", SeaJob.class, op -&gt; op.params(...)); // per one minute
      * </pre>
      * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
      * @param jobType The type of registered job that implements the provided interface. (NotNull)

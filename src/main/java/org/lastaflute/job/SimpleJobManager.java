@@ -89,6 +89,7 @@ public class SimpleJobManager implements JobManager {
     //                                                                         ===========
     @Override
     public synchronized OptionalThing<LaScheduledJob> findJobByKey(String jobKey) {
+        assertArgumentNotNull("jobKey", jobKey);
         return schedulingNow.findJobByKey(jobKey);
     }
 
@@ -98,7 +99,7 @@ public class SimpleJobManager implements JobManager {
     }
 
     @Override
-    public synchronized void reschedule() {
+    public synchronized void rescheduleAll() {
         destroySchedule();
         schedulingNow = createStarter().start();
     }
@@ -132,5 +133,17 @@ public class SimpleJobManager implements JobManager {
             public void destroySchedule() {
             }
         };
+    }
+
+    // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    protected void assertArgumentNotNull(String variableName, Object value) {
+        if (variableName == null) {
+            throw new IllegalArgumentException("The variableName should not be null.");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
+        }
     }
 }
