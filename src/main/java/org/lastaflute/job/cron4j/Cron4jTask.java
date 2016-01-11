@@ -30,7 +30,7 @@ import org.lastaflute.job.LaCronOption.AlreadyExecutingBehavior;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
-import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.key.LaJobUnique;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,8 +148,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return true; // #thiking fixedly true, all right?
     }
 
-    public OptionalThing<LaJobUniqueCode> getUniqueCode() {
-        return option.getUniqueCode();
+    public OptionalThing<LaJobUnique> getJobUnique() {
+        return option.getJobUnique();
     }
 
     // ===================================================================================

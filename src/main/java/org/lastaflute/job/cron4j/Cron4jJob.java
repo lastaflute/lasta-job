@@ -24,7 +24,7 @@ import org.lastaflute.job.exception.JobAlreadyClosedException;
 import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
 import org.lastaflute.job.exception.JobNoExecutingNowException;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.key.LaJobUnique;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -38,6 +38,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           Attribute
     //                                                                           =========
     protected final LaJobKey jobKey;
+    protected final OptionalThing<LaJobUnique> jobUnique;
     protected final String cronExp;
     protected final Cron4jTask cron4jTask;
     protected final Cron4jScheduler cron4jScheduler;
@@ -46,8 +47,10 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(LaJobKey jobKey, String cronExp, Cron4jTask cron4jTask, Cron4jScheduler cron4jScheduler) {
+    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, String cronExp, Cron4jTask cron4jTask,
+            Cron4jScheduler cron4jScheduler) {
         this.jobKey = jobKey;
+        this.jobUnique = jobUnique;
         this.cronExp = cronExp;
         this.cron4jTask = cron4jTask;
         this.cron4jScheduler = cron4jScheduler;
@@ -113,8 +116,9 @@ public class Cron4jJob implements LaScheduledJob {
     @Override
     public String toString() {
         // cron4jTask has cronExp so no use here
+        final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElse(jobKey.toString());
         final String hash = Integer.toHexString(hashCode());
-        return DfTypeUtil.toClassTitle(this) + ":{" + jobKey + ", " + cron4jTask + "}@" + hash;
+        return DfTypeUtil.toClassTitle(this) + ":{" + keyExp + ", " + cron4jTask + "}@" + hash;
     }
 
     // ===================================================================================
@@ -126,13 +130,13 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public String getCronExp() {
-        return cronExp;
+    public OptionalThing<LaJobUnique> getJobUnique() {
+        return jobUnique;
     }
 
     @Override
-    public OptionalThing<LaJobUniqueCode> getUniqueCode() {
-        return cron4jTask.getUniqueCode();
+    public String getCronExp() {
+        return cronExp;
     }
 
     public Cron4jTask getCron4jTask() {

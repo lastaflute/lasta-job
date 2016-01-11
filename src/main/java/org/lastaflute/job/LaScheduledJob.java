@@ -20,7 +20,7 @@ import org.lastaflute.job.exception.JobAlreadyClosedException;
 import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
 import org.lastaflute.job.exception.JobNoExecutingNowException;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.key.LaJobUnique;
 
 /**
  * @author jflute
@@ -30,9 +30,9 @@ public interface LaScheduledJob {
 
     LaJobKey getJobKey();
 
-    String getCronExp();
+    OptionalThing<LaJobUnique> getJobUnique();
 
-    OptionalThing<LaJobUniqueCode> getUniqueCode();
+    String getCronExp();
 
     boolean isExecutingNow();
 

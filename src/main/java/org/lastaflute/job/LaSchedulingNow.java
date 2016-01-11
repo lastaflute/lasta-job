@@ -19,7 +19,7 @@ import java.util.List;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.CronConsumer;
 
 /**
@@ -30,7 +30,7 @@ public interface LaSchedulingNow {
 
     OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey);
 
-    OptionalThing<? extends LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode);
+    OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique);
 
     List<? extends LaScheduledJob> getJobList();
 

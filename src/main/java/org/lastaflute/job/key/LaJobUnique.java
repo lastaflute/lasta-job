@@ -19,7 +19,7 @@ package org.lastaflute.job.key;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class LaJobUniqueCode {
+public class LaJobUnique {
 
     // ===================================================================================
     //                                                                           Attribute
@@ -29,7 +29,7 @@ public class LaJobUniqueCode {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public LaJobUniqueCode(String uniqueCode) {
+    public LaJobUnique(String uniqueCode) {
         if (uniqueCode == null) {
             throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
         }
@@ -46,7 +46,7 @@ public class LaJobUniqueCode {
 
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof LaJobUniqueCode && uniqueCode.equals(((LaJobUniqueCode) obj).uniqueCode);
+        return obj instanceof LaJobUnique && uniqueCode.equals(((LaJobUnique) obj).uniqueCode);
     }
 
     @Override

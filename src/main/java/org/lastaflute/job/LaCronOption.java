@@ -16,7 +16,7 @@
 package org.lastaflute.job;
 
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.ParamsSupplier;
 
 /**
@@ -28,7 +28,7 @@ public class LaCronOption {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected LaJobUniqueCode uniqueCode;
+    protected LaJobUnique jobUnique;
     protected ParamsSupplier paramsSupplier;
     protected AlreadyExecutingBehavior duplicateExecutingBehavior = AlreadyExecutingBehavior.WAIT;
 
@@ -43,12 +43,12 @@ public class LaCronOption {
         if (uniqueCode == null) {
             throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
         }
-        this.uniqueCode = createUniqueCode(uniqueCode);
+        this.jobUnique = createJobUnique(uniqueCode);
         return this;
     }
 
-    protected LaJobUniqueCode createUniqueCode(String uniqueCode) {
-        return new LaJobUniqueCode(uniqueCode);
+    protected LaJobUnique createJobUnique(String uniqueCode) {
+        return new LaJobUnique(uniqueCode);
     }
 
     public LaCronOption params(ParamsSupplier noArgLambda) {
@@ -74,7 +74,7 @@ public class LaCronOption {
     //                                                                      ==============
     @Override
     public String toString() {
-        final String uniqueExp = uniqueCode != null ? uniqueCode.value() : "noUnique";
+        final String uniqueExp = jobUnique != null ? "hasJobUnique(" + jobUnique + ")" : "noJobUnique";
         final String paramsExp = paramsSupplier != null ? "hasParams" : "noParams";
         return "option:{" + uniqueExp + ", " + paramsExp + ", " + duplicateExecutingBehavior + "}";
     }
@@ -82,8 +82,8 @@ public class LaCronOption {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public OptionalThing<LaJobUniqueCode> getUniqueCode() {
-        return OptionalThing.ofNullable(uniqueCode, () -> {
+    public OptionalThing<LaJobUnique> getJobUnique() {
+        return OptionalThing.ofNullable(jobUnique, () -> {
             throw new IllegalStateException("Not found the application unique code.");
         });
     }

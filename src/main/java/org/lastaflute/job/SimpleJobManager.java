@@ -23,7 +23,7 @@ import javax.annotation.PreDestroy;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.CronConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,10 +99,10 @@ public class SimpleJobManager implements JobManager {
     }
 
     @Override
-    public OptionalThing<LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode) {
-        assertArgumentNotNull("uniqueCode", uniqueCode);
+    public OptionalThing<LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique) {
+        assertArgumentNotNull("jobUnique", jobUnique);
         @SuppressWarnings("unchecked")
-        final OptionalThing<LaScheduledJob> job = (OptionalThing<LaScheduledJob>) schedulingNow.findJobByUniqueCode(uniqueCode);
+        final OptionalThing<LaScheduledJob> job = (OptionalThing<LaScheduledJob>) schedulingNow.findJobByUniqueOf(jobUnique);
         return job;
     }
 
@@ -117,6 +117,11 @@ public class SimpleJobManager implements JobManager {
     public void registerJob(CronConsumer oneArgLambda) {
         assertArgumentNotNull("oneArgLambda", oneArgLambda);
         schedulingNow.registerJob(oneArgLambda);
+    }
+
+    @Override
+    public void clearClosedJob() {
+        schedulingNow.clearClosedJob();
     }
 
     @Override
@@ -140,7 +145,7 @@ public class SimpleJobManager implements JobManager {
             }
 
             @Override
-            public OptionalThing<? extends LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode) {
+            public OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique) {
                 return OptionalThing.empty();
             }
 

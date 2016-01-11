@@ -19,7 +19,7 @@ import java.util.List;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUniqueCode;
+import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.CronConsumer;
 
 /**
@@ -34,11 +34,17 @@ public interface JobManager {
      */
     OptionalThing<LaScheduledJob> findJobByKey(LaJobKey jobKey);
 
-    OptionalThing<LaScheduledJob> findJobByUniqueCode(LaJobUniqueCode uniqueCode);
+    /**
+     * @param jobUnique The value of job unique specified by application. (NotNull)
+     * @return The optional scheduled job, which is unique by job key. (NotNull, EmptyAllowed: when not found)
+     */
+    OptionalThing<LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique);
 
     List<LaScheduledJob> getJobList();
 
     void registerJob(CronConsumer oneArgLambda);
+
+    void clearClosedJob();
 
     void destroySchedule();
 }
