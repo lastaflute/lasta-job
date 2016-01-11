@@ -15,11 +15,14 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.util.List;
+
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaScheduledJob;
+import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
+import org.lastaflute.job.exception.JobNoExecutingNowException;
 
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.Task;
+import it.sauronsoftware.cron4j.TaskExecutor;
 
 /**
  * @author jflute
@@ -32,13 +35,13 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           =========
     protected final String jobKey;
     protected final String cronExp;
-    protected final Task cron4jTask;
-    protected final Scheduler cron4jScheduler;
+    protected final Cron4jTask cron4jTask;
+    protected final Cron4jScheduler cron4jScheduler;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(String jobKey, String cronExp, Task cron4jTask, Scheduler cron4jScheduler) {
+    public Cron4jJob(String jobKey, String cronExp, Cron4jTask cron4jTask, Cron4jScheduler cron4jScheduler) {
         this.jobKey = jobKey;
         this.cronExp = cronExp;
         this.cron4jTask = cron4jTask;
@@ -46,11 +49,40 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     // ===================================================================================
+    //                                                                       Executing Now
+    //                                                                       =============
+    @Override
+    public boolean isExecutingNow() {
+        return !findExecutorList().isEmpty();
+    }
+
+    public List<TaskExecutor> findExecutorList() {
+        return cron4jScheduler.findExecutorList(cron4jTask);
+    }
+
+    // ===================================================================================
     //                                                                          Launch Now
     //                                                                          ==========
     @Override
-    public void launchNow() {
+    public void launchNow() throws JobAlreadyExecutingNowException {
+        if (isExecutingNow()) {
+            throw new JobAlreadyExecutingNowException("Already executing the job now: " + toString());
+        }
+        // if executed by cron here, duplicate execution occurs but task level synchronization exists
         cron4jScheduler.launch(cron4jTask);
+    }
+
+    // ===================================================================================
+    //                                                                            Stop Now
+    //                                                                            ========
+    @Override
+    public void stopNow() throws JobNoExecutingNowException {
+        final List<TaskExecutor> executorList = findExecutorList();
+        if (!executorList.isEmpty()) {
+            executorList.forEach(executor -> executor.stop());
+        } else {
+            throw new JobNoExecutingNowException("No executing the job now: " + toString());
+        }
     }
 
     // ===================================================================================
@@ -58,8 +90,9 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                      ==============
     @Override
     public String toString() {
+        // cron4jTask has cronExp so no use here
         final String hash = Integer.toHexString(hashCode());
-        return DfTypeUtil.toClassTitle(this) + ":{" + jobKey + ", " + cronExp + ", " + cron4jTask + "}@" + hash;
+        return DfTypeUtil.toClassTitle(this) + ":{" + jobKey + ", " + cron4jTask + "}@" + hash;
     }
 
     // ===================================================================================
@@ -75,11 +108,11 @@ public class Cron4jJob implements LaScheduledJob {
         return cronExp;
     }
 
-    public Task getCron4jTask() {
+    public Cron4jTask getCron4jTask() {
         return cron4jTask;
     }
 
-    public Scheduler getCron4jScheduler() {
+    public Cron4jScheduler getCron4jScheduler() {
         return cron4jScheduler;
     }
 }

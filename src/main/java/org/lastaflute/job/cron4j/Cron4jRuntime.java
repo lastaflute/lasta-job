@@ -18,10 +18,13 @@ package org.lastaflute.job.cron4j;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
+import java.util.function.Consumer;
 
+import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
+import org.lastaflute.job.exception.JobStoppedException;
 
 import it.sauronsoftware.cron4j.TaskExecutionContext;
 
@@ -39,6 +42,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final Method runMethod;
     protected final Map<String, Object> parameterMap;
     protected final TaskExecutionContext cron4jContext;
+    protected EndTitleRoll endTitleRollData;
 
     // ===================================================================================
     //                                                                         Constructor
@@ -54,6 +58,20 @@ public class Cron4jRuntime implements LaJobRuntime {
         }
         this.parameterMap = Collections.unmodifiableMap(parameterMap);
         this.cron4jContext = cron4jContext;
+    }
+
+    // ===================================================================================
+    //                                                                            Stop Job
+    //                                                                            ========
+    @Override
+    public void stopIfNeeds() {
+        if (isStopRequested()) {
+            throw new JobStoppedException("Stopped the job: " + toString());
+        }
+    }
+
+    protected boolean isStopRequested() {
+        return cron4jContext.isStopped();
     }
 
     // ===================================================================================
@@ -75,6 +93,32 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     // ===================================================================================
+    //                                                                      End-Title Roll
+    //                                                                      ==============
+    @Override
+    public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
+        assertArgumentNotNull("dataLambda", dataLambda);
+        if (endTitleRollData != null) {
+            String msg = "Already existing end-title roll data: " + endTitleRollData + " runtime=" + toString();
+            throw new IllegalStateException(msg);
+        }
+        endTitleRollData = new EndTitleRoll();
+        dataLambda.accept(endTitleRollData);
+    }
+
+    // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    protected void assertArgumentNotNull(String variableName, Object value) {
+        if (variableName == null) {
+            throw new IllegalArgumentException("The variableName should not be null.");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
+        }
+    }
+
+    // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
     @Override
@@ -92,6 +136,11 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                            Accessor
     //                                                                            ========
     @Override
+    public String getCronExp() {
+        return cronExp;
+    }
+
+    @Override
     public Class<? extends LaJob> getJobType() {
         return jobType;
     }
@@ -101,11 +150,19 @@ public class Cron4jRuntime implements LaJobRuntime {
         return runMethod;
     }
 
+    @Override
     public Map<String, Object> getParameterMap() {
-        return parameterMap;
+        return parameterMap; // already unmodifiable
     }
 
     public TaskExecutionContext getCron4jContext() {
         return cron4jContext;
+    }
+
+    @Override
+    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
+        return OptionalThing.ofNullable(endTitleRollData, () -> {
+            throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
+        });
     }
 }

@@ -153,6 +153,12 @@ public class LaJobRunner {
                 sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
             });
             sb.append(LF).append(" runtime: ").append(runtime);
+            runtime.getEndTitleRoll().ifPresent(roll -> {
+                sb.append(LF).append(" endTitleRoll:");
+                roll.getDataMap().forEach((key, value) -> {
+                    sb.append(LF).append("   ").append(key).append(": ").append(value);
+                });
+            });
             if (cause != null) {
                 sb.append(LF).append(" cause: ").append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
             }

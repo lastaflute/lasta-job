@@ -16,7 +16,12 @@
 package org.lastaflute.job;
 
 import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
+
+import org.dbflute.optional.OptionalThing;
 
 /**
  * @author jflute
@@ -24,15 +29,55 @@ import java.util.Map;
  */
 public interface LaJobRuntime {
 
+    // ===================================================================================
+    //                                                                          Basic Info
+    //                                                                          ==========
+    String getCronExp();
+
     Class<? extends LaJob> getJobType(); // not null
 
     Method getRunMethod(); // not null
 
     Map<String, Object> getParameterMap(); // not null, read-only
 
-    String toCronMethodDisp();
+    // ===================================================================================
+    //                                                                      End-Title Roll
+    //                                                                      ==============
+    OptionalThing<EndTitleRoll> getEndTitleRoll();
 
-    String toMethodDisp();
+    /**
+     * @param dataLambda The callback of end-title roll data for registration. (NotNull)
+     */
+    void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda);
 
-    // #thinking: what kind of methods need?
+    class EndTitleRoll {
+
+        protected final Map<String, Object> dataMap = new LinkedHashMap<String, Object>();
+
+        public void register(String key, Object value) {
+            if (key == null) {
+                throw new IllegalArgumentException("The argument 'key' should not be null.");
+            }
+            if (value == null) {
+                throw new IllegalArgumentException("The argument 'value' should not be null.");
+            }
+            dataMap.put(key, value);
+        }
+
+        public Map<String, Object> getDataMap() {
+            return Collections.unmodifiableMap(dataMap);
+        }
+    }
+
+    // ===================================================================================
+    //                                                                            Stop Job
+    //                                                                            ========
+    void stopIfNeeds(); // exception if stopped
+
+    // ===================================================================================
+    //                                                                             Display
+    //                                                                             =======
+    String toCronMethodDisp(); // not null
+
+    String toMethodDisp(); // not null
 }

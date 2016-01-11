@@ -13,24 +13,17 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job;
-
-import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
-import org.lastaflute.job.exception.JobNoExecutingNowException;
+package org.lastaflute.job.exception;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface LaScheduledJob {
+public class JobAlreadyExecutingNowException extends Exception {
 
-    String getJobKey();
+    private static final long serialVersionUID = 1L;
 
-    String getCronExp();
-
-    boolean isExecutingNow();
-
-    void launchNow() throws JobAlreadyExecutingNowException;
-
-    void stopNow() throws JobNoExecutingNowException;
+    public JobAlreadyExecutingNowException(String msg) {
+        super(msg);
+    }
 }

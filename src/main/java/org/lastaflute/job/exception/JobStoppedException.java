@@ -13,24 +13,19 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job;
+package org.lastaflute.job.exception;
 
-import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
-import org.lastaflute.job.exception.JobNoExecutingNowException;
+import org.lastaflute.core.exception.LaSystemException;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface LaScheduledJob {
+public class JobStoppedException extends LaSystemException { // #thiking treated as system error?
 
-    String getJobKey();
+    private static final long serialVersionUID = 1L;
 
-    String getCronExp();
-
-    boolean isExecutingNow();
-
-    void launchNow() throws JobAlreadyExecutingNowException;
-
-    void stopNow() throws JobNoExecutingNowException;
+    public JobStoppedException(String msg) {
+        super(msg);
+    }
 }

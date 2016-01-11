@@ -24,6 +24,7 @@ import org.lastaflute.di.core.smart.hot.HotdeployUtil;
 import org.lastaflute.di.naming.NamingConvention;
 import org.lastaflute.job.cron4j.Cron4jCron;
 import org.lastaflute.job.cron4j.Cron4jNow;
+import org.lastaflute.job.cron4j.Cron4jScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +54,7 @@ public class LastaJobStarter {
             inject(appScheduler);
             final LaJobRunner jobRunner = appScheduler.createRunner();
             inject(jobRunner);
-            final Scheduler cron4jScheduler = createCron4jScheduler(jobRunner);
+            final Cron4jScheduler cron4jScheduler = createCron4jScheduler(jobRunner);
             final Cron4jNow cron4jNow = createCron4jNow(cron4jScheduler, jobRunner);
             final Cron4jCron cron4jCron = createCron4jCron(cron4jScheduler, jobRunner, cron4jNow);
             appScheduler.schedule(cron4jCron);
@@ -67,7 +68,7 @@ public class LastaJobStarter {
         }
     }
 
-    protected void showBoot(LaJobScheduler scheduler, LaJobRunner jobRunner, Scheduler cron4jScheduler, Cron4jNow cron4jNow) {
+    protected void showBoot(LaJobScheduler scheduler, LaJobRunner jobRunner, Cron4jScheduler cron4jScheduler, Cron4jNow cron4jNow) {
         logger.info("[Job Scheduling]");
         logger.info(" scheduler: {}", scheduler);
         logger.info(" jobRunner: {}", jobRunner);
@@ -110,16 +111,20 @@ public class LastaJobStarter {
     // -----------------------------------------------------
     //                                      Cron4j Scheduler
     //                                      ----------------
-    protected Scheduler createCron4jScheduler(LaJobRunner jobRunner) {
+    protected Cron4jScheduler createCron4jScheduler(LaJobRunner jobRunner) {
+        return new Cron4jScheduler(newNativeScheduler());
+    }
+
+    protected Scheduler newNativeScheduler() {
         return new Scheduler();
     }
 
-    protected Cron4jNow createCron4jNow(Scheduler cron4jScheduler, LaJobRunner jobRunner) {
+    protected Cron4jNow createCron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner) {
         return new Cron4jNow(cron4jScheduler, jobRunner);
     }
 
-    protected Cron4jCron createCron4jCron(Scheduler scheduler, LaJobRunner runner, Cron4jNow cron4jNow) {
-        return new Cron4jCron(scheduler, runner, cron4jNow);
+    protected Cron4jCron createCron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner runner, Cron4jNow cron4jNow) {
+        return new Cron4jCron(cron4jScheduler, runner, cron4jNow);
     }
 
     // -----------------------------------------------------
@@ -152,7 +157,7 @@ public class LastaJobStarter {
     // -----------------------------------------------------
     //                                            Start Cron
     //                                            ----------
-    protected void startCron(Scheduler cron4jScheduler) {
+    protected void startCron(Cron4jScheduler cron4jScheduler) {
         cron4jScheduler.start();
     }
 

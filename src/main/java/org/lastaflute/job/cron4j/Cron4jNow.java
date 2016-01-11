@@ -27,9 +27,6 @@ import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.LaSchedulingNow;
 
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.Task;
-
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
@@ -39,14 +36,15 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Scheduler cron4jScheduler;
+    protected final Cron4jScheduler cron4jScheduler;
     protected final LaJobRunner jobRunner;
-    protected final Map<String, Cron4jJob> cron4jJobMap = new LinkedHashMap<String, Cron4jJob>();
+    protected final Map<String, Cron4jJob> jobKeyJobMap = new LinkedHashMap<String, Cron4jJob>();
+    protected final Map<Cron4jTask, Cron4jJob> taskJobMap = new LinkedHashMap<Cron4jTask, Cron4jJob>();
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jNow(Scheduler cron4jScheduler, LaJobRunner jobRunner) {
+    public Cron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner) {
         this.cron4jScheduler = cron4jScheduler;
         this.jobRunner = jobRunner;
     }
@@ -54,32 +52,43 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                            Save Job
     //                                                                            ========
-    public Cron4jJob saveJob(String jobKey, String cronExp, Task cron4jTask) {
+    public Cron4jJob saveJob(String jobKey, String cronExp, Cron4jTask cron4jTask) {
         final Cron4jJob cron4jJob = createCron4jJob(jobKey, cronExp, cron4jTask);
-        cron4jJobMap.put(jobKey, cron4jJob);
+        jobKeyJobMap.put(jobKey, cron4jJob);
+        taskJobMap.put(cron4jTask, cron4jJob); // task is unique in lasta-job world
         return cron4jJob;
     }
 
-    protected Cron4jJob createCron4jJob(String jobKey, String cronExp, Task cron4jTask) {
+    protected Cron4jJob createCron4jJob(String jobKey, String cronExp, Cron4jTask cron4jTask) {
         return new Cron4jJob(jobKey, cronExp, cron4jTask, cron4jScheduler);
     }
 
     // ===================================================================================
-    //                                                                            Behavior
+    //                                                                            Find Job
     //                                                                            ========
     @Override
     public OptionalThing<LaScheduledJob> findJobByKey(String jobKey) {
-        final Cron4jJob found = cron4jJobMap.get(jobKey);
+        final Cron4jJob found = jobKeyJobMap.get(jobKey);
         return OptionalThing.ofNullable(found, () -> {
-            throw new IllegalStateException("Not found the job by the key: " + jobKey + " existing=" + cron4jJobMap.keySet());
+            throw new IllegalStateException("Not found the job by the key: " + jobKey + " existing=" + jobKeyJobMap.keySet());
+        });
+    }
+
+    public OptionalThing<Cron4jJob> findJobByTask(Cron4jTask task) {
+        final Cron4jJob found = taskJobMap.get(task);
+        return OptionalThing.ofNullable(found, () -> {
+            throw new IllegalStateException("Not found the job by the task: " + task + " existing=" + taskJobMap.keySet());
         });
     }
 
     @Override
     public List<LaScheduledJob> getJobList() {
-        return Collections.unmodifiableList(new ArrayList<LaScheduledJob>(cron4jJobMap.values()));
+        return Collections.unmodifiableList(new ArrayList<LaScheduledJob>(jobKeyJobMap.values()));
     }
 
+    // ===================================================================================
+    //                                                                       Stop Schedule
+    //                                                                       =============
     @Override
     public void stop() {
         cron4jScheduler.stop();
@@ -90,13 +99,13 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                      ==============
     @Override
     public String toString() {
-        return DfTypeUtil.toClassTitle(this) + ":{scheduled=" + cron4jJobMap.size() + "}@" + Integer.toHexString(hashCode());
+        return DfTypeUtil.toClassTitle(this) + ":{scheduled=" + jobKeyJobMap.size() + "}@" + Integer.toHexString(hashCode());
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public Scheduler getCron4jScheduler() {
+    public Cron4jScheduler getCron4jScheduler() {
         return cron4jScheduler;
     }
 
@@ -105,6 +114,6 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     public Map<String, Cron4jJob> getCron4jJobMap() {
-        return cron4jJobMap;
+        return jobKeyJobMap;
     }
 }

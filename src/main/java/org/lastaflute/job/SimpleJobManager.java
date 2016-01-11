@@ -48,7 +48,7 @@ public class SimpleJobManager implements JobManager {
     @PostConstruct
     public synchronized void initialize() {
         new Thread(() -> { // use plain thread for silent asynchronous
-            waitBeforeStartCron();
+            delayBeforeStartCron();
             try {
                 schedulingNow = createStarter().start();
                 showBootLogging();
@@ -58,10 +58,14 @@ public class SimpleJobManager implements JobManager {
         }).start();
     }
 
-    protected void waitBeforeStartCron() {
+    protected void delayBeforeStartCron() {
         try {
-            Thread.sleep(5000L); // delay to wait for finishing application boot
+            Thread.sleep(getStartDelayMillis()); // delay to wait for finishing application boot
         } catch (InterruptedException ignored) {}
+    }
+
+    protected long getStartDelayMillis() {
+        return 5000L;
     }
 
     protected void showBootLogging() {
