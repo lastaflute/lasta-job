@@ -21,8 +21,6 @@ import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyClosedException;
-import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
-import org.lastaflute.job.exception.JobNoExecutingNowException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 
@@ -72,12 +70,9 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          Launch Now
     //                                                                          ==========
     @Override
-    public synchronized void launchNow() throws JobAlreadyClosedException, JobAlreadyExecutingNowException {
+    public synchronized void launchNow() {
         if (closed) {
             throw new JobAlreadyClosedException("Already closed the job: " + toString());
-        }
-        if (isExecutingNow()) {
-            throw new JobAlreadyExecutingNowException("Already executing the job now: " + toString());
         }
         // if executed by cron here, duplicate execution occurs but task level synchronization exists
         cron4jScheduler.launch(cron4jTask);
@@ -87,12 +82,10 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            Stop Now
     //                                                                            ========
     @Override
-    public synchronized void stopNow() throws JobNoExecutingNowException {
+    public synchronized void stopNow() {
         final List<TaskExecutor> executorList = findExecutorList();
         if (!executorList.isEmpty()) {
             executorList.forEach(executor -> executor.stop());
-        } else {
-            throw new JobNoExecutingNowException("No executing the job now: " + toString());
         }
     }
 

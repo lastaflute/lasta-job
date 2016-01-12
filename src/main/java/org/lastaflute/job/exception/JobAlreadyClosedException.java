@@ -15,11 +15,13 @@
  */
 package org.lastaflute.job.exception;
 
+import org.lastaflute.core.exception.LaSystemException;
+
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class JobAlreadyClosedException extends Exception {
+public class JobAlreadyClosedException extends LaSystemException {
 
     private static final long serialVersionUID = 1L;
 

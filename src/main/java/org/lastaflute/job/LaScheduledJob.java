@@ -16,9 +16,6 @@
 package org.lastaflute.job;
 
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.exception.JobAlreadyClosedException;
-import org.lastaflute.job.exception.JobAlreadyExecutingNowException;
-import org.lastaflute.job.exception.JobNoExecutingNowException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 
@@ -36,9 +33,9 @@ public interface LaScheduledJob {
 
     boolean isExecutingNow();
 
-    void launchNow() throws JobAlreadyClosedException, JobAlreadyExecutingNowException;
+    void launchNow();
 
-    void stopNow() throws JobNoExecutingNowException;
+    void stopNow();
 
     void closeNow(); // executing job continues, so call stopNow() before if it needs
 
