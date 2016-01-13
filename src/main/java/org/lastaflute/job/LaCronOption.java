@@ -17,8 +17,8 @@ package org.lastaflute.job;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.NoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
+import org.lastaflute.job.subsidiary.NoticeLogLevel;
 
 /**
  * @author jflute
@@ -31,12 +31,7 @@ public class LaCronOption {
     //                                                                           =========
     protected LaJobUnique jobUnique;
     protected CronParamsSupplier paramsSupplier;
-    protected AlreadyExecutingBehavior duplicateExecutingBehavior = AlreadyExecutingBehavior.WAIT;
     protected NoticeLogLevel noticeLogLevel = NoticeLogLevel.INFO;
-
-    public enum AlreadyExecutingBehavior {
-        WAIT, SILENTLY_QUIT, SYSTEM_EXCEPTION
-    }
 
     // ===================================================================================
     //                                                                              Facade
@@ -61,16 +56,6 @@ public class LaCronOption {
         return this;
     }
 
-    public LaCronOption silentlyQuitIfAlreadyExecuting() {
-        duplicateExecutingBehavior = AlreadyExecutingBehavior.SILENTLY_QUIT;
-        return this;
-    }
-
-    public LaCronOption systemExceptionIfAlreadyExecuting() {
-        duplicateExecutingBehavior = AlreadyExecutingBehavior.SYSTEM_EXCEPTION;
-        return this;
-    }
-
     // -----------------------------------------------------
     //                                      Notice Log Level
     //                                      ----------------
@@ -91,7 +76,7 @@ public class LaCronOption {
     public String toString() {
         final String uniqueExp = jobUnique != null ? "hasJobUnique(" + jobUnique + ")" : "noJobUnique";
         final String paramsExp = paramsSupplier != null ? "hasParams" : "noParams";
-        return "option:{" + uniqueExp + ", " + paramsExp + ", " + duplicateExecutingBehavior + ", " + noticeLogLevel + "}";
+        return "option:{" + uniqueExp + ", " + paramsExp + ", " + noticeLogLevel + "}";
     }
 
     // ===================================================================================
@@ -107,10 +92,6 @@ public class LaCronOption {
         return OptionalThing.ofNullable(paramsSupplier, () -> {
             throw new IllegalStateException("Not found the parameters supplier.");
         });
-    }
-
-    public AlreadyExecutingBehavior getAlreadyExecutingBehavior() {
-        return duplicateExecutingBehavior;
     }
 
     public NoticeLogLevel getNoticeLogLevel() {

@@ -26,7 +26,6 @@ import org.dbflute.helper.HandyDate;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaCronOption;
-import org.lastaflute.job.LaCronOption.AlreadyExecutingBehavior;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
@@ -171,10 +170,6 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return true; // #thiking fixedly true, all right?
     }
 
-    protected synchronized AlreadyExecutingBehavior getAlreadyExecutingBehavior() {
-        return cronOption.getAlreadyExecutingBehavior();
-    }
-
     public synchronized OptionalThing<LaJobUnique> getJobUnique() {
         return cronOption.getJobUnique();
     }
@@ -184,7 +179,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                      ==============
     @Override
     public String toString() {
-        return DfTypeUtil.toClassTitle(this) + ":{" + cronExp + ", " + jobType + ", " + cronOption + "}";
+        final String title = DfTypeUtil.toClassTitle(this);
+        return title + ":{" + cronExp + ", " + jobType + ", " + concurrentExec + ", " + cronOption + "}";
     }
 
     // ===================================================================================
