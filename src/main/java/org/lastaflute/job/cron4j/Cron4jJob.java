@@ -113,7 +113,7 @@ public class Cron4jJob implements LaScheduledJob {
     @Override
     public synchronized void unschedule() {
         cron4jNow.getCron4jScheduler().deschedule(jobKey.value());
-        cron4jNow.clearUnscheduleJob();
+        cron4jNow.clearUnscheduleJob(); // #thinking keep until executing job finished?
         unscheduled = true;
     }
 
