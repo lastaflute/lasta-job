@@ -15,14 +15,14 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import org.lastaflute.job.LaCron;
+import java.util.Map;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
 @FunctionalInterface
-public interface CronConsumer {
+public interface LaCronParamsSupplier {
 
-    void consume(LaCron cron);
+    Map<String, Object> supply();
 }

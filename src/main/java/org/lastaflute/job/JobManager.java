@@ -20,7 +20,7 @@ import java.util.List;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.job.subsidiary.LaCronConsumer;
 
 /**
  * @author jflute
@@ -59,7 +59,7 @@ public interface JobManager {
      * </pre>
      * @param oneArgLambda The callback to consume cron. (NotNull)
      */
-    void registerJob(CronConsumer oneArgLambda);
+    void registerJob(LaCronConsumer oneArgLambda);
 
     /**
      * Clear closed jobs from job list if it exists. <br>

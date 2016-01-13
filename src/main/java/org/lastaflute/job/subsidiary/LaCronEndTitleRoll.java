@@ -15,14 +15,29 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.2.0 (2016/01/13 Wednesday)
  */
-@FunctionalInterface
-public interface ParamsSupplier {
+public class LaCronEndTitleRoll {
 
-    Map<String, Object> supply();
+    protected final Map<String, Object> dataMap = new LinkedHashMap<String, Object>();
+
+    public void register(String key, Object value) {
+        if (key == null) {
+            throw new IllegalArgumentException("The argument 'key' should not be null.");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("The argument 'value' should not be null.");
+        }
+        dataMap.put(key, value);
+    }
+
+    public Map<String, Object> getDataMap() {
+        return Collections.unmodifiableMap(dataMap);
+    }
 }

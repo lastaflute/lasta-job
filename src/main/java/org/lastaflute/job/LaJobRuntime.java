@@ -16,12 +16,12 @@
 package org.lastaflute.job;
 
 import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.subsidiary.LaCronEndTitleRoll;
+import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
 
 /**
  * @author jflute
@@ -32,7 +32,7 @@ public interface LaJobRuntime {
     // ===================================================================================
     //                                                                          Basic Info
     //                                                                          ==========
-    String getCronExp();
+    String getCronExp(); // not null
 
     Class<? extends LaJob> getJobType(); // not null
 
@@ -40,34 +40,17 @@ public interface LaJobRuntime {
 
     Map<String, Object> getParameterMap(); // not null, read-only
 
+    LaCronNoticeLogLevel getNoticeLogLevel(); // not null
+
     // ===================================================================================
     //                                                                      End-Title Roll
     //                                                                      ==============
-    OptionalThing<EndTitleRoll> getEndTitleRoll();
+    OptionalThing<LaCronEndTitleRoll> getEndTitleRoll();
 
     /**
      * @param dataLambda The callback of end-title roll data for registration. (NotNull)
      */
-    void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda);
-
-    class EndTitleRoll {
-
-        protected final Map<String, Object> dataMap = new LinkedHashMap<String, Object>();
-
-        public void register(String key, Object value) {
-            if (key == null) {
-                throw new IllegalArgumentException("The argument 'key' should not be null.");
-            }
-            if (value == null) {
-                throw new IllegalArgumentException("The argument 'value' should not be null.");
-            }
-            dataMap.put(key, value);
-        }
-
-        public Map<String, Object> getDataMap() {
-            return Collections.unmodifiableMap(dataMap);
-        }
-    }
+    void showEndTitleRoll(Consumer<LaCronEndTitleRoll> dataLambda);
 
     // ===================================================================================
     //                                                                            Stop Job

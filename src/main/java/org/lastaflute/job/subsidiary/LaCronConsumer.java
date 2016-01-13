@@ -15,14 +15,14 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import org.lastaflute.job.LaCronOption;
+import org.lastaflute.job.LaCron;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
 @FunctionalInterface
-public interface CronOpCall {
+public interface LaCronConsumer {
 
-    void callback(LaCronOption op);
+    void consume(LaCron cron);
 }

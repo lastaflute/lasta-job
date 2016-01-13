@@ -49,6 +49,7 @@ import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
 import org.lastaflute.di.core.smart.hot.HotdeployLock;
 import org.lastaflute.di.core.smart.hot.HotdeployUtil;
+import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,38 +134,57 @@ public class LaJobRunner {
     //                                                                            Show Job
     //                                                                            ========
     protected long showRunning(LaJobRuntime runtime) {
-        if (logger.isInfoEnabled()) {
-            logger.info("#flow #job ...Running job: {}", runtime.toCronMethodDisp());
+        final LaCronNoticeLogLevel noticeLogLevel = runtime.getNoticeLogLevel();
+        final String msgBase = "#flow #job ...Running job: {}";
+        if (LaCronNoticeLogLevel.INFO.equals(noticeLogLevel)) {
+            if (logger.isInfoEnabled()) {
+                logger.info(msgBase, runtime.toCronMethodDisp());
+            }
+        } else if (LaCronNoticeLogLevel.DEBUG.equals(noticeLogLevel)) {
+            if (logger.isDebugEnabled()) {
+                logger.debug(msgBase, runtime.toCronMethodDisp());
+            }
         }
         return System.currentTimeMillis();
     }
 
     protected void showFinishing(LaJobRuntime runtime, long before, Throwable cause) {
-        if (logger.isInfoEnabled()) {
-            final long after = System.currentTimeMillis();
-            final StringBuilder sb = new StringBuilder();
-            sb.append("#flow #job ...Finishing job: ").append(runtime.toMethodDisp());
-            sb.append(LF).append("[Job Result]");
-            sb.append(LF).append(" performanceView: ").append(toPerformanceView(before, after));
-            extractSqlCount().ifPresent(counter -> {
-                sb.append(LF).append(" sqlCount: ").append(counter.toLineDisp());
-            });
-            extractMailCount().ifPresent(counter -> {
-                sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
-            });
-            sb.append(LF).append(" runtime: ").append(runtime);
-            runtime.getEndTitleRoll().ifPresent(roll -> {
-                sb.append(LF).append(" endTitleRoll:");
-                roll.getDataMap().forEach((key, value) -> {
-                    sb.append(LF).append("   ").append(key).append(": ").append(value);
-                });
-            });
-            if (cause != null) {
-                sb.append(LF).append(" cause: ").append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
+        final LaCronNoticeLogLevel noticeLogLevel = runtime.getNoticeLogLevel();
+        if (LaCronNoticeLogLevel.INFO.equals(noticeLogLevel)) {
+            if (logger.isInfoEnabled()) {
+                logger.info(buildFinishingMsg(runtime, before, cause));
             }
-            sb.append(LF).append(LF); // to separate from job logging
-            logger.info(sb.toString());
+        } else if (LaCronNoticeLogLevel.DEBUG.equals(noticeLogLevel)) {
+            if (logger.isDebugEnabled()) {
+                logger.debug(buildFinishingMsg(runtime, before, cause));
+            }
         }
+    }
+
+    protected String buildFinishingMsg(LaJobRuntime runtime, long before, Throwable cause) {
+        final long after = System.currentTimeMillis();
+        final StringBuilder sb = new StringBuilder();
+        sb.append("#flow #job ...Finishing job: ").append(runtime.toMethodDisp());
+        sb.append(LF).append("[Job Result]");
+        sb.append(LF).append(" performanceView: ").append(toPerformanceView(before, after));
+        extractSqlCount().ifPresent(counter -> {
+            sb.append(LF).append(" sqlCount: ").append(counter.toLineDisp());
+        });
+        extractMailCount().ifPresent(counter -> {
+            sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
+        });
+        sb.append(LF).append(" runtime: ").append(runtime);
+        runtime.getEndTitleRoll().ifPresent(roll -> {
+            sb.append(LF).append(" endTitleRoll:");
+            roll.getDataMap().forEach((key, value) -> {
+                sb.append(LF).append("   ").append(key).append(": ").append(value);
+            });
+        });
+        if (cause != null) {
+            sb.append(LF).append(" cause: ").append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
+        }
+        sb.append(LF).append(LF); // to separate from job logging
+        return sb.toString();
     }
 
     protected String toPerformanceView(long before, long after) {

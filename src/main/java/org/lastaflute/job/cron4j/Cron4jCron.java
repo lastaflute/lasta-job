@@ -21,7 +21,7 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.subsidiary.CronOpCall;
+import org.lastaflute.job.subsidiary.LaCronOpCall;
 
 /**
  * @author jflute
@@ -56,27 +56,27 @@ public class Cron4jCron implements LaCron {
     }
 
     @Override
-    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, CronOpCall opLambda) {
+    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, LaCronOpCall opLambda) {
         assertArgumentNotNull("cronExp", cronExp);
         assertArgumentNotNull("jobType", jobType);
         assertArgumentNotNull("opLambda (cronOptionConsumer)", opLambda);
         return doRegister(cronExp, jobType, opLambda);
     }
 
-    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, CronOpCall opLambda) {
-        final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, createOption(opLambda));
+    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, LaCronOpCall opLambda) {
+        final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, createCronOption(opLambda));
         final String jobKey = cron4jScheduler.schedule(cronExp, cron4jTask);
         return cron4jNow.saveJob(createJobKey(jobKey), cronExp, cron4jTask);
     }
 
-    protected LaCronOption createOption(CronOpCall opLambda) {
+    protected LaCronOption createCronOption(LaCronOpCall opLambda) {
         final LaCronOption option = new LaCronOption();
         opLambda.callback(option);
         return option;
     }
 
-    protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, LaCronOption option) {
-        return new Cron4jTask(cronExp, jobType, option, jobRunner, cron4jNow); // adapter task
+    protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, LaCronOption cronOption) {
+        return new Cron4jTask(cronExp, jobType, cronOption, jobRunner, cron4jNow); // adapter task
     }
 
     protected LaJobKey createJobKey(String jobKey) {

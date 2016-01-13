@@ -22,9 +22,12 @@ import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
+import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.exception.JobStoppedException;
+import org.lastaflute.job.subsidiary.LaCronEndTitleRoll;
+import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
 
 import it.sauronsoftware.cron4j.TaskExecutionContext;
 
@@ -41,13 +44,14 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final Class<? extends LaJob> jobType;
     protected final Method runMethod;
     protected final Map<String, Object> parameterMap;
+    protected final LaCronOption cronOption;
     protected final TaskExecutionContext cron4jContext;
-    protected EndTitleRoll endTitleRollData;
+    protected LaCronEndTitleRoll endTitleRollData;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap,
+    public Cron4jRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap, LaCronOption cronOption,
             TaskExecutionContext cron4jContext) {
         this.cronExp = cronExp;
         this.jobType = jobType;
@@ -57,6 +61,7 @@ public class Cron4jRuntime implements LaJobRuntime {
             throw new IllegalStateException("Not found the run method in the job: " + jobType, e);
         }
         this.parameterMap = Collections.unmodifiableMap(parameterMap);
+        this.cronOption = cronOption;
         this.cron4jContext = cron4jContext;
     }
 
@@ -96,13 +101,13 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                      End-Title Roll
     //                                                                      ==============
     @Override
-    public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
+    public void showEndTitleRoll(Consumer<LaCronEndTitleRoll> dataLambda) {
         assertArgumentNotNull("dataLambda", dataLambda);
         if (endTitleRollData != null) {
             String msg = "Already existing end-title roll data: " + endTitleRollData + " runtime=" + toString();
             throw new IllegalStateException(msg);
         }
-        endTitleRollData = new EndTitleRoll();
+        endTitleRollData = new LaCronEndTitleRoll();
         dataLambda.accept(endTitleRollData);
     }
 
@@ -155,12 +160,21 @@ public class Cron4jRuntime implements LaJobRuntime {
         return parameterMap; // already unmodifiable
     }
 
-    public TaskExecutionContext getCron4jContext() {
+    @Override
+    public LaCronNoticeLogLevel getNoticeLogLevel() {
+        return cronOption.getNoticeLogLevel();
+    }
+
+    public LaCronOption getCronOption() { // not interface method because of mutable
+        return cronOption;
+    }
+
+    public TaskExecutionContext getCron4jContext() { // not interface method because of cron4j's one 
         return cron4jContext;
     }
 
     @Override
-    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
+    public OptionalThing<LaCronEndTitleRoll> getEndTitleRoll() {
         return OptionalThing.ofNullable(endTitleRollData, () -> {
             throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
         });

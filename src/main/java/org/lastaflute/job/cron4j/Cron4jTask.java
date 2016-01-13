@@ -54,17 +54,17 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                           =========
     protected final String cronExp;
     protected final Class<? extends LaJob> jobType;
-    protected final LaCronOption option;
+    protected final LaCronOption cronOption;
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(String cronExp, Class<? extends LaJob> jobType, LaCronOption option, LaJobRunner jobRunner, Cron4jNow cron4jNow) {
+    public Cron4jTask(String cronExp, Class<? extends LaJob> jobType, LaCronOption cronOption, LaJobRunner jobRunner, Cron4jNow cron4jNow) {
         this.cronExp = cronExp;
         this.jobType = jobType;
-        this.option = option;
+        this.cronOption = cronOption;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
     }
@@ -77,7 +77,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final Cron4jJob job = findJob();
         final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
         if (executorList.size() >= 2) { // other executions of same task exist
-            final AlreadyExecutingBehavior executingBehavior = option.getAlreadyExecutingBehavior();
+            final AlreadyExecutingBehavior executingBehavior = cronOption.getAlreadyExecutingBehavior();
             if (executingBehavior.equals(AlreadyExecutingBehavior.SILENTLY_QUIT)) {
                 noticeSilentlyQuit(job, executorList);
                 return;
@@ -133,11 +133,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected Cron4jRuntime createCron4jRuntime(TaskExecutionContext cron4jContext) {
-        return new Cron4jRuntime(cronExp, jobType, extractParameterMap(), cron4jContext);
+        return new Cron4jRuntime(cronExp, jobType, extractParameterMap(), cronOption, cron4jContext);
     }
 
     protected Map<String, Object> extractParameterMap() {
-        return option.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
+        return cronOption.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
     }
 
     // ===================================================================================
@@ -149,7 +149,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     public OptionalThing<LaJobUnique> getJobUnique() {
-        return option.getJobUnique();
+        return cronOption.getJobUnique();
     }
 
     // ===================================================================================
@@ -157,6 +157,6 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                      ==============
     @Override
     public String toString() {
-        return DfTypeUtil.toClassTitle(this) + ":{" + cronExp + ", " + jobType + ", " + option + "}";
+        return DfTypeUtil.toClassTitle(this) + ":{" + cronExp + ", " + jobType + ", " + cronOption + "}";
     }
 }

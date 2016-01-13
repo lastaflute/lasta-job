@@ -39,19 +39,18 @@ public class Cron4jJob implements LaScheduledJob {
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected final String cronExp;
     protected final Cron4jTask cron4jTask;
-    protected final Cron4jScheduler cron4jScheduler;
+    protected final Cron4jNow cron4jNow;
     protected volatile boolean closed;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, String cronExp, Cron4jTask cron4jTask,
-            Cron4jScheduler cron4jScheduler) {
+    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, String cronExp, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
         this.jobKey = jobKey;
         this.jobUnique = jobUnique;
         this.cronExp = cronExp;
         this.cron4jTask = cron4jTask;
-        this.cron4jScheduler = cron4jScheduler;
+        this.cron4jNow = cron4jNow;
     }
 
     // ===================================================================================
@@ -63,7 +62,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     public List<TaskExecutor> findExecutorList() {
-        return cron4jScheduler.findExecutorList(cron4jTask);
+        return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
     }
 
     // ===================================================================================
@@ -75,7 +74,7 @@ public class Cron4jJob implements LaScheduledJob {
             throw new JobAlreadyClosedException("Already closed the job: " + toString());
         }
         // if executed by cron here, duplicate execution occurs but task level synchronization exists
-        cron4jScheduler.launch(cron4jTask);
+        cron4jNow.getCron4jScheduler().launch(cron4jTask);
     }
 
     // ===================================================================================
@@ -94,7 +93,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           =========
     @Override
     public synchronized void closeNow() {
-        cron4jScheduler.deschedule(jobKey.value());
+        cron4jNow.getCron4jScheduler().deschedule(jobKey.value());
         closed = true;
     }
 
@@ -134,9 +133,5 @@ public class Cron4jJob implements LaScheduledJob {
 
     public Cron4jTask getCron4jTask() {
         return cron4jTask;
-    }
-
-    public Cron4jScheduler getCron4jScheduler() {
-        return cron4jScheduler;
     }
 }

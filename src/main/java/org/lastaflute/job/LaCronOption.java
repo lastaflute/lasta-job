@@ -17,7 +17,8 @@ package org.lastaflute.job;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.ParamsSupplier;
+import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
+import org.lastaflute.job.subsidiary.LaCronParamsSupplier;
 
 /**
  * @author jflute
@@ -29,8 +30,9 @@ public class LaCronOption {
     //                                                                           Attribute
     //                                                                           =========
     protected LaJobUnique jobUnique;
-    protected ParamsSupplier paramsSupplier;
+    protected LaCronParamsSupplier paramsSupplier;
     protected AlreadyExecutingBehavior duplicateExecutingBehavior = AlreadyExecutingBehavior.WAIT;
+    protected LaCronNoticeLogLevel noticeLogLevel = LaCronNoticeLogLevel.INFO;
 
     public enum AlreadyExecutingBehavior {
         WAIT, SILENTLY_QUIT, SYSTEM_EXCEPTION
@@ -51,7 +53,7 @@ public class LaCronOption {
         return new LaJobUnique(uniqueCode);
     }
 
-    public LaCronOption params(ParamsSupplier noArgLambda) {
+    public LaCronOption params(LaCronParamsSupplier noArgLambda) {
         if (noArgLambda == null) {
             throw new IllegalArgumentException("The argument 'noArgLambda' should not be null.");
         }
@@ -69,6 +71,19 @@ public class LaCronOption {
         return this;
     }
 
+    // -----------------------------------------------------
+    //                                      Notice Log Level
+    //                                      ----------------
+    public LaCronOption changeNoticeLogToDebug() {
+        noticeLogLevel = LaCronNoticeLogLevel.DEBUG;
+        return this;
+    }
+
+    public LaCronOption changeNoticeLogToSuppressed() {
+        noticeLogLevel = LaCronNoticeLogLevel.SUPPRESSED;
+        return this;
+    }
+
     // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
@@ -76,7 +91,7 @@ public class LaCronOption {
     public String toString() {
         final String uniqueExp = jobUnique != null ? "hasJobUnique(" + jobUnique + ")" : "noJobUnique";
         final String paramsExp = paramsSupplier != null ? "hasParams" : "noParams";
-        return "option:{" + uniqueExp + ", " + paramsExp + ", " + duplicateExecutingBehavior + "}";
+        return "option:{" + uniqueExp + ", " + paramsExp + ", " + duplicateExecutingBehavior + ", " + noticeLogLevel + "}";
     }
 
     // ===================================================================================
@@ -88,7 +103,7 @@ public class LaCronOption {
         });
     }
 
-    public OptionalThing<ParamsSupplier> getParamsSupplier() {
+    public OptionalThing<LaCronParamsSupplier> getParamsSupplier() {
         return OptionalThing.ofNullable(paramsSupplier, () -> {
             throw new IllegalStateException("Not found the parameters supplier.");
         });
@@ -96,5 +111,9 @@ public class LaCronOption {
 
     public AlreadyExecutingBehavior getAlreadyExecutingBehavior() {
         return duplicateExecutingBehavior;
+    }
+
+    public LaCronNoticeLogLevel getNoticeLogLevel() {
+        return noticeLogLevel;
     }
 }

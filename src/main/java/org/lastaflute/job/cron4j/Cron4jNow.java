@@ -27,7 +27,7 @@ import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaSchedulingNow;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.job.subsidiary.LaCronConsumer;
 
 /**
  * @author jflute
@@ -71,7 +71,7 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     protected Cron4jJob createCron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, String cronExp, Cron4jTask cron4jTask) {
-        return new Cron4jJob(jobKey, jobUnique, cronExp, cron4jTask, cron4jScheduler);
+        return new Cron4jJob(jobKey, jobUnique, cronExp, cron4jTask, this);
     }
 
     protected void assertDuplicateJobKey(LaJobKey jobKey) {
@@ -138,7 +138,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                        Register Job
     //                                                                        ============
     @Override
-    public synchronized void registerJob(CronConsumer oneArgLambda) {
+    public synchronized void registerJob(LaCronConsumer oneArgLambda) {
         assertArgumentNotNull("oneArgLambda", oneArgLambda);
         oneArgLambda.consume(createCron4jCron());
     }
