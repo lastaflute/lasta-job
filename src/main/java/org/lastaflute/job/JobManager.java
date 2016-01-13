@@ -53,7 +53,7 @@ public interface JobManager {
     /**
      * Schedule new job while scheduler is active.
      * <pre>
-     * jobManager.registerJob(cron -&gt; {
+     * jobManager.schedule(cron -&gt; {
      *     cron.register("* * * * *", SeaJob.class);
      * });
      * </pre>
