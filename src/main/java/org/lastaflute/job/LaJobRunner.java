@@ -49,6 +49,7 @@ import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
 import org.lastaflute.di.core.smart.hot.HotdeployLock;
 import org.lastaflute.di.core.smart.hot.HotdeployUtil;
+import org.lastaflute.job.subsidiary.LaCronNoticeLogHook;
 import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,18 +71,35 @@ public class LaJobRunner {
     //                                                                           Attribute
     //                                                                           =========
     protected AccessContextArranger accessContextArranger; // null allowed, option
+    protected LaCronNoticeLogHook noticeLogHook;
 
     @Resource
     private ExceptionTranslator exceptionTranslator;
 
     // ===================================================================================
-    //                                                                         Constructor
-    //                                                                         ===========
-    public LaJobRunner useAccessContext(AccessContextArranger oneArgLambda) {
+    //                                                                              Option
+    //                                                                              ======
+    /**
+     * @param oneArgLambda The callback of arranger for access contect of DBFlute. (NotNull)
+     * @return this. (NotNull)
+     */
+    public LaJobRunner useAccessContext(AccessContextArranger oneArgLambda) { // almost required if DBFlute
         if (oneArgLambda == null) {
             throw new IllegalArgumentException("The argument 'oneArgLambda' (accessContextArranger) should not be null.");
         }
         this.accessContextArranger = oneArgLambda;
+        return this;
+    }
+
+    /**
+     * @param noticeLogHook The callback of notice log hook for e.g. saving to database. (NotNull)
+     * @return this. (NotNull)
+     */
+    public LaJobRunner useNoticeLogHook(LaCronNoticeLogHook noticeLogHook) { // almost required if DBFlute
+        if (noticeLogHook == null) {
+            throw new IllegalArgumentException("The argument 'noticeLogHook' should not be null.");
+        }
+        this.noticeLogHook = noticeLogHook;
         return this;
     }
 
@@ -134,30 +152,31 @@ public class LaJobRunner {
     //                                                                            Show Job
     //                                                                            ========
     protected long showRunning(LaJobRuntime runtime) {
+        // no use enabled determination to be simple
+        final String msg = "#flow #job ...Running job: " + runtime.toCronMethodDisp();
         final LaCronNoticeLogLevel noticeLogLevel = runtime.getNoticeLogLevel();
-        final String msgBase = "#flow #job ...Running job: {}";
         if (LaCronNoticeLogLevel.INFO.equals(noticeLogLevel)) {
-            if (logger.isInfoEnabled()) {
-                logger.info(msgBase, runtime.toCronMethodDisp());
-            }
+            logger.info(msg);
         } else if (LaCronNoticeLogLevel.DEBUG.equals(noticeLogLevel)) {
-            if (logger.isDebugEnabled()) {
-                logger.debug(msgBase, runtime.toCronMethodDisp());
-            }
+            logger.debug(msg);
+        }
+        if (noticeLogHook != null) {
+            noticeLogHook.hookRunning(runtime, msg);
         }
         return System.currentTimeMillis();
+
     }
 
     protected void showFinishing(LaJobRuntime runtime, long before, Throwable cause) {
+        final String msg = buildFinishingMsg(runtime, before, cause); // also no use enabled
         final LaCronNoticeLogLevel noticeLogLevel = runtime.getNoticeLogLevel();
+        if (noticeLogHook != null) {
+            noticeLogHook.hookFinishing(runtime, msg);
+        }
         if (LaCronNoticeLogLevel.INFO.equals(noticeLogLevel)) {
-            if (logger.isInfoEnabled()) {
-                logger.info(buildFinishingMsg(runtime, before, cause));
-            }
+            logger.info(msg);
         } else if (LaCronNoticeLogLevel.DEBUG.equals(noticeLogLevel)) {
-            if (logger.isDebugEnabled()) {
-                logger.debug(buildFinishingMsg(runtime, before, cause));
-            }
+            logger.debug(msg);
         }
     }
 
