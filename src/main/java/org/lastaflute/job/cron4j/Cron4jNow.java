@@ -137,7 +137,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                        Register Job
     //                                                                        ============
     @Override
-    public synchronized void registerJob(LaCronConsumer oneArgLambda) {
+    public synchronized void schedule(LaCronConsumer oneArgLambda) {
         assertArgumentNotNull("oneArgLambda", oneArgLambda);
         oneArgLambda.consume(createCron4jCron());
     }
@@ -164,7 +164,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                    Destroy Schedule
     //                                                                    ================
     @Override
-    public synchronized void destroySchedule() {
+    public synchronized void destroy() {
         cron4jScheduler.stop();
     }
 

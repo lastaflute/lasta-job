@@ -80,14 +80,6 @@ public class SimpleJobManager implements JobManager {
     }
 
     // ===================================================================================
-    //                                                                             Destroy
-    //                                                                             =======
-    @PreDestroy
-    public synchronized void destroy() {
-        destroySchedule();
-    }
-
-    // ===================================================================================
     //                                                                         Control Job
     //                                                                         ===========
     @Override
@@ -114,14 +106,18 @@ public class SimpleJobManager implements JobManager {
     }
 
     @Override
-    public void registerJob(LaCronConsumer oneArgLambda) {
+    public void schedule(LaCronConsumer oneArgLambda) {
         assertArgumentNotNull("oneArgLambda", oneArgLambda);
-        schedulingNow.registerJob(oneArgLambda);
+        schedulingNow.schedule(oneArgLambda);
     }
 
+    // ===================================================================================
+    //                                                                             Destroy
+    //                                                                             =======
+    @PreDestroy
     @Override
-    public synchronized void destroySchedule() {
-        schedulingNow.destroySchedule();
+    public synchronized void destroy() {
+        schedulingNow.destroy();
     }
 
     // ===================================================================================
@@ -150,11 +146,11 @@ public class SimpleJobManager implements JobManager {
             }
 
             @Override
-            public void registerJob(LaCronConsumer oneArgLambda) {
+            public void schedule(LaCronConsumer oneArgLambda) {
             }
 
             @Override
-            public void destroySchedule() {
+            public void destroy() {
             }
         };
     }

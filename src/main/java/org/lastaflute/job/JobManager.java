@@ -51,7 +51,7 @@ public interface JobManager {
     List<LaScheduledJob> getJobList();
 
     /**
-     * Register new job while scheduler is active.
+     * Schedule new job while scheduler is active.
      * <pre>
      * jobManager.registerJob(cron -&gt; {
      *     cron.register("* * * * *", SeaJob.class);
@@ -59,11 +59,12 @@ public interface JobManager {
      * </pre>
      * @param oneArgLambda The callback to consume cron. (NotNull)
      */
-    void registerJob(LaCronConsumer oneArgLambda);
+    void schedule(LaCronConsumer oneArgLambda);
 
     /**
      * (Dangrous!) Destory registered schedule in framework, that means all jobs and crons. <br>
-     * It requests stop to executing jobs and delete cron and delete scheduler completely.
+     * It requests stop to executing jobs and delete cron and delete scheduler completely. <br>
+     * This is automatically called when application is closed.
      */
-    void destroySchedule();
+    void destroy();
 }

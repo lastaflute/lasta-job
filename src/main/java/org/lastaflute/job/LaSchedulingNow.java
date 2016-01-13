@@ -34,7 +34,7 @@ public interface LaSchedulingNow {
 
     List<? extends LaScheduledJob> getJobList();
 
-    void registerJob(LaCronConsumer oneArgLambda);
+    void schedule(LaCronConsumer oneArgLambda);
 
-    void destroySchedule();
+    void destroy();
 }
