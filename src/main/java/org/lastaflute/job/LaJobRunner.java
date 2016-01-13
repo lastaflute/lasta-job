@@ -48,7 +48,6 @@ import org.lastaflute.db.dbflute.callbackcontext.RomanticTraceableSqlResultHandl
 import org.lastaflute.db.dbflute.callbackcontext.RomanticTraceableSqlStringFilter;
 import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
-import org.lastaflute.di.core.smart.hot.HotdeployLock;
 import org.lastaflute.job.subsidiary.NoticeLogHook;
 import org.lastaflute.job.subsidiary.NoticeLogLevel;
 import org.slf4j.Logger;
@@ -110,13 +109,13 @@ public class LaJobRunner {
         if (!ManagedHotdeploy.isHotdeploy()) { // e.g. production, unit-test
             doRun(jobType, runtimeSupplier);
         }
-        synchronized (HotdeployLock.class) { // #thiking: cannot hotdeploy, why?
-            ManagedHotdeploy.start();
-            try {
-                doRun(jobType, runtimeSupplier);
-            } finally {
-                ManagedHotdeploy.stop();
-            }
+        // no synchronization here because allow web and job to be executed concurrently
+        //synchronized (HotdeployLock.class) {
+        ManagedHotdeploy.start(); // #thiking: cannot hotdeploy, why?
+        try {
+            doRun(jobType, runtimeSupplier);
+        } finally {
+            ManagedHotdeploy.stop();
         }
     }
 

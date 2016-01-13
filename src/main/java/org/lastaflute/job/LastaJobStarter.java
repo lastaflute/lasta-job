@@ -18,6 +18,7 @@ package org.lastaflute.job;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.util.DfReflectionUtil;
 import org.lastaflute.core.smartdeploy.ManagedHotdeploy;
 import org.lastaflute.core.util.ContainerUtil;
@@ -25,6 +26,8 @@ import org.lastaflute.di.naming.NamingConvention;
 import org.lastaflute.job.cron4j.Cron4jCron;
 import org.lastaflute.job.cron4j.Cron4jNow;
 import org.lastaflute.job.cron4j.Cron4jScheduler;
+import org.lastaflute.job.exception.JobSchedulerNoInterfaceException;
+import org.lastaflute.job.exception.JobSchedulerNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,11 +103,44 @@ public class LastaJobStarter {
             schedulerList.add(scheduler);
         }
         if (schedulerList.isEmpty()) {
-            throw new IllegalStateException("Not found the scheduler object: " + derivedNameList);
+            throwJobSchedulerNotFoundException(derivedNameList);
         } else if (schedulerList.size() >= 2) {
             throw new IllegalStateException("Duplicate scheduler object: " + schedulerList);
         }
         return schedulerList.get(0);
+    }
+
+    protected void throwJobSchedulerNotFoundException(List<String> derivedNameList) {
+        final String pureName = getSchedulerPureName();
+        final String interfaceName = LaJobScheduler.class.getSimpleName();
+        final ExceptionMessageBuilder br = new ExceptionMessageBuilder();
+        br.addNotice("Not found the job scheduler for your application.");
+        br.addItem("Advice");
+        br.addElement(pureName + " class is needed for job scheduling,");
+        br.addElement("which implements " + interfaceName + ".");
+        br.addElement("For example:");
+        br.addElement("  app");
+        br.addElement("   |-job");
+        br.addElement("   |  |-" + pureName + " // Good");
+        br.addElement("   |  |-SeaJob");
+        br.addElement("   |  |-LandJob");
+        br.addElement("   |-logic");
+        br.addElement("   |-web");
+        br.addElement("   |  |-...");
+        br.addElement("");
+        br.addElement("  public class " + pureName + " implements " + interfaceName + " {");
+        br.addElement("");
+        br.addElement("      @Override");
+        br.addElement("      public void schedule(" + LaCron.class.getSimpleName() + " cron) {");
+        br.addElement("          ...");
+        br.addElement("      }");
+        br.addElement("  }");
+        br.addItem("Expected Class");
+        for (String derivedName : derivedNameList) {
+            br.addElement(derivedName);
+        }
+        final String msg = br.buildExceptionMessage();
+        throw new JobSchedulerNotFoundException(msg);
     }
 
     // -----------------------------------------------------
@@ -148,9 +184,30 @@ public class LastaJobStarter {
     protected LaJobScheduler createScheduler(Class<?> schedulingType) {
         final Object schedulerObj = DfReflectionUtil.newInstance(schedulingType);
         if (!(schedulerObj instanceof LaJobScheduler)) {
-            throw new IllegalStateException("Your scheduler should implement LaScheduler: " + schedulerObj);
+            throwJobSchedulerNoInterfaceException(schedulerObj);
         }
         return (LaJobScheduler) schedulerObj;
+    }
+
+    protected void throwJobSchedulerNoInterfaceException(Object schedulerObj) {
+        final String pureName = getSchedulerPureName();
+        final String interfaceName = LaJobScheduler.class.getSimpleName();
+        final ExceptionMessageBuilder br = new ExceptionMessageBuilder();
+        br.addNotice("You job scheduler does not implement the interface.");
+        br.addItem("Advice");
+        br.addElement(pureName + " class should implement " + interfaceName + ".");
+        br.addElement("For example:");
+        br.addElement("  public class " + pureName + " implements " + interfaceName + " { // Good");
+        br.addElement("");
+        br.addElement("      @Override");
+        br.addElement("      public void schedule(" + LaCron.class.getSimpleName() + " cron) {");
+        br.addElement("          ...");
+        br.addElement("      }");
+        br.addElement("  }");
+        br.addItem("Job Scheduler");
+        br.addElement(schedulerObj);
+        final String msg = br.buildExceptionMessage();
+        throw new JobSchedulerNoInterfaceException(msg);
     }
 
     // -----------------------------------------------------
