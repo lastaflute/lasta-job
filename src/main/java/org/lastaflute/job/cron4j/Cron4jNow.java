@@ -150,12 +150,10 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                          Closed Job
     //                                                                          ==========
     /**
-     * Clear closed jobs from job list if it exists. <br>
-     * You can close job by job's closeNow(), but the job remains in job list yet. <br>
-     * So you can completely delete the job by this method.
+     * Clear unschedule jobs from job list if it exists.
      */
-    public synchronized void clearClosedJob() {
-        getCron4jJobList().stream().filter(job -> job.isClosed()).forEach(job -> {
+    public synchronized void clearUnscheduleJob() {
+        getCron4jJobList().stream().filter(job -> job.isUnscheduled()).forEach(job -> {
             jobKeyJobMap.remove(job.getJobKey());
             job.getJobUnique().ifPresent(jobUnique -> jobUniqueJobMap.remove(jobUnique));
             cron4jTaskJobMap.remove(job.getCron4jTask());

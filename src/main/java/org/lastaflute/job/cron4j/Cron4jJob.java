@@ -22,7 +22,7 @@ import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaScheduledJob;
-import org.lastaflute.job.exception.JobAlreadyClosedException;
+import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.LaCronOpCall;
@@ -42,7 +42,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected final Cron4jTask cron4jTask;
     protected final Cron4jNow cron4jNow;
-    protected volatile boolean closed;
+    protected volatile boolean unscheduled;
 
     // ===================================================================================
     //                                                                         Constructor
@@ -71,8 +71,8 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void launchNow() {
-        if (closed) {
-            throw new JobAlreadyClosedException("Already closed the job: " + toString());
+        if (unscheduled) {
+            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
         // if executed by cron here, duplicate execution occurs but task level synchronization exists
         cron4jNow.getCron4jScheduler().launch(cron4jTask);
@@ -94,6 +94,9 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void reschedule(String cronExp, LaCronOpCall opLambda) {
+        if (unscheduled) {
+            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
+        }
         cron4jTask.switchCron(cronExp, createCronOption(opLambda));
         cron4jNow.getCron4jScheduler().reschedule(jobKey.value(), cronExp);
     }
@@ -105,18 +108,18 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     // ===================================================================================
-    //                                                                           Close Now
-    //                                                                           =========
+    //                                                                          Unschedule
+    //                                                                          ==========
     @Override
-    public synchronized void closeNow() {
+    public synchronized void unschedule() {
         cron4jNow.getCron4jScheduler().deschedule(jobKey.value());
-        cron4jNow.clearClosedJob();
-        closed = true;
+        cron4jNow.clearUnscheduleJob();
+        unscheduled = true;
     }
 
     @Override
-    public boolean isClosed() {
-        return closed;
+    public boolean isUnscheduled() {
+        return unscheduled;
     }
 
     // ===================================================================================
