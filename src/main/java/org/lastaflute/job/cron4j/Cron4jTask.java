@@ -52,9 +52,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final String cronExp;
+    protected String cronExp; // can be updated
     protected final Class<? extends LaJob> jobType;
-    protected final LaCronOption cronOption;
+    protected LaCronOption cronOption; // can be updated
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
 
@@ -70,6 +70,14 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     // ===================================================================================
+    //                                                                              Switch
+    //                                                                              ======
+    public synchronized void switchCron(String cronExp, LaCronOption cronOption) {
+        this.cronExp = cronExp;
+        this.cronOption = cronOption;
+    }
+
+    // ===================================================================================
     //                                                                             Execute
     //                                                                             =======
     @Override
@@ -77,7 +85,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final Cron4jJob job = findJob();
         final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
         if (executorList.size() >= 2) { // other executions of same task exist
-            final AlreadyExecutingBehavior executingBehavior = cronOption.getAlreadyExecutingBehavior();
+            final AlreadyExecutingBehavior executingBehavior = getAlreadyExecutingBehavior();
             if (executingBehavior.equals(AlreadyExecutingBehavior.SILENTLY_QUIT)) {
                 noticeSilentlyQuit(job, executorList);
                 return;
@@ -95,12 +103,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return cron4jNow.findJobByTask(this).get();
     }
 
-    protected void noticeSilentlyQuit(final Cron4jJob job, final List<TaskExecutor> executorList) {
+    protected void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) {
         final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
         logger.info("...Quitting the job because of already existing job: " + job + " startTimes=" + startTimeList);
     }
 
-    protected void throwJobAlreadyExecutingSystemException(final Cron4jJob job, final List<TaskExecutor> executorList) {
+    protected void throwJobAlreadyExecutingSystemException(Cron4jJob job, List<TaskExecutor> executorList) {
         final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
         throw new JobAlreadyExecutingSystemException("Already executing the job: " + job + " startTimes=" + startTimeList);
     }
@@ -115,17 +123,23 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                             Executing
     //                                             ---------
-    protected void doExecute(TaskExecutionContext context) {
+    protected void doExecute(TaskExecutionContext context) { // in synchronized world
         adjustThreadNameIfNeeds();
         runJob(context);
     }
 
     protected void adjustThreadNameIfNeeds() { // because of too long name of cron4j
         final Thread currentThread = Thread.currentThread();
-        final String adjustedName = "cron4j_" + Integer.toHexString(currentThread.hashCode());
+        final String adjustedName = buildThreadName(currentThread);
         if (!adjustedName.equals(currentThread.getName())) { // first time
             currentThread.setName(adjustedName);
         }
+    }
+
+    protected String buildThreadName(Thread currentThread) {
+        return "job_" + cronOption.getJobUnique().map(uq -> uq.value()).orElseGet(() -> {
+            return Integer.toHexString(currentThread.hashCode());
+        });
     }
 
     protected void runJob(TaskExecutionContext cron4jContext) {
@@ -148,7 +162,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return true; // #thiking fixedly true, all right?
     }
 
-    public OptionalThing<LaJobUnique> getJobUnique() {
+    protected synchronized AlreadyExecutingBehavior getAlreadyExecutingBehavior() {
+        return cronOption.getAlreadyExecutingBehavior();
+    }
+
+    public synchronized OptionalThing<LaJobUnique> getJobUnique() {
         return cronOption.getJobUnique();
     }
 
