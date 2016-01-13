@@ -15,7 +15,8 @@
  */
 package org.lastaflute.job;
 
-import org.lastaflute.job.subsidiary.LaCronOpCall;
+import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.CronOpCall;
 
 /**
  * @author jflute
@@ -26,23 +27,25 @@ public interface LaCron {
     /**
      * Register job with scheduling.
      * <pre>
-     * cron.register("* * * * *", SeaJob.class); // per one minute
+     * cron.register("* * * * *", SeaJob.class, waitIfDuplicate()); // per one minute
      * </pre>
      * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
      * @param jobType The type of registered job that implements the provided interface. (NotNull)
+     * @param concurrentExec The handling type when concurrent execution of same job. (NotNull)
      * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType);
+    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec);
 
     /**
      * Register job with scheduling with option.
      * <pre>
-     * cron.register("* * * * *", SeaJob.class, op -&gt; op.params(...)); // per one minute
+     * cron.register("* * * * *", SeaJob.class, waitIfDuplicate(), op -&gt; op.params(...)); // per one minute
      * </pre>
      * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
      * @param jobType The type of registered job that implements the provided interface. (NotNull)
+     * @param concurrentExec The handling type when concurrent execution of same job. (NotNull)
      * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
      * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, LaCronOpCall opLambda);
+    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, CronOpCall opLambda);
 }

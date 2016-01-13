@@ -26,8 +26,8 @@ import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.exception.JobStoppedException;
-import org.lastaflute.job.subsidiary.LaCronEndTitleRoll;
-import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
+import org.lastaflute.job.subsidiary.EndTitleRoll;
+import org.lastaflute.job.subsidiary.NoticeLogLevel;
 
 import it.sauronsoftware.cron4j.TaskExecutionContext;
 
@@ -46,7 +46,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final Map<String, Object> parameterMap;
     protected final LaCronOption cronOption;
     protected final TaskExecutionContext cron4jContext;
-    protected LaCronEndTitleRoll endTitleRollData;
+    protected EndTitleRoll endTitleRollData;
 
     // ===================================================================================
     //                                                                         Constructor
@@ -101,13 +101,13 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                      End-Title Roll
     //                                                                      ==============
     @Override
-    public void showEndTitleRoll(Consumer<LaCronEndTitleRoll> dataLambda) {
+    public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
         assertArgumentNotNull("dataLambda", dataLambda);
         if (endTitleRollData != null) {
             String msg = "Already existing end-title roll data: " + endTitleRollData + " runtime=" + toString();
             throw new IllegalStateException(msg);
         }
-        endTitleRollData = new LaCronEndTitleRoll();
+        endTitleRollData = new EndTitleRoll();
         dataLambda.accept(endTitleRollData);
     }
 
@@ -161,7 +161,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     @Override
-    public LaCronNoticeLogLevel getNoticeLogLevel() {
+    public NoticeLogLevel getNoticeLogLevel() {
         return cronOption.getNoticeLogLevel();
     }
 
@@ -174,7 +174,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     @Override
-    public OptionalThing<LaCronEndTitleRoll> getEndTitleRoll() {
+    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
         return OptionalThing.ofNullable(endTitleRollData, () -> {
             throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
         });

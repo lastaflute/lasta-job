@@ -15,15 +15,14 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import org.lastaflute.job.LaJobRuntime;
+import org.lastaflute.job.LaCron;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/13 Wednesday)
+ * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface LaCronNoticeLogHook {
+@FunctionalInterface
+public interface CronConsumer {
 
-    void hookRunning(LaJobRuntime runtime, String msg);
-
-    void hookFinishing(LaJobRuntime runtime, String msg);
+    void consume(LaCron cron);
 }

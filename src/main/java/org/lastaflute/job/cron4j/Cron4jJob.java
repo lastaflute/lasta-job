@@ -25,7 +25,7 @@ import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.LaCronOpCall;
+import org.lastaflute.job.subsidiary.CronOpCall;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -93,7 +93,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          Reschedule
     //                                                                          ==========
     @Override
-    public synchronized void reschedule(String cronExp, LaCronOpCall opLambda) {
+    public synchronized void reschedule(String cronExp, CronOpCall opLambda) {
         if (unscheduled) {
             throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
@@ -101,7 +101,7 @@ public class Cron4jJob implements LaScheduledJob {
         cron4jNow.getCron4jScheduler().reschedule(jobKey.value(), cronExp);
     }
 
-    protected LaCronOption createCronOption(LaCronOpCall opLambda) {
+    protected LaCronOption createCronOption(CronOpCall opLambda) {
         final LaCronOption option = new LaCronOption();
         opLambda.callback(option);
         return option;

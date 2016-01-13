@@ -17,8 +17,8 @@ package org.lastaflute.job;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
-import org.lastaflute.job.subsidiary.LaCronParamsSupplier;
+import org.lastaflute.job.subsidiary.NoticeLogLevel;
+import org.lastaflute.job.subsidiary.CronParamsSupplier;
 
 /**
  * @author jflute
@@ -30,9 +30,9 @@ public class LaCronOption {
     //                                                                           Attribute
     //                                                                           =========
     protected LaJobUnique jobUnique;
-    protected LaCronParamsSupplier paramsSupplier;
+    protected CronParamsSupplier paramsSupplier;
     protected AlreadyExecutingBehavior duplicateExecutingBehavior = AlreadyExecutingBehavior.WAIT;
-    protected LaCronNoticeLogLevel noticeLogLevel = LaCronNoticeLogLevel.INFO;
+    protected NoticeLogLevel noticeLogLevel = NoticeLogLevel.INFO;
 
     public enum AlreadyExecutingBehavior {
         WAIT, SILENTLY_QUIT, SYSTEM_EXCEPTION
@@ -53,7 +53,7 @@ public class LaCronOption {
         return LaJobUnique.of(uniqueCode);
     }
 
-    public LaCronOption params(LaCronParamsSupplier noArgLambda) {
+    public LaCronOption params(CronParamsSupplier noArgLambda) {
         if (noArgLambda == null) {
             throw new IllegalArgumentException("The argument 'noArgLambda' should not be null.");
         }
@@ -75,12 +75,12 @@ public class LaCronOption {
     //                                      Notice Log Level
     //                                      ----------------
     public LaCronOption changeNoticeLogToDebug() {
-        noticeLogLevel = LaCronNoticeLogLevel.DEBUG;
+        noticeLogLevel = NoticeLogLevel.DEBUG;
         return this;
     }
 
     public LaCronOption changeNoticeLogToSuppressed() {
-        noticeLogLevel = LaCronNoticeLogLevel.SUPPRESSED;
+        noticeLogLevel = NoticeLogLevel.SUPPRESSED;
         return this;
     }
 
@@ -103,7 +103,7 @@ public class LaCronOption {
         });
     }
 
-    public OptionalThing<LaCronParamsSupplier> getParamsSupplier() {
+    public OptionalThing<CronParamsSupplier> getParamsSupplier() {
         return OptionalThing.ofNullable(paramsSupplier, () -> {
             throw new IllegalStateException("Not found the parameters supplier.");
         });
@@ -113,7 +113,7 @@ public class LaCronOption {
         return duplicateExecutingBehavior;
     }
 
-    public LaCronNoticeLogLevel getNoticeLogLevel() {
+    public NoticeLogLevel getNoticeLogLevel() {
         return noticeLogLevel;
     }
 }

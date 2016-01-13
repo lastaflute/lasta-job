@@ -15,14 +15,11 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import java.util.Map;
-
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.2.0 (2016/01/13 Wednesday)
  */
-@FunctionalInterface
-public interface LaCronParamsSupplier {
+public enum NoticeLogLevel {
 
-    Map<String, Object> supply();
+    INFO, DEBUG, SUPPRESSED
 }

@@ -13,31 +13,16 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job;
+package org.lastaflute.job.subsidiary;
 
-import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.LaCronOption;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/09 Saturday)
+ * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface LaJobScheduler {
+@FunctionalInterface
+public interface CronOpCall {
 
-    void schedule(LaCron cron);
-
-    default LaJobRunner createRunner() {
-        return new LaJobRunner();
-    }
-
-    default ConcurrentExec waitIfConcurrent() {
-        return ConcurrentExec.WAIT;
-    }
-
-    default ConcurrentExec quitIfConcurrent() {
-        return ConcurrentExec.QUIT;
-    }
-
-    default ConcurrentExec errorIfConcurrent() {
-        return ConcurrentExec.ERROR;
-    }
+    void callback(LaCronOption op);
 }

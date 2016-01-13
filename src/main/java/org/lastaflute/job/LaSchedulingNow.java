@@ -20,7 +20,7 @@ import java.util.List;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.LaCronConsumer;
+import org.lastaflute.job.subsidiary.CronConsumer;
 
 /**
  * @author jflute
@@ -34,7 +34,7 @@ public interface LaSchedulingNow {
 
     List<? extends LaScheduledJob> getJobList();
 
-    void schedule(LaCronConsumer oneArgLambda);
+    void schedule(CronConsumer oneArgLambda);
 
     void destroy();
 }

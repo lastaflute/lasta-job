@@ -24,7 +24,7 @@ import javax.annotation.PreDestroy;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.LaCronConsumer;
+import org.lastaflute.job.subsidiary.CronConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,7 +106,7 @@ public class SimpleJobManager implements JobManager {
     }
 
     @Override
-    public void schedule(LaCronConsumer oneArgLambda) {
+    public void schedule(CronConsumer oneArgLambda) {
         assertArgumentNotNull("oneArgLambda", oneArgLambda);
         schedulingNow.schedule(oneArgLambda);
     }
@@ -146,7 +146,7 @@ public class SimpleJobManager implements JobManager {
             }
 
             @Override
-            public void schedule(LaCronConsumer oneArgLambda) {
+            public void schedule(CronConsumer oneArgLambda) {
             }
 
             @Override

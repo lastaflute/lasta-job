@@ -31,6 +31,8 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.NoticeLogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +56,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                           =========
     protected String cronExp; // can be updated
     protected final Class<? extends LaJob> jobType;
+    protected ConcurrentExec concurrentExec;
     protected LaCronOption cronOption; // can be updated
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
@@ -61,9 +64,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(String cronExp, Class<? extends LaJob> jobType, LaCronOption cronOption, LaJobRunner jobRunner, Cron4jNow cron4jNow) {
+    public Cron4jTask(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, LaCronOption cronOption,
+            LaJobRunner jobRunner, Cron4jNow cron4jNow) {
         this.cronExp = cronExp;
         this.jobType = jobType;
+        this.concurrentExec = concurrentExec;
         this.cronOption = cronOption;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
@@ -85,11 +90,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final Cron4jJob job = findJob();
         final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
         if (executorList.size() >= 2) { // other executions of same task exist
-            final AlreadyExecutingBehavior executingBehavior = getAlreadyExecutingBehavior();
-            if (executingBehavior.equals(AlreadyExecutingBehavior.SILENTLY_QUIT)) {
+            if (concurrentExec.equals(ConcurrentExec.QUIT)) {
                 noticeSilentlyQuit(job, executorList);
                 return;
-            } else if (executingBehavior.equals(AlreadyExecutingBehavior.SYSTEM_EXCEPTION)) {
+            } else if (concurrentExec.equals(ConcurrentExec.ERROR)) {
                 throwJobAlreadyExecutingSystemException(job, executorList);
             }
             // wait by synchronization as default
@@ -103,9 +107,14 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return cron4jNow.findJobByTask(this).get();
     }
 
-    protected void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) {
+    protected synchronized void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) {
         final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
-        logger.info("...Quitting the job because of already existing job: " + job + " startTimes=" + startTimeList);
+        final String msg = "...Quitting the job because of already existing job: " + job + " startTimes=" + startTimeList;
+        if (cronOption.getNoticeLogLevel().equals(NoticeLogLevel.INFO)) {
+            logger.info(msg);
+        } else if (cronOption.getNoticeLogLevel().equals(NoticeLogLevel.DEBUG)) {
+            logger.debug(msg);
+        }
     }
 
     protected void throwJobAlreadyExecutingSystemException(Cron4jJob job, List<TaskExecutor> executorList) {

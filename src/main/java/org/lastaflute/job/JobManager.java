@@ -20,7 +20,7 @@ import java.util.List;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.LaCronConsumer;
+import org.lastaflute.job.subsidiary.CronConsumer;
 
 /**
  * @author jflute
@@ -59,7 +59,7 @@ public interface JobManager {
      * </pre>
      * @param oneArgLambda The callback to consume cron. (NotNull)
      */
-    void schedule(LaCronConsumer oneArgLambda);
+    void schedule(CronConsumer oneArgLambda);
 
     /**
      * (Dangrous!) Destory registered schedule in framework, that means all jobs and crons. <br>

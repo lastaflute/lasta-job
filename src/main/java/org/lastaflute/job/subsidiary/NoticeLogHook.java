@@ -15,14 +15,15 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import org.lastaflute.job.LaCronOption;
+import org.lastaflute.job.LaJobRuntime;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.2.0 (2016/01/13 Wednesday)
  */
-@FunctionalInterface
-public interface LaCronOpCall {
+public interface NoticeLogHook {
 
-    void callback(LaCronOption op);
+    void hookRunning(LaJobRuntime runtime, String msg);
+
+    void hookFinishing(LaJobRuntime runtime, String msg);
 }

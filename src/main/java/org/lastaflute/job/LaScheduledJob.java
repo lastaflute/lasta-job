@@ -18,7 +18,7 @@ package org.lastaflute.job;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.LaCronOpCall;
+import org.lastaflute.job.subsidiary.CronOpCall;
 
 /**
  * @author jflute
@@ -82,7 +82,7 @@ public interface LaScheduledJob {
      * @param cronExp The new cron expression of the job e.g. '10 * * * *' (NotNull)
      * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
      */
-    void reschedule(String cronExp, LaCronOpCall opLambda);
+    void reschedule(String cronExp, CronOpCall opLambda);
 
     /**
      * Unschedule the job, no more launched by cron and launghNow(). <br>

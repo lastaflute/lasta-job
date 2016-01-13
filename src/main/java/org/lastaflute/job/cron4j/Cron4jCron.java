@@ -21,7 +21,8 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.subsidiary.LaCronOpCall;
+import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.CronOpCall;
 
 /**
  * @author jflute
@@ -49,34 +50,38 @@ public class Cron4jCron implements LaCron {
     //                                                                            Register
     //                                                                            ========
     @Override
-    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType) {
+    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec) {
         assertArgumentNotNull("cronExp", cronExp);
         assertArgumentNotNull("jobType", jobType);
-        return doRegister(cronExp, jobType, op -> {});
+        assertArgumentNotNull("concurrentExec", concurrentExec);
+        return doRegister(cronExp, jobType, concurrentExec, op -> {});
     }
 
     @Override
-    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, LaCronOpCall opLambda) {
+    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, CronOpCall opLambda) {
         assertArgumentNotNull("cronExp", cronExp);
         assertArgumentNotNull("jobType", jobType);
+        assertArgumentNotNull("concurrentExec", concurrentExec);
         assertArgumentNotNull("opLambda (cronOptionConsumer)", opLambda);
-        return doRegister(cronExp, jobType, opLambda);
+        return doRegister(cronExp, jobType, concurrentExec, opLambda);
     }
 
-    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, LaCronOpCall opLambda) {
-        final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, createCronOption(opLambda));
+    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
+            CronOpCall opLambda) {
+        final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, concurrentExec, createCronOption(opLambda));
         final String jobKey = cron4jScheduler.schedule(cronExp, cron4jTask);
         return cron4jNow.saveJob(createJobKey(jobKey), cron4jTask);
     }
 
-    protected LaCronOption createCronOption(LaCronOpCall opLambda) {
+    protected LaCronOption createCronOption(CronOpCall opLambda) {
         final LaCronOption option = new LaCronOption();
         opLambda.callback(option);
         return option;
     }
 
-    protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, LaCronOption cronOption) {
-        return new Cron4jTask(cronExp, jobType, cronOption, jobRunner, cron4jNow); // adapter task
+    protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
+            LaCronOption cronOption) {
+        return new Cron4jTask(cronExp, jobType, concurrentExec, cronOption, jobRunner, cron4jNow); // adapter task
     }
 
     protected LaJobKey createJobKey(String jobKey) {

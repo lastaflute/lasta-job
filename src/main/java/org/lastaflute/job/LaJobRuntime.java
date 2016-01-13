@@ -20,8 +20,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.subsidiary.LaCronEndTitleRoll;
-import org.lastaflute.job.subsidiary.LaCronNoticeLogLevel;
+import org.lastaflute.job.subsidiary.EndTitleRoll;
+import org.lastaflute.job.subsidiary.NoticeLogLevel;
 
 /**
  * @author jflute
@@ -40,17 +40,17 @@ public interface LaJobRuntime {
 
     Map<String, Object> getParameterMap(); // not null, read-only
 
-    LaCronNoticeLogLevel getNoticeLogLevel(); // not null
+    NoticeLogLevel getNoticeLogLevel(); // not null
 
     // ===================================================================================
     //                                                                      End-Title Roll
     //                                                                      ==============
-    OptionalThing<LaCronEndTitleRoll> getEndTitleRoll();
+    OptionalThing<EndTitleRoll> getEndTitleRoll();
 
     /**
      * @param dataLambda The callback of end-title roll data for registration. (NotNull)
      */
-    void showEndTitleRoll(Consumer<LaCronEndTitleRoll> dataLambda);
+    void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda);
 
     // ===================================================================================
     //                                                                            Stop Job

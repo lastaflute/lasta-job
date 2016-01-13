@@ -27,7 +27,7 @@ import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaSchedulingNow;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.LaCronConsumer;
+import org.lastaflute.job.subsidiary.CronConsumer;
 
 /**
  * @author jflute
@@ -137,7 +137,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                        Register Job
     //                                                                        ============
     @Override
-    public synchronized void schedule(LaCronConsumer oneArgLambda) {
+    public synchronized void schedule(CronConsumer oneArgLambda) {
         assertArgumentNotNull("oneArgLambda", oneArgLambda);
         oneArgLambda.consume(createCron4jCron());
     }
