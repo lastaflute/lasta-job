@@ -19,10 +19,13 @@ import java.util.List;
 
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
+import org.lastaflute.job.LaCronOption;
+import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyClosedException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.subsidiary.LaCronOpCall;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -37,7 +40,6 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           =========
     protected final LaJobKey jobKey;
     protected final OptionalThing<LaJobUnique> jobUnique;
-    protected final String cronExp;
     protected final Cron4jTask cron4jTask;
     protected final Cron4jNow cron4jNow;
     protected volatile boolean closed;
@@ -45,10 +47,9 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, String cronExp, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
+    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
         this.jobKey = jobKey;
         this.jobUnique = jobUnique;
-        this.cronExp = cronExp;
         this.cron4jTask = cron4jTask;
         this.cron4jNow = cron4jNow;
     }
@@ -89,11 +90,27 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     // ===================================================================================
+    //                                                                          Reschedule
+    //                                                                          ==========
+    @Override
+    public synchronized void reschedule(String cronExp, LaCronOpCall opLambda) {
+        cron4jTask.switchCron(cronExp, createCronOption(opLambda));
+        cron4jNow.getCron4jScheduler().reschedule(jobKey.value(), cronExp);
+    }
+
+    protected LaCronOption createCronOption(LaCronOpCall opLambda) {
+        final LaCronOption option = new LaCronOption();
+        opLambda.callback(option);
+        return option;
+    }
+
+    // ===================================================================================
     //                                                                           Close Now
     //                                                                           =========
     @Override
     public synchronized void closeNow() {
         cron4jNow.getCron4jScheduler().deschedule(jobKey.value());
+        cron4jNow.clearClosedJob();
         closed = true;
     }
 
@@ -128,7 +145,12 @@ public class Cron4jJob implements LaScheduledJob {
 
     @Override
     public String getCronExp() {
-        return cronExp;
+        return cron4jTask.getCronExp();
+    }
+
+    @Override
+    public Class<? extends LaJob> getJobType() {
+        return cron4jTask.getJobType();
     }
 
     public Cron4jTask getCron4jTask() {

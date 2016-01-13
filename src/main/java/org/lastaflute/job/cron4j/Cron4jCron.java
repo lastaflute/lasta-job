@@ -66,7 +66,7 @@ public class Cron4jCron implements LaCron {
     protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, LaCronOpCall opLambda) {
         final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, createCronOption(opLambda));
         final String jobKey = cron4jScheduler.schedule(cronExp, cron4jTask);
-        return cron4jNow.saveJob(createJobKey(jobKey), cronExp, cron4jTask);
+        return cron4jNow.saveJob(createJobKey(jobKey), cron4jTask);
     }
 
     protected LaCronOption createCronOption(LaCronOpCall opLambda) {
@@ -80,7 +80,7 @@ public class Cron4jCron implements LaCron {
     }
 
     protected LaJobKey createJobKey(String jobKey) {
-        return new LaJobKey(jobKey);
+        return LaJobKey.of(jobKey);
     }
 
     // ===================================================================================

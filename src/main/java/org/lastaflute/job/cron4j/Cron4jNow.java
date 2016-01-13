@@ -55,11 +55,10 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                            Save Job
     //                                                                            ========
-    public synchronized Cron4jJob saveJob(LaJobKey jobKey, String cronExp, Cron4jTask cron4jTask) {
+    public synchronized Cron4jJob saveJob(LaJobKey jobKey, Cron4jTask cron4jTask) {
         assertArgumentNotNull("jobKey", jobKey);
-        assertArgumentNotNull("cronExp", cronExp);
         assertArgumentNotNull("cron4jTask", cron4jTask);
-        final Cron4jJob cron4jJob = createCron4jJob(jobKey, cron4jTask.getJobUnique(), cronExp, cron4jTask);
+        final Cron4jJob cron4jJob = createCron4jJob(jobKey, cron4jTask.getJobUnique(), cron4jTask);
         assertDuplicateJobKey(jobKey);
         jobKeyJobMap.put(jobKey, cron4jJob);
         cron4jTask.getJobUnique().ifPresent(jobUnique -> {
@@ -70,8 +69,8 @@ public class Cron4jNow implements LaSchedulingNow {
         return cron4jJob;
     }
 
-    protected Cron4jJob createCron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, String cronExp, Cron4jTask cron4jTask) {
-        return new Cron4jJob(jobKey, jobUnique, cronExp, cron4jTask, this);
+    protected Cron4jJob createCron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, Cron4jTask cron4jTask) {
+        return new Cron4jJob(jobKey, jobUnique, cron4jTask, this);
     }
 
     protected void assertDuplicateJobKey(LaJobKey jobKey) {
@@ -150,7 +149,11 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                          Closed Job
     //                                                                          ==========
-    @Override
+    /**
+     * Clear closed jobs from job list if it exists. <br>
+     * You can close job by job's closeNow(), but the job remains in job list yet. <br>
+     * So you can completely delete the job by this method.
+     */
     public synchronized void clearClosedJob() {
         getCron4jJobList().stream().filter(job -> job.isClosed()).forEach(job -> {
             jobKeyJobMap.remove(job.getJobKey());

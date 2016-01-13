@@ -50,7 +50,7 @@ public class LaCronOption {
     }
 
     protected LaJobUnique createJobUnique(String uniqueCode) {
-        return new LaJobUnique(uniqueCode);
+        return LaJobUnique.of(uniqueCode);
     }
 
     public LaCronOption params(LaCronParamsSupplier noArgLambda) {

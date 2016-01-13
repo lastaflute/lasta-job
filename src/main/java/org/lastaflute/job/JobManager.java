@@ -62,13 +62,6 @@ public interface JobManager {
     void registerJob(LaCronConsumer oneArgLambda);
 
     /**
-     * Clear closed jobs from job list if it exists. <br>
-     * You can close job by job's closeNow(), but the job remains in job list yet. <br>
-     * So you can completely delete the job by this method.
-     */
-    void clearClosedJob();
-
-    /**
      * (Dangrous!) Destory registered schedule in framework, that means all jobs and crons. <br>
      * It requests stop to executing jobs and delete cron and delete scheduler completely.
      */

@@ -51,6 +51,10 @@ public class Cron4jScheduler {
         return nativeScheduler.schedule(cronExp, cron4jTask);
     }
 
+    public void reschedule(String jobKey, String cronExp) {
+        nativeScheduler.reschedule(jobKey, cronExp);
+    }
+
     public void deschedule(String jobKey) {
         nativeScheduler.deschedule(jobKey);
     }

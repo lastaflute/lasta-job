@@ -120,11 +120,6 @@ public class SimpleJobManager implements JobManager {
     }
 
     @Override
-    public void clearClosedJob() {
-        schedulingNow.clearClosedJob();
-    }
-
-    @Override
     public synchronized void destroySchedule() {
         schedulingNow.destroySchedule();
     }
@@ -160,10 +155,6 @@ public class SimpleJobManager implements JobManager {
 
             @Override
             public void destroySchedule() {
-            }
-
-            @Override
-            public void clearClosedJob() {
             }
         };
     }

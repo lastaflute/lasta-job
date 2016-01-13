@@ -29,11 +29,15 @@ public class LaJobKey {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public LaJobKey(String jobKey) {
+    protected LaJobKey(String jobKey) {
         if (jobKey == null) {
             throw new IllegalArgumentException("The argument 'jobKey' should not be null.");
         }
         this.jobKey = jobKey;
+    }
+
+    public static LaJobKey of(String jobKey) {
+        return new LaJobKey(jobKey);
     }
 
     // ===================================================================================

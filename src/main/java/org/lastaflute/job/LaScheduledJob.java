@@ -18,6 +18,7 @@ package org.lastaflute.job;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.subsidiary.LaCronOpCall;
 
 /**
  * @author jflute
@@ -41,6 +42,11 @@ public interface LaScheduledJob {
     String getCronExp();
 
     /**
+     * @return The type of job component for your application. (NotNull)
+     */
+    Class<? extends LaJob> getJobType();
+
+    /**
      * Is the job actually executing now? <br>
      * If you want to stop it, use stopNow().
      * @return true if executing now.
@@ -62,6 +68,18 @@ public interface LaScheduledJob {
      * You can call this even if the job is closed. (might be exeucuting even if closed)
      */
     void stopNow();
+
+    /**
+     * Re-schedule the job by the cron expression and options. <br>
+     * If executing job exists, its process is continued. <br>
+     * New cron schedule is used since next execution.
+     * @param cronExp The new cron expression of the job e.g. '10 * * * *' (NotNull)
+     * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
+     */
+    void reschedule(String cronExp, LaCronOpCall opLambda);
+
+    // TODO jflute unschedule (2016/01/13)
+    //void deschedule();
 
     /**
      * Close the job, no more launched by cron and launghNow(). <br>

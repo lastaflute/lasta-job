@@ -177,4 +177,15 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     public String toString() {
         return DfTypeUtil.toClassTitle(this) + ":{" + cronExp + ", " + jobType + ", " + cronOption + "}";
     }
+
+    // ===================================================================================
+    //                                                                            Accessor
+    //                                                                            ========
+    public String getCronExp() {
+        return cronExp;
+    }
+
+    public Class<? extends LaJob> getJobType() {
+        return jobType;
+    }
 }

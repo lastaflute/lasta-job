@@ -29,11 +29,15 @@ public class LaJobUnique {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public LaJobUnique(String uniqueCode) {
+    protected LaJobUnique(String uniqueCode) {
         if (uniqueCode == null) {
             throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
         }
         this.uniqueCode = uniqueCode;
+    }
+
+    public static LaJobUnique of(String uniqueCode) {
+        return new LaJobUnique(uniqueCode);
     }
 
     // ===================================================================================

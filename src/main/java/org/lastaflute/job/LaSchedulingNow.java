@@ -36,7 +36,5 @@ public interface LaSchedulingNow {
 
     void registerJob(LaCronConsumer oneArgLambda);
 
-    void clearClosedJob();
-
     void destroySchedule();
 }
