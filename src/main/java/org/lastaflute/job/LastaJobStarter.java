@@ -19,8 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.dbflute.util.DfReflectionUtil;
+import org.lastaflute.core.smartdeploy.ManagedHotdeploy;
 import org.lastaflute.core.util.ContainerUtil;
-import org.lastaflute.di.core.smart.hot.HotdeployUtil;
 import org.lastaflute.di.naming.NamingConvention;
 import org.lastaflute.job.cron4j.Cron4jCron;
 import org.lastaflute.job.cron4j.Cron4jNow;
@@ -45,9 +45,9 @@ public class LastaJobStarter {
     //                                                                               Start
     //                                                                               =====
     public LaSchedulingNow start() {
-        final boolean needsHot = !HotdeployUtil.isAlreadyHotdeploy(); // just in case
+        final boolean needsHot = !ManagedHotdeploy.isAlreadyHotdeploy(); // just in case
         if (needsHot) {
-            HotdeployUtil.start();
+            ManagedHotdeploy.start();
         }
         try {
             final LaJobScheduler appScheduler = findAppScheduler();
@@ -63,7 +63,7 @@ public class LastaJobStarter {
             return cron4jNow;
         } finally {
             if (needsHot) {
-                HotdeployUtil.stop();
+                ManagedHotdeploy.stop();
             }
         }
     }

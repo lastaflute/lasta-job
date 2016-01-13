@@ -38,6 +38,7 @@ import org.dbflute.util.Srl;
 import org.lastaflute.core.exception.ExceptionTranslator;
 import org.lastaflute.core.magic.ThreadCacheContext;
 import org.lastaflute.core.mail.PostedMailCounter;
+import org.lastaflute.core.smartdeploy.ManagedHotdeploy;
 import org.lastaflute.core.util.ContainerUtil;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextArranger;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextResource;
@@ -48,7 +49,6 @@ import org.lastaflute.db.dbflute.callbackcontext.RomanticTraceableSqlStringFilte
 import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
 import org.lastaflute.di.core.smart.hot.HotdeployLock;
-import org.lastaflute.di.core.smart.hot.HotdeployUtil;
 import org.lastaflute.job.subsidiary.NoticeLogHook;
 import org.lastaflute.job.subsidiary.NoticeLogLevel;
 import org.slf4j.Logger;
@@ -107,15 +107,15 @@ public class LaJobRunner {
     //                                                                                Run
     //                                                                               =====
     public void run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
-        if (!HotdeployUtil.isHotdeploy()) { // e.g. production, unit-test
+        if (!ManagedHotdeploy.isHotdeploy()) { // e.g. production, unit-test
             doRun(jobType, runtimeSupplier);
         }
         synchronized (HotdeployLock.class) { // #thiking: cannot hotdeploy, why?
-            HotdeployUtil.start();
+            ManagedHotdeploy.start();
             try {
                 doRun(jobType, runtimeSupplier);
             } finally {
-                HotdeployUtil.stop();
+                ManagedHotdeploy.stop();
             }
         }
     }
