@@ -25,6 +25,7 @@ import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.web.servlet.filter.bowgun.BowgunCurtainBefore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,25 +52,14 @@ public class SimpleJobManager implements JobManager {
      */
     @PostConstruct
     public synchronized void initialize() {
-        new Thread(() -> { // use plain thread for silent asynchronous
-            delayBeforeStartCron();
+        BowgunCurtainBefore.shootBowgunCurtainBefore(assistantDirector -> {
             try {
                 schedulingNow = createStarter().start();
                 showBootLogging();
             } catch (Throwable cause) {
                 logger.error("Failed to start job scheduling.", cause);
             }
-        }).start();
-    }
-
-    protected void delayBeforeStartCron() {
-        try {
-            Thread.sleep(getStartDelayMillis()); // delay to wait for finishing application boot
-        } catch (InterruptedException ignored) {}
-    }
-
-    protected long getStartDelayMillis() {
-        return 5000L;
+        });
     }
 
     protected void showBootLogging() {
