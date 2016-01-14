@@ -111,11 +111,11 @@ public class LaJobRunner {
         }
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
-        startHotdeploy();
+        final ClassLoader originalLoader = startHotdeploy();
         try {
             doRun(jobType, runtimeSupplier);
         } finally {
-            stopHotdeploy();
+            stopHotdeploy(originalLoader);
         }
     }
 
@@ -127,12 +127,12 @@ public class LaJobRunner {
         return false;
     }
 
-    protected void startHotdeploy() {
-        ManagedHotdeploy.start(); // #thiking: cannot hotdeploy, why?
+    protected ClassLoader startHotdeploy() {
+        return ManagedHotdeploy.start(); // #thiking: cannot hotdeploy, why?
     }
 
-    protected void stopHotdeploy() {
-        ManagedHotdeploy.stop();
+    protected void stopHotdeploy(ClassLoader originalLoader) {
+        ManagedHotdeploy.stop(originalLoader);
     }
 
     protected void doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {

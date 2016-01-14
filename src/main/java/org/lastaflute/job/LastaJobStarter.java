@@ -48,10 +48,7 @@ public class LastaJobStarter {
     //                                                                               Start
     //                                                                               =====
     public LaSchedulingNow start() {
-        final boolean needsHot = !ManagedHotdeploy.isAlreadyHotdeploy(); // just in case
-        if (needsHot) {
-            ManagedHotdeploy.start();
-        }
+        final ClassLoader originalLoader = startHotdeploy();
         try {
             final LaJobScheduler appScheduler = findAppScheduler();
             inject(appScheduler);
@@ -65,10 +62,16 @@ public class LastaJobStarter {
             startCron(cron4jScheduler);
             return cron4jNow;
         } finally {
-            if (needsHot) {
-                ManagedHotdeploy.stop();
-            }
+            stopHotdeploy(originalLoader);
         }
+    }
+
+    protected ClassLoader startHotdeploy() {
+        return ManagedHotdeploy.start();
+    }
+
+    protected void stopHotdeploy(ClassLoader originalLoader) {
+        ManagedHotdeploy.stop(originalLoader);
     }
 
     protected void showBoot(LaJobScheduler scheduler, LaJobRunner jobRunner, Cron4jScheduler cron4jScheduler, Cron4jNow cron4jNow) {
