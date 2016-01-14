@@ -21,6 +21,7 @@ import java.util.List;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
+import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
@@ -119,27 +120,42 @@ public class SimpleJobManager implements JobManager {
 
             @Override
             public OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey) {
-                return OptionalThing.empty();
+                throwJobManagerNotInitializedYetException();
+                return OptionalThing.empty(); // unreachable
             }
 
             @Override
             public OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique) {
-                return OptionalThing.empty();
+                throwJobManagerNotInitializedYetException();
+                return OptionalThing.empty(); // unreachable
             }
 
             @Override
             public List<LaScheduledJob> getJobList() {
+                throwJobManagerNotInitializedYetException();
                 return Collections.emptyList();
             }
 
             @Override
             public void schedule(CronConsumer oneArgLambda) {
+                throwJobManagerNotInitializedYetException();
             }
 
             @Override
             public void destroy() {
+                throwJobManagerNotInitializedYetException();
             }
         };
+    }
+
+    protected void throwJobManagerNotInitializedYetException() {
+        final ExceptionMessageBuilder br = new ExceptionMessageBuilder();
+        br.addNotice("JobManager is not initialized yet at the timing.");
+        br.addItem("Advice");
+        br.addElement("You cannot use JobManager in your job scheduler");
+        br.addElement("because JobManager uses the your scheduling result.");
+        final String msg = br.buildExceptionMessage();
+        throw new IllegalStateException(msg);
     }
 
     // ===================================================================================

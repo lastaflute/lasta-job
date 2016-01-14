@@ -106,17 +106,33 @@ public class LaJobRunner {
     //                                                                                Run
     //                                                                               =====
     public void run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
-        if (!ManagedHotdeploy.isHotdeploy()) { // e.g. production, unit-test
+        if (!isHotdeployEnabled() || isSuppressHotdeploy()) { // e.g. production, unit-test
             doRun(jobType, runtimeSupplier);
         }
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
-        ManagedHotdeploy.start(); // #thiking: cannot hotdeploy, why?
+        startHotdeploy();
         try {
             doRun(jobType, runtimeSupplier);
         } finally {
-            ManagedHotdeploy.stop();
+            stopHotdeploy();
         }
+    }
+
+    protected boolean isHotdeployEnabled() {
+        return ManagedHotdeploy.isHotdeploy();
+    }
+
+    protected boolean isSuppressHotdeploy() { // for emergency
+        return false;
+    }
+
+    protected void startHotdeploy() {
+        ManagedHotdeploy.start(); // #thiking: cannot hotdeploy, why?
+    }
+
+    protected void stopHotdeploy() {
+        ManagedHotdeploy.stop();
     }
 
     protected void doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
