@@ -67,4 +67,10 @@ public interface JobManager {
      * This is automatically called when application is closed.
      */
     void destroy();
+
+    /**
+     * Is scheduling done? (scheduling is lazy loaded)
+     * @return true if done.
+     */
+    boolean isSchedulingDone();
 }

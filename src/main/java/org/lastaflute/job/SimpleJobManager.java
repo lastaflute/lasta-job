@@ -44,6 +44,9 @@ public class SimpleJobManager implements JobManager {
     /** The current state of scheduling. (NotNull) */
     protected LaSchedulingNow schedulingNow = createEmptyNow(); // because of delayed initialization
 
+    /** Is scheduling done? (scheduling is lazy loaded) */
+    protected boolean schedulingDone;
+
     // ===================================================================================
     //                                                                          Initialize
     //                                                                          ==========
@@ -56,6 +59,7 @@ public class SimpleJobManager implements JobManager {
         BowgunCurtainBefore.unlock();
         BowgunCurtainBefore.shootBowgunCurtainBefore(assistantDirector -> {
             schedulingNow = createStarter().start();
+            schedulingDone = true;
             showBootLogging();
         });
     }
@@ -106,6 +110,14 @@ public class SimpleJobManager implements JobManager {
     @Override
     public synchronized void destroy() {
         schedulingNow.destroy();
+    }
+
+    // ===================================================================================
+    //                                                                         Initialized
+    //                                                                         ===========
+    @Override
+    public synchronized boolean isSchedulingDone() {
+        return schedulingDone;
     }
 
     // ===================================================================================
