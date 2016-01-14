@@ -52,13 +52,10 @@ public class SimpleJobManager implements JobManager {
      */
     @PostConstruct
     public synchronized void initialize() {
+        BowgunCurtainBefore.unlock();
         BowgunCurtainBefore.shootBowgunCurtainBefore(assistantDirector -> {
-            try {
-                schedulingNow = createStarter().start();
-                showBootLogging();
-            } catch (Throwable cause) {
-                logger.error("Failed to start job scheduling.", cause);
-            }
+            schedulingNow = createStarter().start();
+            showBootLogging();
         });
     }
 
