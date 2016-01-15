@@ -20,8 +20,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
-import org.lastaflute.job.subsidiary.NoticeLogLevel;
 
 /**
  * @author jflute
@@ -40,7 +40,7 @@ public interface LaJobRuntime {
 
     Map<String, Object> getParameterMap(); // not null, read-only
 
-    NoticeLogLevel getNoticeLogLevel(); // not null
+    JobNoticeLogLevel getNoticeLogLevel(); // not null
 
     // ===================================================================================
     //                                                                      End-Title Roll

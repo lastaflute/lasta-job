@@ -26,8 +26,10 @@ import org.dbflute.util.DfTypeUtil;
 import org.dbflute.util.Srl;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaSchedulingNow;
+import org.lastaflute.job.cron4j.Cron4jCron.CronRegistrationType;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.subsidiary.CronConsumer;
 
 /**
@@ -181,7 +183,7 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     protected Cron4jCron createCron4jCron() {
-        return new Cron4jCron(cron4jScheduler, jobRunner, this);
+        return new Cron4jCron(cron4jScheduler, jobRunner, this, CronRegistrationType.CHANGE);
     }
 
     // ===================================================================================
@@ -204,6 +206,9 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                    ================
     @Override
     public synchronized void destroy() {
+        if (JobChangeLog.isLogEnabled()) {
+            JobChangeLog.log("#job ...Destroying scheduler completely: jobs={} scheduler={}", jobKeyJobMap.size(), cron4jScheduler);
+        }
         cron4jScheduler.stop();
     }
 

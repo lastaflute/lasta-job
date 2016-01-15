@@ -17,8 +17,8 @@ package org.lastaflute.job;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
-import org.lastaflute.job.subsidiary.NoticeLogLevel;
 
 /**
  * @author jflute
@@ -31,7 +31,7 @@ public class LaCronOption {
     //                                                                           =========
     protected LaJobUnique jobUnique;
     protected CronParamsSupplier paramsSupplier;
-    protected NoticeLogLevel noticeLogLevel = NoticeLogLevel.INFO;
+    protected JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
 
     // ===================================================================================
     //                                                                              Facade
@@ -60,12 +60,12 @@ public class LaCronOption {
     //                                      Notice Log Level
     //                                      ----------------
     public LaCronOption changeNoticeLogToDebug() {
-        noticeLogLevel = NoticeLogLevel.DEBUG;
+        noticeLogLevel = JobNoticeLogLevel.DEBUG;
         return this;
     }
 
     public LaCronOption changeNoticeLogToSuppressed() {
-        noticeLogLevel = NoticeLogLevel.SUPPRESSED;
+        noticeLogLevel = JobNoticeLogLevel.SUPPRESSED;
         return this;
     }
 
@@ -94,7 +94,7 @@ public class LaCronOption {
         });
     }
 
-    public NoticeLogLevel getNoticeLogLevel() {
+    public JobNoticeLogLevel getNoticeLogLevel() {
         return noticeLogLevel;
     }
 }

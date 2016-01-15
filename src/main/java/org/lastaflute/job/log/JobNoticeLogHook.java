@@ -13,13 +13,17 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.subsidiary;
+package org.lastaflute.job.log;
+
+import org.lastaflute.job.LaJobRuntime;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/13 Wednesday)
  */
-public enum NoticeLogLevel {
+public interface JobNoticeLogHook {
 
-    INFO, DEBUG, SUPPRESSED
+    void hookRunning(LaJobRuntime runtime, String msg);
+
+    void hookFinishing(LaJobRuntime runtime, String msg);
 }

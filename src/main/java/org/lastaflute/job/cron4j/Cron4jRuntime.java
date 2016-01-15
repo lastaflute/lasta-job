@@ -26,8 +26,8 @@ import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.exception.JobStoppedException;
+import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
-import org.lastaflute.job.subsidiary.NoticeLogLevel;
 
 import it.sauronsoftware.cron4j.TaskExecutionContext;
 
@@ -161,7 +161,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     @Override
-    public NoticeLogLevel getNoticeLogLevel() {
+    public JobNoticeLogLevel getNoticeLogLevel() {
         return cronOption.getNoticeLogLevel();
     }
 

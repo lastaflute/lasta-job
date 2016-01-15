@@ -30,8 +30,8 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
-import org.lastaflute.job.subsidiary.NoticeLogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,9 +113,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected synchronized void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) {
         final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
         final String msg = "...Quitting the job because of already existing job: " + job + " startTimes=" + startTimeList;
-        if (cronOption.getNoticeLogLevel().equals(NoticeLogLevel.INFO)) {
+        if (cronOption.getNoticeLogLevel().equals(JobNoticeLogLevel.INFO)) {
             logger.info(msg);
-        } else if (cronOption.getNoticeLogLevel().equals(NoticeLogLevel.DEBUG)) {
+        } else if (cronOption.getNoticeLogLevel().equals(JobNoticeLogLevel.DEBUG)) {
             logger.debug(msg);
         }
     }
@@ -184,7 +184,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     @Override
     public String toString() {
         final String title = DfTypeUtil.toClassTitle(this);
-        return title + ":{" + cronExp + ", " + jobType + ", " + concurrentExec + ", " + cronOption + "}";
+        final String cronExpExp = isNonCron() ? "non-cron" : cronExp;
+        return title + ":{" + cronExpExp + ", " + jobType + ", " + concurrentExec + ", " + cronOption + "}";
     }
 
     // ===================================================================================

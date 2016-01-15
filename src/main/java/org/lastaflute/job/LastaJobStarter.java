@@ -24,6 +24,7 @@ import org.lastaflute.core.smartdeploy.ManagedHotdeploy;
 import org.lastaflute.core.util.ContainerUtil;
 import org.lastaflute.di.naming.NamingConvention;
 import org.lastaflute.job.cron4j.Cron4jCron;
+import org.lastaflute.job.cron4j.Cron4jCron.CronRegistrationType;
 import org.lastaflute.job.cron4j.Cron4jNow;
 import org.lastaflute.job.cron4j.Cron4jScheduler;
 import org.lastaflute.job.exception.JobSchedulerNoInterfaceException;
@@ -162,7 +163,7 @@ public class LastaJobStarter {
     }
 
     protected Cron4jCron createCron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner runner, Cron4jNow cron4jNow) {
-        return new Cron4jCron(cron4jScheduler, runner, cron4jNow);
+        return new Cron4jCron(cron4jScheduler, runner, cron4jNow, CronRegistrationType.START);
     }
 
     // -----------------------------------------------------

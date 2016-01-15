@@ -103,6 +103,10 @@ public class SimpleJobManager implements JobManager {
     @Override
     public void schedule(CronConsumer oneArgLambda) {
         assertArgumentNotNull("oneArgLambda", oneArgLambda);
+        // registration log later so no logging here
+        //if (JobChangeLog.isLogEnabled()) {
+        //    JobChangeLog.log("#job ...Scheduling new jobs: {}", oneArgLambda);
+        //}
         schedulingNow.schedule(oneArgLambda);
     }
 

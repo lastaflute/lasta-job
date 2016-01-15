@@ -48,8 +48,8 @@ import org.lastaflute.db.dbflute.callbackcontext.RomanticTraceableSqlResultHandl
 import org.lastaflute.db.dbflute.callbackcontext.RomanticTraceableSqlStringFilter;
 import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
-import org.lastaflute.job.subsidiary.NoticeLogHook;
-import org.lastaflute.job.subsidiary.NoticeLogLevel;
+import org.lastaflute.job.log.JobNoticeLog;
+import org.lastaflute.job.log.JobNoticeLogHook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +70,7 @@ public class LaJobRunner {
     //                                                                           Attribute
     //                                                                           =========
     protected AccessContextArranger accessContextArranger; // null allowed, option
-    protected NoticeLogHook noticeLogHook; // null allowed, option
+    protected JobNoticeLogHook noticeLogHook; // null allowed, option
 
     @Resource
     private ExceptionTranslator exceptionTranslator; // injected simply
@@ -94,7 +94,7 @@ public class LaJobRunner {
      * @param noticeLogHook The callback of notice log hook for e.g. saving to database. (NotNull)
      * @return this. (NotNull)
      */
-    public LaJobRunner useNoticeLogHook(NoticeLogHook noticeLogHook) { // almost required if DBFlute
+    public LaJobRunner useNoticeLogHook(JobNoticeLogHook noticeLogHook) { // almost required if DBFlute
         if (noticeLogHook == null) {
             throw new IllegalArgumentException("The argument 'noticeLogHook' should not be null.");
         }
@@ -169,12 +169,7 @@ public class LaJobRunner {
     protected long showRunning(LaJobRuntime runtime) {
         // no use enabled determination to be simple
         final String msg = "#flow #job ...Running job: " + runtime.toCronMethodDisp();
-        final NoticeLogLevel noticeLogLevel = runtime.getNoticeLogLevel();
-        if (NoticeLogLevel.INFO.equals(noticeLogLevel)) {
-            logger.info(msg);
-        } else if (NoticeLogLevel.DEBUG.equals(noticeLogLevel)) {
-            logger.debug(msg);
-        }
+        JobNoticeLog.log(runtime.getNoticeLogLevel(), () -> msg);
         if (noticeLogHook != null) {
             noticeLogHook.hookRunning(runtime, msg);
         }
@@ -184,15 +179,10 @@ public class LaJobRunner {
 
     protected void showFinishing(LaJobRuntime runtime, long before, Throwable cause) {
         final String msg = buildFinishingMsg(runtime, before, cause); // also no use enabled
-        final NoticeLogLevel noticeLogLevel = runtime.getNoticeLogLevel();
         if (noticeLogHook != null) {
             noticeLogHook.hookFinishing(runtime, msg);
         }
-        if (NoticeLogLevel.INFO.equals(noticeLogLevel)) {
-            logger.info(msg);
-        } else if (NoticeLogLevel.DEBUG.equals(noticeLogLevel)) {
-            logger.debug(msg);
-        }
+        JobNoticeLog.log(runtime.getNoticeLogLevel(), () -> msg);
     }
 
     protected String buildFinishingMsg(LaJobRuntime runtime, long before, Throwable cause) {
