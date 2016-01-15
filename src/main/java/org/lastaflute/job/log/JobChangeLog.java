@@ -30,7 +30,7 @@ public class JobChangeLog {
     /** The logger instance for this class. (NotNull) */
     private static final Logger logger = LoggerFactory.getLogger(JobChangeLog.class);
 
-    protected static boolean _jobLogLevelInfo;
+    protected static boolean _jobLogLevelDebug; // default is INFO
     protected static boolean _loggingInHolidayMood;
     protected static boolean _locked = true;
 
@@ -38,10 +38,10 @@ public class JobChangeLog {
     //                                                                         Job Logging
     //                                                                         ===========
     public static void log(String msg, Object... args) { // very internal
-        if (_jobLogLevelInfo) {
-            logger.info(msg, args);
-        } else {
+        if (_jobLogLevelDebug) {
             logger.debug(msg, args);
+        } else {
+            logger.info(msg, args);
         }
     }
 
@@ -49,26 +49,26 @@ public class JobChangeLog {
         if (_loggingInHolidayMood) {
             return false;
         }
-        if (_jobLogLevelInfo) {
-            return logger.isInfoEnabled();
-        } else {
+        if (_jobLogLevelDebug) {
             return logger.isDebugEnabled();
+        } else {
+            return logger.isInfoEnabled();
         }
     }
 
     // ===================================================================================
     //                                                                  Logging Adjustment
     //                                                                  ==================
-    protected static boolean isJobLogLevelInfo() {
-        return _jobLogLevelInfo;
+    protected static boolean isJobLogLevelDebug() {
+        return _jobLogLevelDebug;
     }
 
-    public static void setJobLogLevelInfo(boolean jobLogLevelInfo) {
+    public static void setJobLogLevelDebug(boolean jobLogLevelDebug) {
         assertUnlocked();
         if (logger.isInfoEnabled()) {
-            logger.info("...Setting jobLogLevelInfo: " + jobLogLevelInfo);
+            logger.info("...Setting jobLogLevelDebug: " + jobLogLevelDebug);
         }
-        _jobLogLevelInfo = jobLogLevelInfo;
+        _jobLogLevelDebug = jobLogLevelDebug;
         lock(); // auto-lock here, because of deep world
     }
 
@@ -116,6 +116,6 @@ public class JobChangeLog {
         if (!isLocked()) {
             return;
         }
-        throw new IllegalStateException("The job log is locked.");
+        throw new IllegalStateException("The job change log is locked.");
     }
 }
