@@ -93,6 +93,13 @@ public interface LaScheduledJob {
     void unschedule();
 
     /**
+     * This job becomes non-cron so the job will not executed by scheduler. <br>
+     * You can only execute by launchNow(). <br>
+     * And you can restore the job as normal cron by reschedule().
+     */
+    void becomeNonCron();
+
+    /**
      * @return true if the job is unscheduled.
      */
     boolean isUnscheduled();

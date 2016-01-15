@@ -53,7 +53,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected String cronExp; // can be updated
+    protected String cronExp; // can be updated, might be non-cron
     protected final Class<? extends LaJob> jobType;
     protected ConcurrentExec concurrentExec;
     protected LaCronOption cronOption; // can be updated
@@ -76,6 +76,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                              Switch
     //                                                                              ======
+    public synchronized void becomeNonCrom() {
+        cronExp = Cron4jCron.NON_CRON;
+    }
+
     public synchronized void switchCron(String cronExp, LaCronOption cronOption) {
         this.cronExp = cronExp;
         this.cronOption = cronOption;
@@ -163,15 +167,15 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     // ===================================================================================
-    //                                                                              Option
-    //                                                                              ======
+    //                                                                       Determination
+    //                                                                       =============
     @Override
     public boolean canBeStopped() {
-        return true; // #thiking fixedly true, all right?
+        return true; // fixedly
     }
 
-    public synchronized OptionalThing<LaJobUnique> getJobUnique() {
-        return cronOption.getJobUnique();
+    public synchronized boolean isNonCron() {
+        return Cron4jCron.isNonCron(cronExp);
     }
 
     // ===================================================================================
@@ -192,5 +196,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     public Class<? extends LaJob> getJobType() {
         return jobType;
+    }
+
+    public synchronized OptionalThing<LaJobUnique> getJobUnique() {
+        return cronOption.getJobUnique();
+    }
+
+    public LaCronOption getCronOption() {
+        return cronOption;
     }
 }

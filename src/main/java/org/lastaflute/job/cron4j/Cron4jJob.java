@@ -40,6 +40,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           =========
     protected final LaJobKey jobKey;
     protected final OptionalThing<LaJobUnique> jobUnique;
+    protected OptionalThing<Cron4jId> cron4jId; // mutable
     protected final Cron4jTask cron4jTask;
     protected final Cron4jNow cron4jNow;
     protected volatile boolean unscheduled;
@@ -47,9 +48,11 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
+    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, OptionalThing<Cron4jId> cron4jId, Cron4jTask cron4jTask,
+            Cron4jNow cron4jNow) {
         this.jobKey = jobKey;
         this.jobUnique = jobUnique;
+        this.cron4jId = cron4jId;
         this.cron4jTask = cron4jTask;
         this.cron4jNow = cron4jNow;
     }
@@ -97,8 +100,20 @@ public class Cron4jJob implements LaScheduledJob {
         if (unscheduled) {
             throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
+        if (isNonCrom(cronExp)) {
+            throw new IllegalArgumentException("The cronExp for reschedule() should not be non-cron: " + toString());
+        }
         cron4jTask.switchCron(cronExp, createCronOption(opLambda));
-        cron4jNow.getCron4jScheduler().reschedule(jobKey.value(), cronExp);
+        cron4jId.ifPresent(id -> {
+            cron4jNow.getCron4jScheduler().reschedule(id, cronExp);
+        }).orElse(() -> {
+            final String generatedId = cron4jNow.getCron4jScheduler().schedule(cronExp, cron4jTask);
+            cron4jId = OptionalThing.of(Cron4jId.of(generatedId));
+        });
+    }
+
+    protected boolean isNonCrom(String cronExp) {
+        return Cron4jCron.isNonCron(cronExp);
     }
 
     protected LaCronOption createCronOption(CronOpCall opLambda) {
@@ -112,14 +127,31 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void unschedule() {
-        cron4jNow.getCron4jScheduler().deschedule(jobKey.value());
-        cron4jNow.clearUnscheduleJob(); // #thinking keep until executing job finished?
+        cron4jId.ifPresent(id -> {
+            cron4jNow.getCron4jScheduler().deschedule(id);
+        });
+        cron4jNow.clearUnscheduleJob(); // immediately clear, executing process is kept
         unscheduled = true;
     }
 
     @Override
     public boolean isUnscheduled() {
         return unscheduled;
+    }
+
+    // ===================================================================================
+    //                                                                            Non-Cron
+    //                                                                            ========
+    @Override
+    public void becomeNonCron() {
+        cron4jId.ifPresent(id -> {
+            cron4jTask.becomeNonCrom();
+            cron4jNow.getCron4jScheduler().deschedule(id);
+            cron4jId = OptionalThing.empty();
+        }).orElse(() -> {
+            String msg = "Already non-cron so your becomeNonCron() is non-sense: job=" + toString();
+            throw new IllegalStateException(msg);
+        });
     }
 
     // ===================================================================================
