@@ -188,7 +188,7 @@ public class LaJobRunner {
     protected String buildFinishingMsg(LaJobRuntime runtime, long before, Throwable cause) {
         final long after = System.currentTimeMillis();
         final StringBuilder sb = new StringBuilder();
-        sb.append("#flow #job ...Finishing job: ").append(runtime.toMethodDisp());
+        sb.append("#flow #job ...Finishing job: ").append(runtime.toRunMethodDisp());
         sb.append(LF).append("[Job Result]");
         sb.append(LF).append(" performanceView: ").append(toPerformanceView(before, after));
         extractSqlCount().ifPresent(counter -> {

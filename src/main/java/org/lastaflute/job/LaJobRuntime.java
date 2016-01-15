@@ -62,5 +62,5 @@ public interface LaJobRuntime {
     //                                                                             =======
     String toCronMethodDisp(); // not null
 
-    String toMethodDisp(); // not null
+    String toRunMethodDisp(); // not null
 }

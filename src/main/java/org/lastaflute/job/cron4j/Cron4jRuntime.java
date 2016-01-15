@@ -91,7 +91,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     @Override
-    public String toMethodDisp() {
+    public String toRunMethodDisp() {
         final StringBuilder sb = new StringBuilder();
         sb.append(jobType.getSimpleName()).append("@").append(runMethod.getName()).append("()");
         return sb.toString();
