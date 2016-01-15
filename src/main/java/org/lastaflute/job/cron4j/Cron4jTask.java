@@ -174,7 +174,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return true; // fixedly
     }
 
-    public synchronized boolean isNonCron() {
+    public boolean isNonCron() {
         return Cron4jCron.isNonCron(cronExp);
     }
 
@@ -199,7 +199,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return jobType;
     }
 
-    public synchronized OptionalThing<LaJobUnique> getJobUnique() {
+    public OptionalThing<LaJobUnique> getJobUnique() {
         return cronOption.getJobUnique();
     }
 
