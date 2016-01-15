@@ -78,7 +78,7 @@ public class Cron4jJob implements LaScheduledJob {
         if (unscheduled) {
             throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
-        if (JobChangeLog.isLogEnabled()) {
+        if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Launching now: {}", toString());
         }
         // if executed by cron here, duplicate execution occurs but task level synchronization exists
@@ -91,7 +91,7 @@ public class Cron4jJob implements LaScheduledJob {
     @Override
     public synchronized void stopNow() {
         final List<TaskExecutor> executorList = findExecutorList();
-        if (JobChangeLog.isLogEnabled()) {
+        if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Stopping {} execution(s) now: {}", executorList.size(), toString());
         }
         if (!executorList.isEmpty()) {
@@ -114,12 +114,12 @@ public class Cron4jJob implements LaScheduledJob {
         cron4jTask.switchCron(cronExp, createCronOption(opLambda));
         final Cron4jScheduler cron4jScheduler = cron4jNow.getCron4jScheduler();
         cron4jId.ifPresent(id -> {
-            if (JobChangeLog.isLogEnabled()) {
+            if (JobChangeLog.isEnabled()) {
                 JobChangeLog.log("#job ...Rescheduling {} as cron from '{}' to '{}'", jobKey, existingCronExp, cronExp);
             }
             cron4jScheduler.reschedule(id, cronExp);
         }).orElse(() -> {
-            if (JobChangeLog.isLogEnabled()) {
+            if (JobChangeLog.isEnabled()) {
                 JobChangeLog.log("#job ...Rescheduling {} as cron from non-cron to '{}'", jobKey, cronExp);
             }
             final String generatedId = cron4jScheduler.schedule(cronExp, cron4jTask);
@@ -142,7 +142,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void unschedule() {
-        if (JobChangeLog.isLogEnabled()) {
+        if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Unscheduling {}", toString());
         }
         cron4jId.ifPresent(id -> {
@@ -162,7 +162,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            ========
     @Override
     public synchronized void becomeNonCron() {
-        if (JobChangeLog.isLogEnabled()) {
+        if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Becoming non-cron: {}", toString());
         }
         cron4jId.ifPresent(id -> {

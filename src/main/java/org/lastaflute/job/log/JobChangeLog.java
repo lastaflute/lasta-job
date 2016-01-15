@@ -30,7 +30,10 @@ public class JobChangeLog {
     /** The logger instance for this class. (NotNull) */
     private static final Logger logger = LoggerFactory.getLogger(JobChangeLog.class);
 
-    protected static boolean _jobLogLevelDebug; // default is INFO
+    // ===================================================================================
+    //                                                                           Attribute
+    //                                                                           =========
+    protected static boolean _logLevelDebug; // default is INFO
     protected static boolean _loggingInHolidayMood;
     protected static boolean _locked = true;
 
@@ -38,18 +41,18 @@ public class JobChangeLog {
     //                                                                         Job Logging
     //                                                                         ===========
     public static void log(String msg, Object... args) { // very internal
-        if (_jobLogLevelDebug) {
+        if (_logLevelDebug) {
             logger.debug(msg, args);
         } else {
             logger.info(msg, args);
         }
     }
 
-    public static boolean isLogEnabled() { // very internal
+    public static boolean isEnabled() { // very internal
         if (_loggingInHolidayMood) {
             return false;
         }
-        if (_jobLogLevelDebug) {
+        if (_logLevelDebug) {
             return logger.isDebugEnabled();
         } else {
             return logger.isInfoEnabled();
@@ -59,16 +62,12 @@ public class JobChangeLog {
     // ===================================================================================
     //                                                                  Logging Adjustment
     //                                                                  ==================
-    protected static boolean isJobLogLevelDebug() {
-        return _jobLogLevelDebug;
-    }
-
-    public static void setJobLogLevelDebug(boolean jobLogLevelDebug) {
+    public static void setLogLevelDebug(boolean logLevelDebug) {
         assertUnlocked();
         if (logger.isInfoEnabled()) {
-            logger.info("...Setting jobLogLevelDebug: " + jobLogLevelDebug);
+            logger.info("...Setting job-change logLevelDebug: " + logLevelDebug);
         }
-        _jobLogLevelDebug = jobLogLevelDebug;
+        _logLevelDebug = logLevelDebug;
         lock(); // auto-lock here, because of deep world
     }
 
@@ -79,7 +78,7 @@ public class JobChangeLog {
     public static void setLoggingInHolidayMood(boolean loggingInHolidayMood) {
         assertUnlocked();
         if (logger.isInfoEnabled()) {
-            logger.info("...Setting loggingInHolidayMood: " + loggingInHolidayMood);
+            logger.info("...Setting job-change loggingInHolidayMood: " + loggingInHolidayMood);
         }
         _loggingInHolidayMood = loggingInHolidayMood;
         lock(); // auto-lock here, because of deep world

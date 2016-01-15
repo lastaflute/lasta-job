@@ -206,7 +206,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                    ================
     @Override
     public synchronized void destroy() {
-        if (JobChangeLog.isLogEnabled()) {
+        if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Destroying scheduler completely: jobs={} scheduler={}", jobKeyJobMap.size(), cron4jScheduler);
         }
         cron4jScheduler.stop();

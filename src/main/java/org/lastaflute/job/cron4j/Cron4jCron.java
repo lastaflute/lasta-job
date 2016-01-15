@@ -110,7 +110,7 @@ public class Cron4jCron implements LaCron {
     }
 
     protected void showRegistering(final Cron4jTask cron4jTask) {
-        if (CronRegistrationType.CHANGE.equals(registrationType) && JobChangeLog.isLogEnabled()) {
+        if (CronRegistrationType.CHANGE.equals(registrationType) && JobChangeLog.isEnabled()) {
             // only when change, because starter shows rich logging when start
             JobChangeLog.log("#job ...Registering job: {}", cron4jTask);
         }
