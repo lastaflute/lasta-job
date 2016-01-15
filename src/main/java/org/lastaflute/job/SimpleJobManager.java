@@ -41,6 +41,9 @@ public class SimpleJobManager implements JobManager {
     //                                                                          ==========
     private static final Logger logger = LoggerFactory.getLogger(SimpleJobManager.class);
 
+    // ===================================================================================
+    //                                                                           Attribute
+    //                                                                           =========
     /** The current state of scheduling. (NotNull) */
     protected LaSchedulingNow schedulingNow = createEmptyNow(); // because of delayed initialization
 

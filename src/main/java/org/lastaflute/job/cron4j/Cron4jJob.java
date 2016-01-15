@@ -104,10 +104,11 @@ public class Cron4jJob implements LaScheduledJob {
             throw new IllegalArgumentException("The cronExp for reschedule() should not be non-cron: " + toString());
         }
         cron4jTask.switchCron(cronExp, createCronOption(opLambda));
+        final Cron4jScheduler cron4jScheduler = cron4jNow.getCron4jScheduler();
         cron4jId.ifPresent(id -> {
-            cron4jNow.getCron4jScheduler().reschedule(id, cronExp);
+            cron4jScheduler.reschedule(id, cronExp);
         }).orElse(() -> {
-            final String generatedId = cron4jNow.getCron4jScheduler().schedule(cronExp, cron4jTask);
+            final String generatedId = cron4jScheduler.schedule(cronExp, cron4jTask);
             cron4jId = OptionalThing.of(Cron4jId.of(generatedId));
         });
     }
@@ -135,7 +136,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public boolean isUnscheduled() {
+    public synchronized boolean isUnscheduled() {
         return unscheduled;
     }
 
@@ -143,15 +144,17 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            Non-Cron
     //                                                                            ========
     @Override
-    public void becomeNonCron() {
+    public synchronized void becomeNonCron() {
         cron4jId.ifPresent(id -> {
             cron4jTask.becomeNonCrom();
             cron4jNow.getCron4jScheduler().deschedule(id);
             cron4jId = OptionalThing.empty();
-        }).orElse(() -> {
-            String msg = "Already non-cron so your becomeNonCron() is non-sense: job=" + toString();
-            throw new IllegalStateException(msg);
         });
+    }
+
+    @Override
+    public synchronized boolean isNonCron() {
+        return cron4jId.isPresent();
     }
 
     // ===================================================================================
@@ -159,10 +162,10 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                      ==============
     @Override
     public String toString() {
-        // cron4jTask has cronExp so no use here
-        final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElse(jobKey.toString());
+        final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.toString());
+        final String idExp = cron4jId.map(id -> id.value()).orElse("non-cron");
         final String hash = Integer.toHexString(hashCode());
-        return DfTypeUtil.toClassTitle(this) + ":{" + keyExp + ", " + cron4jTask + "}@" + hash;
+        return DfTypeUtil.toClassTitle(this) + ":{" + keyExp + ", " + idExp + ", " + cron4jTask + "}@" + hash;
     }
 
     // ===================================================================================
