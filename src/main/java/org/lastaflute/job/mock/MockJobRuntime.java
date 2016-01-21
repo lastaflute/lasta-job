@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.cron4j.Cron4jRuntime;
@@ -46,26 +45,26 @@ public class MockJobRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public MockJobRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap, LaCronOption cronOption,
-            TaskExecutionContext cron4jContext) {
-        cron4jRuntime = new Cron4jRuntime(cronExp, jobType, parameterMap, cronOption, cron4jContext);
+    public MockJobRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap,
+            JobNoticeLogLevel noticeLogLevel, TaskExecutionContext cron4jContext) {
+        cron4jRuntime = new Cron4jRuntime(cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
     }
 
     public static MockJobRuntime asDefault() {
         final Map<String, Object> parameterMap = new HashMap<String, Object>();
-        final LaCronOption option = new LaCronOption();
+        final JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
         final Scheduler scheduler = new Scheduler();
         final TaskExecutor taskExecutor = null; // cannot create...
         final TaskExecutionContext cron4jContext = new MockTaskExecutionContext(scheduler, taskExecutor);
-        return new MockJobRuntime("* * * * *", MockJob.class, parameterMap, option, cron4jContext);
+        return new MockJobRuntime("* * * * *", MockJob.class, parameterMap, noticeLogLevel, cron4jContext);
     }
 
     public static MockJobRuntime withParameter(Map<String, Object> parameterMap) {
-        final LaCronOption option = new LaCronOption();
+        final JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
         final Scheduler scheduler = new Scheduler();
         final TaskExecutor taskExecutor = null; // cannot create...
         final TaskExecutionContext cron4jContext = new MockTaskExecutionContext(scheduler, taskExecutor);
-        return new MockJobRuntime("* * * * *", MockJob.class, parameterMap, option, cron4jContext);
+        return new MockJobRuntime("* * * * *", MockJob.class, parameterMap, noticeLogLevel, cron4jContext);
     }
 
     // ===================================================================================

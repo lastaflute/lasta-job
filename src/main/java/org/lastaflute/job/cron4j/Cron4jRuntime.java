@@ -22,7 +22,6 @@ import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
-import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.exception.JobStoppedException;
@@ -44,14 +43,14 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final Class<? extends LaJob> jobType;
     protected final Method runMethod;
     protected final Map<String, Object> parameterMap;
-    protected final LaCronOption cronOption;
+    protected final JobNoticeLogLevel noticeLogLevel;
     protected final TaskExecutionContext cron4jContext;
     protected EndTitleRoll endTitleRollData;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap, LaCronOption cronOption,
+    public Cron4jRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap, JobNoticeLogLevel noticeLogLevel,
             TaskExecutionContext cron4jContext) {
         this.cronExp = cronExp;
         this.jobType = jobType;
@@ -61,7 +60,7 @@ public class Cron4jRuntime implements LaJobRuntime {
             throw new IllegalStateException("Not found the run method in the job: " + jobType, e);
         }
         this.parameterMap = Collections.unmodifiableMap(parameterMap);
-        this.cronOption = cronOption;
+        this.noticeLogLevel = noticeLogLevel;
         this.cron4jContext = cron4jContext;
     }
 
@@ -162,11 +161,7 @@ public class Cron4jRuntime implements LaJobRuntime {
 
     @Override
     public JobNoticeLogLevel getNoticeLogLevel() {
-        return cronOption.getNoticeLogLevel();
-    }
-
-    public LaCronOption getCronOption() { // not interface method because of mutable
-        return cronOption;
+        return noticeLogLevel;
     }
 
     public TaskExecutionContext getCron4jContext() { // not interface method because of cron4j's one 
