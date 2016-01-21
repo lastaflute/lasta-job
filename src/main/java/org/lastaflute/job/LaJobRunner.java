@@ -106,9 +106,11 @@ public class LaJobRunner {
     //                                                                                Run
     //                                                                               =====
     public void run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
-        if (!isHotdeployEnabled() || isSuppressHotdeploy()) { // e.g. production, unit-test
+        if (isPlainlyRun()) { // e.g. production, unit-test
             doRun(jobType, runtimeSupplier);
+            return;
         }
+        // e.g. local development (hot deploy)
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
         final ClassLoader originalLoader = startHotdeploy();
@@ -117,6 +119,10 @@ public class LaJobRunner {
         } finally {
             stopHotdeploy(originalLoader);
         }
+    }
+
+    protected boolean isPlainlyRun() {
+        return !isHotdeployEnabled() || isSuppressHotdeploy();
     }
 
     protected boolean isHotdeployEnabled() {
