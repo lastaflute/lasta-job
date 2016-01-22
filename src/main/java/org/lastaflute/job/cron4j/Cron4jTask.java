@@ -52,12 +52,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected VaryingCron varyingCron; // can be switched, might be non-cron
+    protected VaryingCron varyingCron; // not null, can be switched
     protected final Class<? extends LaJob> jobType;
     protected final ConcurrentExec concurrentExec;
     protected final String threadName;
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
+    protected final Object executingLock = new Object();
     protected final Object varyingLock = new Object();
 
     // ===================================================================================
@@ -71,21 +72,6 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         this.threadName = threadName;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
-    }
-
-    // ===================================================================================
-    //                                                                              Switch
-    //                                                                              ======
-    public void becomeNonCrom() {
-        synchronized (varyingLock) {
-            this.varyingCron = new VaryingCron(Cron4jCron.NON_CRON, varyingCron.getCronOption());
-        }
-    }
-
-    public void switchCron(String cronExp, VaryingCronOption cronOption) {
-        synchronized (varyingLock) {
-            this.varyingCron = new VaryingCron(cronExp, cronOption);
-        }
     }
 
     // ===================================================================================
@@ -110,7 +96,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             cronExp = varyingCron.getCronExp();
             cronOption = varyingCron.getCronOption();
         }
-        synchronized (this) { // avoid duplicate execution, waiting for previous ending
+        synchronized (executingLock) { // avoid duplicate execution, waiting for previous ending
             doExecute(cronExp, cronOption, context);
         }
     }
@@ -145,7 +131,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                             Executing
     //                                             ---------
-    // cannot use instance variables of switchable resources e.g. this.cronExp, this.cronOption
+    // in execution lock, cannot use varingCron here
     protected void doExecute(String cronExp, VaryingCronOption cronOption, TaskExecutionContext context) { // in synchronized world
         adjustThreadNameIfNeeds(cronOption);
         runJob(cronExp, cronOption, context);
@@ -170,6 +156,25 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     protected Map<String, Object> extractParameterMap(VaryingCronOption cronOption) {
         return cronOption.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
+    }
+
+    // ===================================================================================
+    //                                                                              Switch
+    //                                                                              ======
+    public void becomeNonCrom() {
+        synchronized (varyingLock) {
+            this.varyingCron = createVaryingCron(Cron4jCron.NON_CRON, varyingCron.getCronOption());
+        }
+    }
+
+    public void switchCron(String cronExp, VaryingCronOption cronOption) {
+        synchronized (varyingLock) {
+            this.varyingCron = createVaryingCron(cronExp, cronOption);
+        }
+    }
+
+    protected VaryingCron createVaryingCron(String cronExp, VaryingCronOption cronOption) {
+        return new VaryingCron(cronExp, cronOption);
     }
 
     // ===================================================================================
@@ -208,5 +213,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     public Class<? extends LaJob> getJobType() {
         return jobType;
+    }
+
+    public Object getExecutingLock() {
+        return executingLock;
+    }
+
+    public Object getVaryingLock() {
+        return varyingLock;
     }
 }

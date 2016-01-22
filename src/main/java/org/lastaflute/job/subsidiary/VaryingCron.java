@@ -21,8 +21,8 @@ package org.lastaflute.job.subsidiary;
  */
 public class VaryingCron {
 
-    protected final String cronExp;
-    protected final VaryingCronOption cronOption;
+    protected final String cronExp; // not null, might be non-cron
+    protected final VaryingCronOption cronOption; // not null
 
     public VaryingCron(String cronExp, VaryingCronOption cronOption) {
         this.cronExp = cronExp;

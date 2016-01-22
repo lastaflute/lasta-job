@@ -45,7 +45,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final Map<String, Object> parameterMap;
     protected final JobNoticeLogLevel noticeLogLevel;
     protected final TaskExecutionContext cron4jContext;
-    protected EndTitleRoll endTitleRollData;
+    protected EndTitleRoll endTitleRollData; // specified by application in job
 
     // ===================================================================================
     //                                                                         Constructor
