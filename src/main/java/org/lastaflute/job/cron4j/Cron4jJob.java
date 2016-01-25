@@ -42,7 +42,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           =========
     protected final LaJobKey jobKey;
     protected final OptionalThing<LaJobUnique> jobUnique;
-    protected OptionalThing<Cron4jId> cron4jId; // mutable
+    protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
     protected final Cron4jTask cron4jTask;
     protected final Cron4jNow cron4jNow;
     protected volatile boolean unscheduled;
@@ -108,7 +108,7 @@ public class Cron4jJob implements LaScheduledJob {
         if (unscheduled) {
             throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
-        if (isNonCrom(cronExp)) {
+        if (isNonCromExp(cronExp)) {
             throw new IllegalArgumentException("The cronExp for reschedule() should not be non-cron: " + toString());
         }
         final String existingCronExp = cron4jTask.getVaryingCron().getCronExp();
@@ -128,8 +128,8 @@ public class Cron4jJob implements LaScheduledJob {
         });
     }
 
-    protected boolean isNonCrom(String cronExp) {
-        return Cron4jCron.isNonCron(cronExp);
+    protected boolean isNonCromExp(String cronExp) {
+        return Cron4jCron.isNonCronExp(cronExp);
     }
 
     protected VaryingCronOption createCronOption(VaryingCronOpCall opLambda) {
@@ -175,7 +175,7 @@ public class Cron4jJob implements LaScheduledJob {
 
     @Override
     public synchronized boolean isNonCron() {
-        return cron4jId.isPresent();
+        return !cron4jId.isPresent();
     }
 
     // ===================================================================================

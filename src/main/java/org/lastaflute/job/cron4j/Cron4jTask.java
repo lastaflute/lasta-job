@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.dbflute.helper.HandyDate;
@@ -55,7 +56,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected VaryingCron varyingCron; // not null, can be switched
     protected final Class<? extends LaJob> jobType;
     protected final ConcurrentExec concurrentExec;
-    protected final String threadName;
+    protected final Supplier<String> threadNaming;
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
     protected final Object executingLock = new Object();
@@ -64,12 +65,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, String threadName,
+    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, Supplier<String> threadNaming,
             LaJobRunner jobRunner, Cron4jNow cron4jNow) {
         this.varyingCron = varyingCron;
         this.jobType = jobType;
         this.concurrentExec = concurrentExec;
-        this.threadName = threadName;
+        this.threadNaming = threadNaming;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
     }
@@ -122,10 +123,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected List<LocalDateTime> extractExecutingStartTimes(List<TaskExecutor> executorList) {
-        final List<LocalDateTime> startTimeList = executorList.stream().map(executor -> {
+        return executorList.stream().map(executor -> {
             return new HandyDate(new Date(executor.getStartTime())).getLocalDateTime();
         }).collect(Collectors.toList());
-        return startTimeList;
     }
 
     // -----------------------------------------------------
@@ -138,10 +138,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected void adjustThreadNameIfNeeds(VaryingCronOption cronOption) { // because of too long name of cron4j
+        final String supplied = threadNaming.get();
         final Thread currentThread = Thread.currentThread();
-        if (!threadName.equals(currentThread.getName())) { // first time
-            currentThread.setName(threadName);
+        if (currentThread.getName().equals(supplied)) { // already adjusted
+            return;
         }
+        currentThread.setName(supplied);
     }
 
     protected void runJob(String cronExp, VaryingCronOption cronOption, TaskExecutionContext cron4jContext) {
@@ -186,7 +188,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     public boolean isNonCron() {
-        return Cron4jCron.isNonCron(varyingCron.getCronExp());
+        return Cron4jCron.isNonCronExp(varyingCron.getCronExp());
     }
 
     // ===================================================================================
