@@ -15,15 +15,21 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.util.function.Supplier;
+
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaCron;
-import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaScheduledJob;
+import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
-import org.lastaflute.job.subsidiary.CronOpCall;
+import org.lastaflute.job.subsidiary.CronOption;
+import org.lastaflute.job.subsidiary.InitialCronOpCall;
+import org.lastaflute.job.subsidiary.InitialCronOption;
+import org.lastaflute.job.subsidiary.VaryingCron;
+import org.lastaflute.job.subsidiary.VaryingCronOption;
 
 /**
  * @author jflute
@@ -37,7 +43,7 @@ public class Cron4jCron implements LaCron {
     /** The cronExp to specify non-scheduling. */
     public static String NON_CRON = "$$nonCron$$";
 
-    public static boolean isNonCron(String cronExp) {
+    public static boolean isNonCronExp(String cronExp) {
         return NON_CRON.equals(cronExp);
     }
 
@@ -67,7 +73,8 @@ public class Cron4jCron implements LaCron {
     //                                                                            Register
     //                                                                            ========
     @Override
-    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, CronOpCall opLambda) {
+    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
+            InitialCronOpCall opLambda) {
         assertArgumentNotNull("cronExp", cronExp);
         if (isNonCrom(cronExp)) {
             throw new IllegalArgumentException("The cronExp for register() should not be non-cron: " + toString());
@@ -79,11 +86,11 @@ public class Cron4jCron implements LaCron {
     }
 
     protected boolean isNonCrom(String cronExp) {
-        return Cron4jCron.isNonCron(cronExp);
+        return Cron4jCron.isNonCronExp(cronExp);
     }
 
     @Override
-    public LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, CronOpCall opLambda) {
+    public LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, InitialCronOpCall opLambda) {
         assertArgumentNotNull("jobType", jobType);
         assertArgumentNotNull("concurrentExec", concurrentExec);
         assertArgumentNotNull("opLambda (cronOptionConsumer)", opLambda);
@@ -91,25 +98,42 @@ public class Cron4jCron implements LaCron {
     }
 
     protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
-            CronOpCall opLambda) {
-        final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, concurrentExec, createCronOption(opLambda));
+            InitialCronOpCall opLambda) {
+        final InitialCronOption cronOption = createCronOption(opLambda);
+        final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, concurrentExec, cronOption);
         showRegistering(cron4jTask);
-        final String cron4jId = scheduleIfNeeds(cronExp, cron4jTask);
-        return saveJob(cron4jId, cron4jTask);
+        final OptionalThing<LaJobUnique> jobUnique = cronOption.getJobUnique();
+        final String cron4jId = scheduleIfNeeds(cronExp, cron4jTask); // null allowed when non-cron
+        return saveJob(cron4jTask, jobUnique, cron4jId);
     }
 
-    protected LaCronOption createCronOption(CronOpCall opLambda) {
-        final LaCronOption option = new LaCronOption();
+    protected InitialCronOption createCronOption(InitialCronOpCall opLambda) {
+        final CronOption option = new CronOption();
         opLambda.callback(option);
         return option;
     }
 
     protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
-            LaCronOption cronOption) {
-        return new Cron4jTask(cronExp, jobType, concurrentExec, cronOption, jobRunner, cron4jNow); // adapter task
+            InitialCronOption cronOption) {
+        final VaryingCron varyingCron = createVaryingCron(cronExp, cronOption);
+        final Supplier<String> threadNaming = prepareThreadNaming(cronOption);
+        return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow); // adapter task
     }
 
-    protected void showRegistering(final Cron4jTask cron4jTask) {
+    protected VaryingCron createVaryingCron(String cronExp, VaryingCronOption cronOption) {
+        return new VaryingCron(cronExp, cronOption);
+    }
+
+    protected Supplier<String> prepareThreadNaming(InitialCronOption cronOption) {
+        final OptionalThing<LaJobUnique> jobUnique = cronOption.getJobUnique();
+        return () -> { // callback for current thread
+            return "job_" + jobUnique.map(uq -> uq.value()).orElseGet(() -> {
+                return Integer.toHexString(Thread.currentThread().hashCode()); // task's threand
+            });
+        };
+    }
+
+    protected void showRegistering(Cron4jTask cron4jTask) {
         if (CronRegistrationType.CHANGE.equals(registrationType) && JobChangeLog.isEnabled()) {
             // only when change, because starter shows rich logging when start
             JobChangeLog.log("#job ...Registering job: {}", cron4jTask);
@@ -126,8 +150,8 @@ public class Cron4jCron implements LaCron {
         return cron4jId;
     }
 
-    protected Cron4jJob saveJob(String cron4jId, Cron4jTask cron4jTask) {
-        return cron4jNow.saveJob(cron4jTask, OptionalThing.ofNullable(cron4jId, () -> {
+    protected Cron4jJob saveJob(Cron4jTask cron4jTask, OptionalThing<LaJobUnique> jobUnique, String cron4jId) {
+        return cron4jNow.saveJob(cron4jTask, jobUnique, OptionalThing.ofNullable(cron4jId, () -> {
             throw new IllegalStateException("Not found the cron4jId: " + cron4jTask);
         }));
     }

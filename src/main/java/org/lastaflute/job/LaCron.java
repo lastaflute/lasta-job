@@ -16,7 +16,7 @@
 package org.lastaflute.job;
 
 import org.lastaflute.job.subsidiary.ConcurrentExec;
-import org.lastaflute.job.subsidiary.CronOpCall;
+import org.lastaflute.job.subsidiary.InitialCronOpCall;
 
 /**
  * @author jflute
@@ -35,7 +35,7 @@ public interface LaCron {
      * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
      * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, CronOpCall opLambda);
+    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, InitialCronOpCall opLambda);
 
     /**
      * Register non-cron job with scheduling with option.
@@ -47,5 +47,5 @@ public interface LaCron {
      * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
      * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, CronOpCall opLambda);
+    LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, InitialCronOpCall opLambda);
 }

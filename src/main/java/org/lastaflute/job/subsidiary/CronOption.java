@@ -13,18 +13,17 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job;
+package org.lastaflute.job.subsidiary;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
-import org.lastaflute.job.subsidiary.CronParamsSupplier;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class LaCronOption {
+public class CronOption implements InitialCronOption, VaryingCronOption {
 
     // ===================================================================================
     //                                                                           Attribute
@@ -36,7 +35,8 @@ public class LaCronOption {
     // ===================================================================================
     //                                                                              Facade
     //                                                                              ======
-    public LaCronOption uniqueBy(String uniqueCode) {
+    @Override
+    public CronOption uniqueBy(String uniqueCode) {
         if (uniqueCode == null) {
             throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
         }
@@ -48,7 +48,8 @@ public class LaCronOption {
         return LaJobUnique.of(uniqueCode);
     }
 
-    public LaCronOption params(CronParamsSupplier noArgLambda) {
+    @Override
+    public CronOption params(CronParamsSupplier noArgLambda) {
         if (noArgLambda == null) {
             throw new IllegalArgumentException("The argument 'noArgLambda' should not be null.");
         }
@@ -59,12 +60,14 @@ public class LaCronOption {
     // -----------------------------------------------------
     //                                      Notice Log Level
     //                                      ----------------
-    public LaCronOption changeNoticeLogToDebug() {
+    @Override
+    public CronOption changeNoticeLogToDebug() {
         noticeLogLevel = JobNoticeLogLevel.DEBUG;
         return this;
     }
 
-    public LaCronOption changeNoticeLogToSuppressed() {
+    @Override
+    public CronOption changeNoticeLogToSuppressed() {
         noticeLogLevel = JobNoticeLogLevel.SUPPRESSED;
         return this;
     }
@@ -82,18 +85,21 @@ public class LaCronOption {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    @Override
     public OptionalThing<LaJobUnique> getJobUnique() {
         return OptionalThing.ofNullable(jobUnique, () -> {
             throw new IllegalStateException("Not found the application unique code.");
         });
     }
 
+    @Override
     public OptionalThing<CronParamsSupplier> getParamsSupplier() {
         return OptionalThing.ofNullable(paramsSupplier, () -> {
             throw new IllegalStateException("Not found the parameters supplier.");
         });
     }
 
+    @Override
     public JobNoticeLogLevel getNoticeLogLevel() {
         return noticeLogLevel;
     }

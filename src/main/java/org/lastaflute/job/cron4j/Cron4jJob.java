@@ -19,14 +19,15 @@ import java.util.List;
 
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
-import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
-import org.lastaflute.job.subsidiary.CronOpCall;
+import org.lastaflute.job.subsidiary.CronOption;
+import org.lastaflute.job.subsidiary.VaryingCronOpCall;
+import org.lastaflute.job.subsidiary.VaryingCronOption;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -41,7 +42,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           =========
     protected final LaJobKey jobKey;
     protected final OptionalThing<LaJobUnique> jobUnique;
-    protected OptionalThing<Cron4jId> cron4jId; // mutable
+    protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
     protected final Cron4jTask cron4jTask;
     protected final Cron4jNow cron4jNow;
     protected volatile boolean unscheduled;
@@ -103,14 +104,14 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          Reschedule
     //                                                                          ==========
     @Override
-    public synchronized void reschedule(String cronExp, CronOpCall opLambda) {
+    public synchronized void reschedule(String cronExp, VaryingCronOpCall opLambda) {
         if (unscheduled) {
             throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
-        if (isNonCrom(cronExp)) {
+        if (isNonCromExp(cronExp)) {
             throw new IllegalArgumentException("The cronExp for reschedule() should not be non-cron: " + toString());
         }
-        final String existingCronExp = cron4jTask.getCronExp();
+        final String existingCronExp = cron4jTask.getVaryingCron().getCronExp();
         cron4jTask.switchCron(cronExp, createCronOption(opLambda));
         final Cron4jScheduler cron4jScheduler = cron4jNow.getCron4jScheduler();
         cron4jId.ifPresent(id -> {
@@ -127,12 +128,12 @@ public class Cron4jJob implements LaScheduledJob {
         });
     }
 
-    protected boolean isNonCrom(String cronExp) {
-        return Cron4jCron.isNonCron(cronExp);
+    protected boolean isNonCromExp(String cronExp) {
+        return Cron4jCron.isNonCronExp(cronExp);
     }
 
-    protected LaCronOption createCronOption(CronOpCall opLambda) {
-        final LaCronOption option = new LaCronOption();
+    protected VaryingCronOption createCronOption(VaryingCronOpCall opLambda) {
+        final VaryingCronOption option = new CronOption();
         opLambda.callback(option);
         return option;
     }
@@ -174,7 +175,7 @@ public class Cron4jJob implements LaScheduledJob {
 
     @Override
     public synchronized boolean isNonCron() {
-        return cron4jId.isPresent();
+        return !cron4jId.isPresent();
     }
 
     // ===================================================================================
@@ -203,7 +204,7 @@ public class Cron4jJob implements LaScheduledJob {
 
     @Override
     public String getCronExp() {
-        return cron4jTask.getCronExp();
+        return cron4jTask.getVaryingCron().getCronExp();
     }
 
     @Override

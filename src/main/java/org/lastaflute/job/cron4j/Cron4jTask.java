@@ -20,18 +20,18 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.dbflute.helper.HandyDate;
-import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
-import org.lastaflute.job.LaCronOption;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
-import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.VaryingCron;
+import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,36 +53,26 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected String cronExp; // can be updated, might be non-cron
+    protected VaryingCron varyingCron; // not null, can be switched
     protected final Class<? extends LaJob> jobType;
-    protected ConcurrentExec concurrentExec;
-    protected LaCronOption cronOption; // can be updated
+    protected final ConcurrentExec concurrentExec;
+    protected final Supplier<String> threadNaming;
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
+    protected final Object executingLock = new Object();
+    protected final Object varyingLock = new Object();
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, LaCronOption cronOption,
+    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, Supplier<String> threadNaming,
             LaJobRunner jobRunner, Cron4jNow cron4jNow) {
-        this.cronExp = cronExp;
+        this.varyingCron = varyingCron;
         this.jobType = jobType;
         this.concurrentExec = concurrentExec;
-        this.cronOption = cronOption;
+        this.threadNaming = threadNaming;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
-    }
-
-    // ===================================================================================
-    //                                                                              Switch
-    //                                                                              ======
-    public synchronized void becomeNonCrom() {
-        cronExp = Cron4jCron.NON_CRON;
-    }
-
-    public synchronized void switchCron(String cronExp, LaCronOption cronOption) {
-        this.cronExp = cronExp;
-        this.cronOption = cronOption;
     }
 
     // ===================================================================================
@@ -92,17 +82,23 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     public void execute(TaskExecutionContext context) {
         final Cron4jJob job = findJob();
         final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
-        if (executorList.size() >= 2) { // other executions of same task exist
-            if (concurrentExec.equals(ConcurrentExec.QUIT)) {
-                noticeSilentlyQuit(job, executorList);
-                return;
-            } else if (concurrentExec.equals(ConcurrentExec.ERROR)) {
-                throwJobAlreadyExecutingSystemException(job, executorList);
+        final String cronExp;
+        final VaryingCronOption cronOption;
+        synchronized (varyingLock) {
+            if (executorList.size() >= 2) { // other executions of same task exist
+                if (concurrentExec.equals(ConcurrentExec.QUIT)) {
+                    noticeSilentlyQuit(job, executorList);
+                    return;
+                } else if (concurrentExec.equals(ConcurrentExec.ERROR)) {
+                    throwJobAlreadyExecutingSystemException(job, executorList);
+                }
+                // wait by synchronization as default
             }
-            // wait by synchronization as default
+            cronExp = varyingCron.getCronExp();
+            cronOption = varyingCron.getCronOption();
         }
-        synchronized (this) { // avoid duplicate execution, waiting for previous ending
-            doExecute(context);
+        synchronized (executingLock) { // avoid duplicate execution, waiting for previous ending
+            doExecute(cronExp, cronOption, context);
         }
     }
 
@@ -110,12 +106,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return cron4jNow.findJobByTask(this).get();
     }
 
-    protected synchronized void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) {
+    protected void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) { // in varying lock
+        final JobNoticeLogLevel noticeLogLevel = varyingCron.getCronOption().getNoticeLogLevel();
         final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
         final String msg = "...Quitting the job because of already existing job: " + job + " startTimes=" + startTimeList;
-        if (cronOption.getNoticeLogLevel().equals(JobNoticeLogLevel.INFO)) {
+        if (noticeLogLevel.equals(JobNoticeLogLevel.INFO)) {
             logger.info(msg);
-        } else if (cronOption.getNoticeLogLevel().equals(JobNoticeLogLevel.DEBUG)) {
+        } else if (noticeLogLevel.equals(JobNoticeLogLevel.DEBUG)) {
             logger.debug(msg);
         }
     }
@@ -126,44 +123,60 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected List<LocalDateTime> extractExecutingStartTimes(List<TaskExecutor> executorList) {
-        final List<LocalDateTime> startTimeList = executorList.stream().map(executor -> {
+        return executorList.stream().map(executor -> {
             return new HandyDate(new Date(executor.getStartTime())).getLocalDateTime();
         }).collect(Collectors.toList());
-        return startTimeList;
     }
 
     // -----------------------------------------------------
     //                                             Executing
     //                                             ---------
-    protected void doExecute(TaskExecutionContext context) { // in synchronized world
-        adjustThreadNameIfNeeds();
-        runJob(context);
+    // in execution lock, cannot use varingCron here
+    protected void doExecute(String cronExp, VaryingCronOption cronOption, TaskExecutionContext context) { // in synchronized world
+        adjustThreadNameIfNeeds(cronOption);
+        runJob(cronExp, cronOption, context);
     }
 
-    protected void adjustThreadNameIfNeeds() { // because of too long name of cron4j
+    protected void adjustThreadNameIfNeeds(VaryingCronOption cronOption) { // because of too long name of cron4j
+        final String supplied = threadNaming.get();
         final Thread currentThread = Thread.currentThread();
-        final String adjustedName = buildThreadName(currentThread);
-        if (!adjustedName.equals(currentThread.getName())) { // first time
-            currentThread.setName(adjustedName);
+        if (currentThread.getName().equals(supplied)) { // already adjusted
+            return;
+        }
+        currentThread.setName(supplied);
+    }
+
+    protected void runJob(String cronExp, VaryingCronOption cronOption, TaskExecutionContext cron4jContext) {
+        jobRunner.run(jobType, () -> createCron4jRuntime(cronExp, cronOption, cron4jContext));
+    }
+
+    protected Cron4jRuntime createCron4jRuntime(String cronExp, VaryingCronOption cronOption, TaskExecutionContext cron4jContext) {
+        final Map<String, Object> parameterMap = extractParameterMap(cronOption);
+        final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
+        return new Cron4jRuntime(cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
+    }
+
+    protected Map<String, Object> extractParameterMap(VaryingCronOption cronOption) {
+        return cronOption.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
+    }
+
+    // ===================================================================================
+    //                                                                              Switch
+    //                                                                              ======
+    public void becomeNonCrom() {
+        synchronized (varyingLock) {
+            this.varyingCron = createVaryingCron(Cron4jCron.NON_CRON, varyingCron.getCronOption());
         }
     }
 
-    protected String buildThreadName(Thread currentThread) {
-        return "job_" + cronOption.getJobUnique().map(uq -> uq.value()).orElseGet(() -> {
-            return Integer.toHexString(currentThread.hashCode());
-        });
+    public void switchCron(String cronExp, VaryingCronOption cronOption) {
+        synchronized (varyingLock) {
+            this.varyingCron = createVaryingCron(cronExp, cronOption);
+        }
     }
 
-    protected void runJob(TaskExecutionContext cron4jContext) {
-        jobRunner.run(jobType, () -> createCron4jRuntime(cron4jContext));
-    }
-
-    protected Cron4jRuntime createCron4jRuntime(TaskExecutionContext cron4jContext) {
-        return new Cron4jRuntime(cronExp, jobType, extractParameterMap(), cronOption, cron4jContext);
-    }
-
-    protected Map<String, Object> extractParameterMap() {
-        return cronOption.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
+    protected VaryingCron createVaryingCron(String cronExp, VaryingCronOption cronOption) {
+        return new VaryingCron(cronExp, cronOption);
     }
 
     // ===================================================================================
@@ -175,7 +188,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     public boolean isNonCron() {
-        return Cron4jCron.isNonCron(cronExp);
+        return Cron4jCron.isNonCronExp(varyingCron.getCronExp());
     }
 
     // ===================================================================================
@@ -184,26 +197,31 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     @Override
     public String toString() {
         final String title = DfTypeUtil.toClassTitle(this);
-        final String cronExpExp = isNonCron() ? "non-cron" : cronExp;
+        final String cronExpExp;
+        final VaryingCronOption cronOption;
+        synchronized (varyingLock) {
+            cronExpExp = isNonCron() ? "non-cron" : varyingCron.getCronExp();
+            cronOption = varyingCron.getCronOption();
+        }
         return title + ":{" + cronExpExp + ", " + jobType + ", " + concurrentExec + ", " + cronOption + "}";
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public String getCronExp() {
-        return cronExp;
+    public VaryingCron getVaryingCron() {
+        return varyingCron;
     }
 
     public Class<? extends LaJob> getJobType() {
         return jobType;
     }
 
-    public OptionalThing<LaJobUnique> getJobUnique() {
-        return cronOption.getJobUnique();
+    public Object getExecutingLock() {
+        return executingLock;
     }
 
-    public LaCronOption getCronOption() {
-        return cronOption;
+    public Object getVaryingLock() {
+        return varyingLock;
     }
 }
