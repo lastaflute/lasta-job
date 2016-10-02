@@ -61,10 +61,14 @@ public class SimpleJobManager implements JobManager {
     public synchronized void initialize() {
         BowgunCurtainBefore.unlock();
         BowgunCurtainBefore.shootBowgunCurtainBefore(assistantDirector -> {
-            schedulingNow = createStarter().start();
-            schedulingDone = true;
+            startSchedule();
             showBootLogging();
         });
+    }
+
+    protected void startSchedule() {
+        schedulingNow = createStarter().start();
+        schedulingDone = true;
     }
 
     protected void showBootLogging() {
@@ -117,6 +121,17 @@ public class SimpleJobManager implements JobManager {
     @Override
     public synchronized void destroy() {
         schedulingNow.destroy();
+        schedulingNow = createEmptyNow();
+        schedulingDone = false;
+    }
+
+    // ===================================================================================
+    //                                                                              Reload
+    //                                                                              ======
+    @Override
+    public synchronized void reboot() {
+        destroy();
+        startSchedule();
     }
 
     // ===================================================================================
