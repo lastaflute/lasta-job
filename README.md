@@ -8,7 +8,7 @@ Job Scheduling for LastaFlute
 <dependency>
     <groupId>org.lastaflute.job</groupId>
     <artifactId>lasta-job</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.4</version>
 </dependency>
 ```
 
@@ -19,5 +19,7 @@ Apache License 2.0
 comming soon...
 
 # Thanks, Friends
-Lasta Job is used by:  
-comming soon...
+LastaFlute is used by:  
+- Fess: https://github.com/codelibs/fess (from version10)
+
+Deeply Thanks!

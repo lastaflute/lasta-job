@@ -69,6 +69,11 @@ public interface JobManager {
     void destroy();
 
     /**
+     * (Dangrous!) Destory and re-start schedules.
+     */
+    void reboot();
+
+    /**
      * Is scheduling done? (scheduling is lazy loaded)
      * @return true if done.
      */
