@@ -15,6 +15,7 @@
  */
 package org.lastaflute.job.log;
 
+import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJobRuntime;
 
 /**
@@ -25,5 +26,5 @@ public interface JobNoticeLogHook {
 
     void hookRunning(LaJobRuntime runtime, String msg);
 
-    void hookFinishing(LaJobRuntime runtime, String msg);
+    void hookFinishing(LaJobRuntime runtime, String msg, OptionalThing<Throwable> cause);
 }
