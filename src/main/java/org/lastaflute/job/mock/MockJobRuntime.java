@@ -16,7 +16,7 @@
 package org.lastaflute.job.mock;
 
 import java.lang.reflect.Method;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -38,6 +38,11 @@ import it.sauronsoftware.cron4j.TaskExecutor;
 public class MockJobRuntime implements LaJobRuntime {
 
     // ===================================================================================
+    //                                                                          Definition
+    //                                                                          ==========
+    protected static final String MOCK_CRON_EXP = "* * * * *";
+
+    // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
     protected final Cron4jRuntime cron4jRuntime;
@@ -50,21 +55,48 @@ public class MockJobRuntime implements LaJobRuntime {
         cron4jRuntime = new Cron4jRuntime(cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
     }
 
+    // -----------------------------------------------------
+    //                                               Factory
+    //                                               -------
     public static MockJobRuntime asDefault() {
-        final Map<String, Object> parameterMap = new HashMap<String, Object>();
-        final JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
-        final Scheduler scheduler = new Scheduler();
-        final TaskExecutor taskExecutor = null; // cannot create...
-        final TaskExecutionContext cron4jContext = new MockTaskExecutionContext(scheduler, taskExecutor);
-        return new MockJobRuntime("* * * * *", MockJob.class, parameterMap, noticeLogLevel, cron4jContext);
+        return createRuntime(MOCK_CRON_EXP, MockJob.class, Collections.emptyMap());
     }
 
-    public static MockJobRuntime withParameter(Map<String, Object> parameterMap) {
-        final JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
+    public static MockJobRuntime of(Class<? extends LaJob> jobType) {
+        return createRuntime(MOCK_CRON_EXP, jobType, Collections.emptyMap());
+    }
+
+    public static MockJobRuntime of(Class<? extends LaJob> jobType, Map<String, Object> parameterMap) {
+        return createRuntime(MOCK_CRON_EXP, jobType, parameterMap);
+    }
+
+    @Deprecated
+    public static MockJobRuntime withParameter(Map<String, Object> parameterMap) { // use of()
+        return createRuntime(MOCK_CRON_EXP, MockJob.class, parameterMap);
+    }
+
+    protected static MockJobRuntime createRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap) {
+        return new MockJobRuntime(cronExp, jobType, parameterMap, prepareMockLogLevel(), createMockContext());
+    }
+
+    protected static JobNoticeLogLevel prepareMockLogLevel() {
+        return JobNoticeLogLevel.INFO;
+    }
+
+    protected static MockTaskExecutionContext createMockContext() {
         final Scheduler scheduler = new Scheduler();
         final TaskExecutor taskExecutor = null; // cannot create...
-        final TaskExecutionContext cron4jContext = new MockTaskExecutionContext(scheduler, taskExecutor);
-        return new MockJobRuntime("* * * * *", MockJob.class, parameterMap, noticeLogLevel, cron4jContext);
+        return new MockTaskExecutionContext(scheduler, taskExecutor);
+    }
+
+    // ===================================================================================
+    //                                                                              Facade
+    //                                                                              ======
+    /**
+     * @return The read-only map of end-title-roll. (NotNull, EmptyAllowed: when e.g. not found)
+     */
+    public Map<String, Object> getEndTitleRollMap() {
+        return getEndTitleRoll().map(roll -> roll.getDataMap()).orElse(Collections.emptyMap());
     }
 
     // ===================================================================================
