@@ -30,6 +30,7 @@ import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.JobSubAttr;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -55,6 +56,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                           =========
     protected VaryingCron varyingCron; // not null, can be switched
     protected final Class<? extends LaJob> jobType;
+    protected final JobSubAttr jobSubAttr;
     protected final ConcurrentExec concurrentExec;
     protected final Supplier<String> threadNaming;
     protected final LaJobRunner jobRunner;
@@ -65,10 +67,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, Supplier<String> threadNaming,
-            LaJobRunner jobRunner, Cron4jNow cron4jNow) {
+    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, JobSubAttr jobSubAttr, ConcurrentExec concurrentExec,
+            Supplier<String> threadNaming, LaJobRunner jobRunner, Cron4jNow cron4jNow) {
         this.varyingCron = varyingCron;
         this.jobType = jobType;
+        this.jobSubAttr = jobSubAttr;
         this.concurrentExec = concurrentExec;
         this.threadNaming = threadNaming;
         this.jobRunner = jobRunner;
@@ -153,7 +156,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected Cron4jRuntime createCron4jRuntime(String cronExp, VaryingCronOption cronOption, TaskExecutionContext cron4jContext) {
         final Map<String, Object> parameterMap = extractParameterMap(cronOption);
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
-        return new Cron4jRuntime(cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
+        return new Cron4jRuntime(cronExp, jobType, jobSubAttr, parameterMap, noticeLogLevel, cron4jContext);
     }
 
     protected Map<String, Object> extractParameterMap(VaryingCronOption cronOption) {
@@ -215,6 +218,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     public Class<? extends LaJob> getJobType() {
         return jobType;
+    }
+
+    public JobSubAttr getJobSubAttr() {
+        return jobSubAttr;
     }
 
     public Object getExecutingLock() {

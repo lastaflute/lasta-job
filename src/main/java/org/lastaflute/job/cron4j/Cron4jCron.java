@@ -27,7 +27,6 @@ import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.InitialCronOpCall;
-import org.lastaflute.job.subsidiary.InitialCronOption;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 
@@ -99,32 +98,31 @@ public class Cron4jCron implements LaCron {
 
     protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
             InitialCronOpCall opLambda) {
-        final InitialCronOption cronOption = createCronOption(opLambda);
+        final CronOption cronOption = createCronOption(opLambda);
         final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, concurrentExec, cronOption);
         showRegistering(cron4jTask);
-        final OptionalThing<LaJobUnique> jobUnique = cronOption.getJobUnique();
         final String cron4jId = scheduleIfNeeds(cronExp, cron4jTask); // null allowed when non-cron
-        return saveJob(cron4jTask, jobUnique, cron4jId);
+        return saveJob(cron4jTask, cronOption, cron4jId);
     }
 
-    protected InitialCronOption createCronOption(InitialCronOpCall opLambda) {
+    protected CronOption createCronOption(InitialCronOpCall opLambda) {
         final CronOption option = new CronOption();
         opLambda.callback(option);
         return option;
     }
 
     protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
-            InitialCronOption cronOption) {
+            CronOption cronOption) {
         final VaryingCron varyingCron = createVaryingCron(cronExp, cronOption);
         final Supplier<String> threadNaming = prepareThreadNaming(cronOption);
-        return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow); // adapter task
+        return new Cron4jTask(varyingCron, jobType, cronOption, concurrentExec, threadNaming, jobRunner, cron4jNow); // adapter task
     }
 
     protected VaryingCron createVaryingCron(String cronExp, VaryingCronOption cronOption) {
         return new VaryingCron(cronExp, cronOption);
     }
 
-    protected Supplier<String> prepareThreadNaming(InitialCronOption cronOption) {
+    protected Supplier<String> prepareThreadNaming(CronOption cronOption) {
         final OptionalThing<LaJobUnique> jobUnique = cronOption.getJobUnique();
         return () -> { // callback for current thread
             return "job_" + jobUnique.map(uq -> uq.value()).orElseGet(() -> {
@@ -150,8 +148,8 @@ public class Cron4jCron implements LaCron {
         return cron4jId;
     }
 
-    protected Cron4jJob saveJob(Cron4jTask cron4jTask, OptionalThing<LaJobUnique> jobUnique, String cron4jId) {
-        return cron4jNow.saveJob(cron4jTask, jobUnique, OptionalThing.ofNullable(cron4jId, () -> {
+    protected Cron4jJob saveJob(Cron4jTask cron4jTask, CronOption cronOption, String cron4jId) {
+        return cron4jNow.saveJob(cron4jTask, cronOption, OptionalThing.ofNullable(cron4jId, () -> {
             throw new IllegalStateException("Not found the cron4jId: " + cron4jTask);
         }));
     }

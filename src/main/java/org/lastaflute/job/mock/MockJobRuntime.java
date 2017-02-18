@@ -25,7 +25,9 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.cron4j.Cron4jRuntime;
 import org.lastaflute.job.log.JobNoticeLogLevel;
+import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
+import org.lastaflute.job.subsidiary.InitialCronOpCall;
 
 import it.sauronsoftware.cron4j.Scheduler;
 import it.sauronsoftware.cron4j.TaskExecutionContext;
@@ -50,37 +52,38 @@ public class MockJobRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public MockJobRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap,
-            JobNoticeLogLevel noticeLogLevel, TaskExecutionContext cron4jContext) {
-        cron4jRuntime = new Cron4jRuntime(cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
+    public MockJobRuntime(String cronExp, Class<? extends LaJob> jobType, CronOption cronOption, TaskExecutionContext cron4jContext) {
+        final Map<String, Object> parameterMap = cronOption.getParamsSupplier().map(supplier -> {
+            return supplier.supply();
+        }).orElse(Collections.emptyMap());
+        final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
+        cron4jRuntime = new Cron4jRuntime(cronExp, jobType, cronOption, parameterMap, noticeLogLevel, cron4jContext);
     }
 
     // -----------------------------------------------------
     //                                               Factory
     //                                               -------
     public static MockJobRuntime asDefault() {
-        return createRuntime(MOCK_CRON_EXP, MockJob.class, Collections.emptyMap());
+        return createRuntime(MOCK_CRON_EXP, MockJob.class, op -> {});
     }
 
     public static MockJobRuntime of(Class<? extends LaJob> jobType) {
-        return createRuntime(MOCK_CRON_EXP, jobType, Collections.emptyMap());
+        return createRuntime(MOCK_CRON_EXP, jobType, op -> {});
     }
 
-    public static MockJobRuntime of(Class<? extends LaJob> jobType, Map<String, Object> parameterMap) {
-        return createRuntime(MOCK_CRON_EXP, jobType, parameterMap);
+    public static MockJobRuntime of(Class<? extends LaJob> jobType, InitialCronOpCall opLambda) {
+        return createRuntime(MOCK_CRON_EXP, jobType, opLambda);
     }
 
     @Deprecated
     public static MockJobRuntime withParameter(Map<String, Object> parameterMap) { // use of()
-        return createRuntime(MOCK_CRON_EXP, MockJob.class, parameterMap);
+        return createRuntime(MOCK_CRON_EXP, MockJob.class, op -> op.params(() -> parameterMap));
     }
 
-    protected static MockJobRuntime createRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap) {
-        return new MockJobRuntime(cronExp, jobType, parameterMap, prepareMockLogLevel(), createMockContext());
-    }
-
-    protected static JobNoticeLogLevel prepareMockLogLevel() {
-        return JobNoticeLogLevel.INFO;
+    protected static MockJobRuntime createRuntime(String cronExp, Class<? extends LaJob> jobType, InitialCronOpCall opLambda) {
+        final CronOption option = new CronOption();
+        opLambda.callback(option);
+        return new MockJobRuntime(cronExp, jobType, option, createMockContext());
     }
 
     protected static MockTaskExecutionContext createMockContext() {

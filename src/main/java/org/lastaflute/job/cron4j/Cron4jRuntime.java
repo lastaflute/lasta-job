@@ -27,6 +27,7 @@ import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.exception.JobStoppedException;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
+import org.lastaflute.job.subsidiary.JobSubAttr;
 
 import it.sauronsoftware.cron4j.TaskExecutionContext;
 
@@ -39,19 +40,21 @@ public class Cron4jRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
+    // all 'final' attributes are not null
     protected final String cronExp;
     protected final Class<? extends LaJob> jobType;
     protected final Method runMethod;
+    protected final JobSubAttr jobSubAttr; // for e.g. logging
     protected final Map<String, Object> parameterMap;
     protected final JobNoticeLogLevel noticeLogLevel;
     protected final TaskExecutionContext cron4jContext;
-    protected EndTitleRoll endTitleRollData; // specified by application in job
+    protected EndTitleRoll endTitleRollData; // null allowed, specified by application in job
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jRuntime(String cronExp, Class<? extends LaJob> jobType, Map<String, Object> parameterMap, JobNoticeLogLevel noticeLogLevel,
-            TaskExecutionContext cron4jContext) {
+    public Cron4jRuntime(String cronExp, Class<? extends LaJob> jobType, JobSubAttr jobSubAttr, Map<String, Object> parameterMap,
+            JobNoticeLogLevel noticeLogLevel, TaskExecutionContext cron4jContext) {
         this.cronExp = cronExp;
         this.jobType = jobType;
         try {
@@ -59,6 +62,7 @@ public class Cron4jRuntime implements LaJobRuntime {
         } catch (Exception e) { // no way
             throw new IllegalStateException("Not found the run method in the job: " + jobType, e);
         }
+        this.jobSubAttr = jobSubAttr;
         this.parameterMap = Collections.unmodifiableMap(parameterMap);
         this.noticeLogLevel = noticeLogLevel;
         this.cron4jContext = cron4jContext;
@@ -83,17 +87,22 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                             =======
     @Override
     public String toCronMethodDisp() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append(cronExp);
-        sb.append(" ").append(jobType.getSimpleName()).append("@").append(runMethod.getName()).append("()");
-        return sb.toString();
+        return cronExp + " " + toRunMethodDisp();
     }
 
     @Override
     public String toRunMethodDisp() {
         final StringBuilder sb = new StringBuilder();
-        sb.append(jobType.getSimpleName()).append("@").append(runMethod.getName()).append("()");
+        sb.append(buildRunMethodExp()).append(buildJobUniqueSuffix());
         return sb.toString();
+    }
+
+    protected String buildRunMethodExp() {
+        return jobType.getSimpleName() + "@" + runMethod.getName() + "()";
+    }
+
+    protected String buildJobUniqueSuffix() {
+        return jobSubAttr.getJobUnique().map(uq -> " [" + uq + "]").orElse("");
     }
 
     // ===================================================================================
@@ -106,8 +115,12 @@ public class Cron4jRuntime implements LaJobRuntime {
             String msg = "Already existing end-title roll data: " + endTitleRollData + " runtime=" + toString();
             throw new IllegalStateException(msg);
         }
-        endTitleRollData = new EndTitleRoll();
+        endTitleRollData = newEndTitleRoll();
         dataLambda.accept(endTitleRollData);
+    }
+
+    protected EndTitleRoll newEndTitleRoll() {
+        return new EndTitleRoll();
     }
 
     // ===================================================================================
@@ -131,6 +144,8 @@ public class Cron4jRuntime implements LaJobRuntime {
         sb.append(DfTypeUtil.toClassTitle(this));
         sb.append(":{").append(cronExp);
         sb.append(", ").append(jobType.getSimpleName()).append("@").append(runMethod.getName()).append("()");
+        sb.append(jobSubAttr.getJobTitle().map(title -> ", " + title).orElse(""));
+        sb.append(jobSubAttr.getJobUnique().map(uq -> ", " + uq).orElse(""));
         sb.append(", params=").append(parameterMap);
         sb.append("}@").append(Integer.toHexString(hashCode()));
         return sb.toString();
@@ -152,6 +167,10 @@ public class Cron4jRuntime implements LaJobRuntime {
     @Override
     public Method getRunMethod() {
         return runMethod;
+    }
+
+    public JobSubAttr getJobSubAttr() { // no interface, internal info for now
+        return jobSubAttr;
     }
 
     @Override

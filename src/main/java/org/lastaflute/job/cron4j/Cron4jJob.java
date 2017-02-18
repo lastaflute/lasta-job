@@ -41,6 +41,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                           Attribute
     //                                                                           =========
     protected final LaJobKey jobKey;
+    protected final OptionalThing<String> jobTitle;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
     protected final Cron4jTask cron4jTask;
@@ -50,9 +51,10 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobUnique> jobUnique, OptionalThing<Cron4jId> cron4jId, Cron4jTask cron4jTask,
-            Cron4jNow cron4jNow) {
+    public Cron4jJob(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique,
+            OptionalThing<Cron4jId> cron4jId, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
         this.jobKey = jobKey;
+        this.jobTitle = jobTitle;
         this.jobUnique = jobUnique;
         this.cron4jId = cron4jId;
         this.cron4jTask = cron4jTask;
@@ -183,10 +185,11 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                      ==============
     @Override
     public String toString() {
+        final String titlePrefix = jobTitle.map(title -> title + ", ").orElse("");
         final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.toString());
         final String idExp = cron4jId.map(id -> id.value()).orElse("non-cron");
         final String hash = Integer.toHexString(hashCode());
-        return DfTypeUtil.toClassTitle(this) + ":{" + keyExp + ", " + idExp + ", " + cron4jTask + "}@" + hash;
+        return DfTypeUtil.toClassTitle(this) + ":{" + titlePrefix + keyExp + ", " + idExp + ", " + cron4jTask + "}@" + hash;
     }
 
     // ===================================================================================
@@ -195,6 +198,11 @@ public class Cron4jJob implements LaScheduledJob {
     @Override
     public LaJobKey getJobKey() {
         return jobKey;
+    }
+
+    @Override
+    public OptionalThing<String> getJobTitle() {
+        return jobTitle;
     }
 
     @Override

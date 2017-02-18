@@ -15,16 +15,16 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.key.LaJobUnique;
+
 /**
  * @author jflute
- * @since 0.2.2 (2016/01/22 Friday at bay maihama)
+ * @since 0.2.6 (2017/02/28 Saturday)
  */
-public interface InitialCronOption extends VaryingCronOption { // also varying to set varying options as first settings 
+public interface JobSubAttr {
 
-    // ===================================================================================
-    //                                                                              Facade
-    //                                                                              ======
-    InitialCronOption uniqueBy(String uniqueCode);
+    OptionalThing<String> getJobTitle();
 
-    InitialCronOption title(String jobTitle);
+    OptionalThing<LaJobUnique> getJobUnique();
 }

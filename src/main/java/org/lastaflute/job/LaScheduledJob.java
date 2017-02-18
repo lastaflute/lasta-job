@@ -40,6 +40,11 @@ public interface LaScheduledJob {
     OptionalThing<LaJobUnique> getJobUnique();
 
     /**
+     * @return The title expression of the job. (NotNull, EmptyAllowed)
+     */
+    OptionalThing<String> getJobTitle();
+
+    /**
      * @return The cron expression of the job e.g. '10 * * * *' (NotNull)
      */
     String getCronExp();

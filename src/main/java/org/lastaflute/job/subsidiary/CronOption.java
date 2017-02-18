@@ -23,11 +23,12 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class CronOption implements InitialCronOption, VaryingCronOption {
+public class CronOption implements InitialCronOption, VaryingCronOption, JobSubAttr {
 
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
+    protected String jobTitle;
     protected LaJobUnique jobUnique;
     protected CronParamsSupplier paramsSupplier;
     protected JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
@@ -36,9 +37,18 @@ public class CronOption implements InitialCronOption, VaryingCronOption {
     //                                                                              Facade
     //                                                                              ======
     @Override
+    public CronOption title(String jobTitle) {
+        if (jobTitle == null || jobTitle.trim().isEmpty()) {
+            throw new IllegalArgumentException("The argument 'jobTitle' should not be null or empty: " + jobTitle);
+        }
+        this.jobTitle = jobTitle;
+        return this;
+    }
+
+    @Override
     public CronOption uniqueBy(String uniqueCode) {
-        if (uniqueCode == null) {
-            throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
+        if (uniqueCode == null || uniqueCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("The argument 'uniqueCode' should not be null or empty: " + uniqueCode);
         }
         this.jobUnique = createJobUnique(uniqueCode);
         return this;
@@ -89,6 +99,13 @@ public class CronOption implements InitialCronOption, VaryingCronOption {
     public OptionalThing<LaJobUnique> getJobUnique() {
         return OptionalThing.ofNullable(jobUnique, () -> {
             throw new IllegalStateException("Not found the application unique code.");
+        });
+    }
+
+    @Override
+    public OptionalThing<String> getJobTitle() {
+        return OptionalThing.ofNullable(jobTitle, () -> {
+            throw new IllegalStateException("Not found the application job title.");
         });
     }
 
