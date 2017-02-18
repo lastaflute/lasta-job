@@ -186,7 +186,9 @@ public class LaJobRunner {
     protected void showFinishing(LaJobRuntime runtime, long before, Throwable cause) {
         final String msg = buildFinishingMsg(runtime, before, cause); // also no use enabled
         if (noticeLogHook != null) {
-            noticeLogHook.hookFinishing(runtime, msg);
+            noticeLogHook.hookFinishing(runtime, msg, OptionalThing.ofNullable(cause, () -> {
+                throw new IllegalStateException("Not found the cause: " + runtime);
+            }));
         }
         JobNoticeLog.log(runtime.getNoticeLogLevel(), () -> msg);
     }

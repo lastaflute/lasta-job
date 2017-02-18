@@ -13,18 +13,18 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.log;
+package org.lastaflute.job.subsidiary;
 
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.LaJobRuntime;
+import org.lastaflute.job.key.LaJobUnique;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/13 Wednesday)
+ * @since 0.2.6 (2017/02/28 Saturday)
  */
-public interface JobNoticeLogHook {
+public interface JobSubAttr {
 
-    void hookRunning(LaJobRuntime runtime, String msg);
+    OptionalThing<String> getJobTitle();
 
-    void hookFinishing(LaJobRuntime runtime, String msg, OptionalThing<Throwable> cause);
+    OptionalThing<LaJobUnique> getJobUnique();
 }

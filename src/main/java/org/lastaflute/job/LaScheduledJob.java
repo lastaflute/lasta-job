@@ -35,6 +35,11 @@ public interface LaScheduledJob {
     LaJobKey getJobKey();
 
     /**
+     * @return The title expression of the job. (NotNull, EmptyAllowed)
+     */
+    OptionalThing<String> getJobTitle();
+
+    /**
      * @return The optional job unique code provided by application when schedule registration. (NotNull, EmptyAllowed)
      */
     OptionalThing<LaJobUnique> getJobUnique();
