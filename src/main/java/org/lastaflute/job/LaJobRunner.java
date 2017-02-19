@@ -320,11 +320,18 @@ public class LaJobRunner {
     //                                                                  Exception Handling
     //                                                                  ==================
     protected void handleJobException(LaJobRuntime runtime, long before, Throwable cause) {
-        // not use second argument here, same reason as logging filter
-        final Throwable handled = exceptionTranslator.filterCause(cause);
-        logger.error(buildJobExceptionMessage(runtime, before, handled));
+        final Throwable filtered = exceptionTranslator.filterCause(cause);
+        showJobException(runtime, before, filtered);
     }
 
+    protected void showJobException(LaJobRuntime runtime, long before, Throwable cause) {
+        final String msg = buildJobExceptionMessage(runtime, before, cause);
+        logJobException(msg, cause);
+    }
+
+    // -----------------------------------------------------
+    //                                      Message Building
+    //                                      ----------------
     protected String buildJobExceptionMessage(LaJobRuntime runtime, long before, Throwable cause) {
         final StringBuilder sb = new StringBuilder();
         sb.append("Failed to run the job process: #flow #job");
@@ -425,6 +432,13 @@ public class LaJobRunner {
                 ps.close();
             }
         }
+    }
+
+    // -----------------------------------------------------
+    //                                     Exception Logging
+    //                                     -----------------
+    protected void logJobException(String msg, Throwable cause) { // msg contains stack-trace
+        logger.error(msg); // not use second argument here, same reason as logging filter
     }
 
     // ===================================================================================
