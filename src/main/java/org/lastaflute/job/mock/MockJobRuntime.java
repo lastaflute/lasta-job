@@ -47,7 +47,7 @@ public class MockJobRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Cron4jRuntime cron4jRuntime;
+    protected final Cron4jRuntime cron4jRuntime; // not null
 
     // ===================================================================================
     //                                                                         Constructor
@@ -100,6 +100,14 @@ public class MockJobRuntime implements LaJobRuntime {
      */
     public Map<String, Object> getEndTitleRollMap() {
         return getEndTitleRoll().map(roll -> roll.getDataMap()).orElse(Collections.emptyMap());
+    }
+
+    // ===================================================================================
+    //                                                                      Basic Override
+    //                                                                      ==============
+    @Override
+    public String toString() {
+        return "mock:{" + cron4jRuntime + "}";
     }
 
     // ===================================================================================
