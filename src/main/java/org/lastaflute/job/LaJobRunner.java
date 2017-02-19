@@ -326,7 +326,7 @@ public class LaJobRunner {
 
     protected void showJobException(LaJobRuntime runtime, long before, Throwable cause) {
         final String msg = buildJobExceptionMessage(runtime, before, cause);
-        logJobException(msg, cause);
+        logJobException(runtime, msg, cause);
     }
 
     // -----------------------------------------------------
@@ -437,7 +437,7 @@ public class LaJobRunner {
     // -----------------------------------------------------
     //                                     Exception Logging
     //                                     -----------------
-    protected void logJobException(String msg, Throwable cause) { // msg contains stack-trace
+    protected void logJobException(LaJobRuntime runtime, String msg, Throwable cause) { // msg contains stack-trace
         logger.error(msg); // not use second argument here, same reason as logging filter
     }
 
