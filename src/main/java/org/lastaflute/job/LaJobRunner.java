@@ -213,7 +213,9 @@ public class LaJobRunner {
             });
         });
         if (cause != null) {
-            sb.append(LF).append(" cause: ").append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
+            sb.append(LF).append(" cause: ");
+            sb.append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
+            sb.append(" ").append(Integer.toHexString(cause.hashCode()));
         }
         sb.append(LF).append(LF); // to separate from job logging
         return sb.toString();
