@@ -8,7 +8,7 @@ Job Scheduling for LastaFlute
 <dependency>
     <groupId>org.lastaflute.job</groupId>
     <artifactId>lasta-job</artifactId>
-    <version>0.2.6</version>
+    <version>0.2.7-RC1</version>
 </dependency>
 ```
 
