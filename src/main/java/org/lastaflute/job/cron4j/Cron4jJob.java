@@ -15,20 +15,25 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
+import org.lastaflute.job.exception.JobTriggeredNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -37,6 +42,11 @@ import it.sauronsoftware.cron4j.TaskExecutor;
  * @since 0.2.0 (2016/01/11 Monday)
  */
 public class Cron4jJob implements LaScheduledJob {
+
+    // ===================================================================================
+    //                                                                          Definition
+    //                                                                          ==========
+    private static final Logger logger = LoggerFactory.getLogger(Cron4jJob.class);
 
     // ===================================================================================
     //                                                                           Attribute
@@ -48,7 +58,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final Cron4jTask cron4jTask;
     protected final Cron4jNow cron4jNow;
     protected volatile boolean unscheduled;
-    protected List<LaJobKey> triggeredJobKeyList;
+    protected List<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
 
     // ===================================================================================
     //                                                                         Constructor
@@ -195,19 +205,49 @@ public class Cron4jJob implements LaScheduledJob {
         if (triggeredJobKey == null) {
             throw new IllegalArgumentException("The argument 'triggeredJobKey' should not be null.");
         }
-        if (!cron4jNow.findJobByKey(triggeredJobKey).isPresent()) {
-            throw new IllegalArgumentException("Not found the job by the job key: " + triggeredJobKey);
+        // lazy check for initialization logic
+        //if (!cron4jNow.findJobByKey(triggeredJobKey).isPresent()) {
+        //    throw new IllegalArgumentException("Not found the job by the job key: " + triggeredJobKey);
+        //}
+        if (triggeredJobKeyList == null) {
+            triggeredJobKeyList = new ArrayList<LaJobKey>();
         }
         triggeredJobKeyList.add(triggeredJobKey);
     }
 
     public synchronized void triggerNext() { // called in framework
         verifyScheduledState();
-        for (LaJobKey jobKey : triggeredJobKeyList) { // expception if unscheduled
-            cron4jNow.findJobByKey(jobKey).alwaysPresent(job -> { // already checked
-                job.launchNow();
-            });
+        if (triggeredJobKeyList == null) {
+            return;
         }
+        final List<Cron4jJob> triggeredJobList = triggeredJobKeyList.stream().map(triggeredJobKey -> {
+            return findTriggeredJob(triggeredJobKey);
+        }).collect(Collectors.toList());
+        showPreparingNextTrigger(triggeredJobList);
+        for (Cron4jJob triggeredJob : triggeredJobList) { // expception if contains unscheduled
+            triggeredJob.launchNow();
+        }
+    }
+
+    protected Cron4jJob findTriggeredJob(LaJobKey triggeredJobKey) {
+        return cron4jNow.findJobByKey(triggeredJobKey).orElseTranslatingThrow(cause -> {
+            String msg = "Not found the next job: " + triggeredJobKey + " triggered by " + toString();
+            throw new JobTriggeredNotFoundException(msg, cause);
+        });
+    }
+
+    protected void showPreparingNextTrigger(List<Cron4jJob> triggeredJobList) {
+        final List<String> nextJobExpList = triggeredJobList.stream().map(triggeredJob -> {
+            return buildTriggerNextJobExp(triggeredJob);
+        }).collect(Collectors.toList());
+        logger.info("#job ...Preparing next job {} triggered by {}", nextJobExpList, buildTriggerNextJobExp(this));
+    }
+
+    protected String buildTriggerNextJobExp(Cron4jJob triggeredJob) {
+        final String keyExp = triggeredJob.getJobUnique().map(unique -> unique.value()).orElseGet(() -> {
+            return triggeredJob.getJobKey().value();
+        });
+        return keyExp + "(" + triggeredJob.getJobType().getSimpleName() + ")";
     }
 
     // ===================================================================================
@@ -256,6 +296,6 @@ public class Cron4jJob implements LaScheduledJob {
 
     @Override
     public synchronized List<LaJobKey> getTriggeredJobList() { // synchronized for varying
-        return Collections.unmodifiableList(triggeredJobKeyList);
+        return triggeredJobKeyList != null ? Collections.unmodifiableList(triggeredJobKeyList) : Collections.emptyList();
     }
 }

@@ -13,17 +13,17 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.exception;
+package org.lastaflute.job.exception.base;
 
 /**
  * @author jflute
  * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public abstract class LaJobOperationException extends LaJobSystemException {
+public abstract class LaJobStructureException extends LaJobSystemException {
 
     private static final long serialVersionUID = 1L;
 
-    public LaJobOperationException(String msg) {
+    public LaJobStructureException(String msg) {
         super(msg);
     }
 }

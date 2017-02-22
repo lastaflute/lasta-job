@@ -210,7 +210,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             cronExpExp = isNonCron() ? "non-cron" : varyingCron.getCronExp();
             cronOption = varyingCron.getCronOption();
         }
-        return title + ":{" + cronExpExp + ", " + jobType + ", " + concurrentExec + ", " + cronOption + "}";
+        return title + ":{" + cronExpExp + ", " + jobType.getName() + ", " + concurrentExec + ", " + cronOption + "}";
     }
 
     // ===================================================================================

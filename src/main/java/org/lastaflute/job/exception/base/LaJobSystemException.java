@@ -13,7 +13,7 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.exception;
+package org.lastaflute.job.exception.base;
 
 import org.lastaflute.core.exception.LaSystemException;
 
@@ -27,5 +27,9 @@ public abstract class LaJobSystemException extends LaSystemException {
 
     public LaJobSystemException(String msg) {
         super(msg);
+    }
+
+    public LaJobSystemException(String msg, Throwable cause) {
+        super(msg, cause);
     }
 }

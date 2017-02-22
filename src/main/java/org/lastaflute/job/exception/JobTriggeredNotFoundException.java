@@ -15,15 +15,21 @@
  */
 package org.lastaflute.job.exception;
 
+import org.lastaflute.job.exception.base.LaJobOperationException;
+
 /**
  * @author jflute
  * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public abstract class LaJobStructureException extends LaJobSystemException {
+public class JobTriggeredNotFoundException extends LaJobOperationException {
 
     private static final long serialVersionUID = 1L;
 
-    public LaJobStructureException(String msg) {
+    public JobTriggeredNotFoundException(String msg) {
         super(msg);
+    }
+
+    public JobTriggeredNotFoundException(String msg, Throwable cause) {
+        super(msg, cause);
     }
 }

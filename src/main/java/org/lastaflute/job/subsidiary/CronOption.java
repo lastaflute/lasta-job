@@ -16,6 +16,7 @@
 package org.lastaflute.job.subsidiary;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.dbflute.optional.OptionalThing;
@@ -136,7 +137,7 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
 
     @Override
     public List<LaJobKey> getTriggeringJobKeyList() {
-        return triggeringJobKeyList;
+        return triggeringJobKeyList != null ? Collections.unmodifiableList(triggeringJobKeyList) : Collections.emptyList();
     }
 
     @Override

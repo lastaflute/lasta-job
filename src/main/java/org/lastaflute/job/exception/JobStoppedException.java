@@ -15,6 +15,8 @@
  */
 package org.lastaflute.job.exception;
 
+import org.lastaflute.job.exception.base.LaJobOperationException;
+
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)

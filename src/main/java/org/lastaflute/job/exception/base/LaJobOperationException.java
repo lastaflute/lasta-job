@@ -13,19 +13,21 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.exception;
-
-import org.lastaflute.job.exception.base.LaJobOperationException;
+package org.lastaflute.job.exception.base;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public class JobAlreadyIllegallyExecutingException extends LaJobOperationException {
+public abstract class LaJobOperationException extends LaJobSystemException {
 
     private static final long serialVersionUID = 1L;
 
-    public JobAlreadyIllegallyExecutingException(String msg) {
+    public LaJobOperationException(String msg) {
         super(msg);
+    }
+
+    public LaJobOperationException(String msg, Throwable cause) {
+        super(msg, cause);
     }
 }
