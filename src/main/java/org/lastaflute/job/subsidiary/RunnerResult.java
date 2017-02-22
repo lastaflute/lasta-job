@@ -23,8 +23,8 @@ import org.dbflute.optional.OptionalThing;
  */
 public class RunnerResult {
 
-    protected final boolean success;
-    protected final Throwable cause; // null allowed
+    protected final boolean success; // e.g. no cause
+    protected final Throwable cause; // null allowed, already handled (e.g. logging)
 
     public RunnerResult(boolean success, Throwable cause) {
         this.success = success;

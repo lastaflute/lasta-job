@@ -29,6 +29,11 @@ public class VaryingCron {
         this.cronOption = cronOption;
     }
 
+    @Override
+    public String toString() {
+        return "{" + cronExp + "}";
+    }
+
     public String getCronExp() {
         return cronExp;
     }

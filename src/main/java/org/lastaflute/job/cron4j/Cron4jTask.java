@@ -85,6 +85,14 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                             =======
     @Override
     public void execute(TaskExecutionContext context) {
+        try {
+            doExecute(context);
+        } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
+            logger.error("Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName(), cause);
+        }
+    }
+
+    protected void doExecute(TaskExecutionContext context) {
         final Cron4jJob job = findJob();
         final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
         final String cronExp;
@@ -95,7 +103,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     noticeSilentlyQuit(job, executorList);
                     return;
                 } else if (concurrentExec.equals(ConcurrentExec.ERROR)) {
-                    throwJobAlreadyExecutingSystemException(job, executorList);
+                    throwJobAlreadyIllegallyExecutingException(job, executorList);
                 }
                 // wait by synchronization as default
             }
@@ -125,7 +133,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         }
     }
 
-    protected void throwJobAlreadyExecutingSystemException(Cron4jJob job, List<TaskExecutor> executorList) {
+    protected void throwJobAlreadyIllegallyExecutingException(Cron4jJob job, List<TaskExecutor> executorList) {
         final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
         throw new JobAlreadyIllegallyExecutingException("Already executing the job: " + job + " startTimes=" + startTimeList);
     }
