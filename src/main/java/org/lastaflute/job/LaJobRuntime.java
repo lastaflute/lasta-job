@@ -58,6 +58,13 @@ public interface LaJobRuntime {
     void stopIfNeeds(); // exception if stopped
 
     // ===================================================================================
+    //                                                                    Business Failure
+    //                                                                    ================
+    void suppressNextTrigger();
+
+    boolean isSuppressNextTrigger();
+
+    // ===================================================================================
     //                                                                             Display
     //                                                                             =======
     String toCronMethodDisp(); // not null

@@ -15,7 +15,10 @@
  */
 package org.lastaflute.job;
 
+import java.util.List;
+
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
@@ -65,10 +68,10 @@ public interface LaScheduledJob {
     boolean isExecutingNow();
 
     /**
-     * Actually launch the job now, no-related to cron time. <br>
+     * Actually launch the job now (at other thread), no-related to cron time. <br>
      * If executing job exists, the launched job is waiting for <br>
-     * finishing the executing job. (you can change the behavior by option) <br>
-     * You cannot call this if the job is closed. (throws exception)
+     * finishing the executing job. (you can change the behavior by option)
+     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void launchNow();
 
@@ -86,6 +89,7 @@ public interface LaScheduledJob {
      * New cron schedule is used since next execution.
      * @param cronExp The new cron expression of the job e.g. '10 * * * *' (NotNull)
      * @param opLambda The callback to setup varying option for e.g. parameter. (NotNull)
+     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void reschedule(String cronExp, VaryingCronOpCall opLambda);
 
@@ -94,6 +98,7 @@ public interface LaScheduledJob {
      * If the job is executing, the process continues until finishing. <br>
      * So call stopNow() if you want to stop it immediately. <br>
      * And you cannot find the job after unscheduling.
+     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void unschedule();
 
@@ -107,6 +112,7 @@ public interface LaScheduledJob {
      * You can only execute by launchNow(). <br>
      * And you can restore the job as normal cron by reschedule(). <br>
      * Do nothing if already non-cron.
+     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void becomeNonCron();
 
@@ -114,4 +120,20 @@ public interface LaScheduledJob {
      * @return true if the job is non-cron.
      */
     boolean isNonCron();
+
+    // ===================================================================================
+    //                                                                             Trigger
+    //                                                                             =======
+    /**
+     * Register triggered job for success.
+     * @param triggeredJob The job key of triggered job. (NotNull)
+     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
+     */
+    void registerNext(LaJobKey triggeredJob);
+
+    /**
+     * Get the list of triggered job.
+     * @return The list of job key for triggered job. (NotNull)
+     */
+    List<LaJobKey> getTriggeredJobList();
 }

@@ -15,13 +15,11 @@
  */
 package org.lastaflute.job.exception;
 
-import org.lastaflute.core.exception.LaSystemException;
-
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class JobAlreadyUnscheduleException extends LaSystemException {
+public class JobAlreadyUnscheduleException extends LaJobOperationException {
 
     private static final long serialVersionUID = 1L;
 

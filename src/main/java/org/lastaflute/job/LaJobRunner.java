@@ -50,6 +50,7 @@ import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogHook;
+import org.lastaflute.job.subsidiary.RunnerResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,17 +106,16 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                                Run
     //                                                                               =====
-    public void run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
+    public RunnerResult run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         if (isPlainlyRun()) { // e.g. production, unit-test
-            doRun(jobType, runtimeSupplier);
-            return;
+            return doRun(jobType, runtimeSupplier);
         }
         // e.g. local development (hot deploy)
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
         final ClassLoader originalLoader = startHotdeploy();
         try {
-            doRun(jobType, runtimeSupplier);
+            return doRun(jobType, runtimeSupplier);
         } finally {
             stopHotdeploy(originalLoader);
         }
@@ -141,7 +141,7 @@ public class LaJobRunner {
         ManagedHotdeploy.stop(originalLoader);
     }
 
-    protected void doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
+    protected RunnerResult doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         // simplar to async manager's process
         final LaJobRuntime runtime = runtimeSupplier.get();
         arrangeThreadCacheContext(runtime);
@@ -162,11 +162,20 @@ public class LaJobRunner {
             clearCallbackContext();
             clearThreadCacheContext();
         }
+        return createRunnerResult(runtime, cause);
     }
 
     protected void actuallyRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
         final LaJob job = ContainerUtil.getComponent(jobType);
         job.run(runtime);
+    }
+
+    protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
+        return new RunnerResult(isRunnerSuccess(runtime, cause), cause);
+    }
+
+    protected boolean isRunnerSuccess(LaJobRuntime runtime, Throwable cause) {
+        return cause == null;
     }
 
     // ===================================================================================
@@ -212,6 +221,9 @@ public class LaJobRunner {
                 sb.append(LF).append("   ").append(key).append(": ").append(value);
             });
         });
+        if (runtime.isSuppressNextTrigger()) {
+            sb.append(LF).append(" suppressNextTrigger: true");
+        }
         if (cause != null) {
             sb.append(LF).append(" cause: ");
             sb.append(cause.getClass().getSimpleName()).append(" *Read the exception message!");

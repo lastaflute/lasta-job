@@ -13,23 +13,17 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.subsidiary;
-
-import java.util.List;
-
-import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUnique;
+package org.lastaflute.job.exception;
 
 /**
  * @author jflute
- * @since 0.2.6 (2017/02/28 Saturday)
+ * @since 0.2.0 (2016/01/11 Monday)
  */
-public interface JobSubAttr {
+public class JobAlreadyIllegallyExecutingException extends LaJobOperationException {
 
-    OptionalThing<String> getJobTitle();
+    private static final long serialVersionUID = 1L;
 
-    OptionalThing<LaJobUnique> getJobUnique();
-
-    List<LaJobKey> getTriggeringJobKeyList();
+    public JobAlreadyIllegallyExecutingException(String msg) {
+        super(msg);
+    }
 }

@@ -27,10 +27,11 @@ import org.dbflute.helper.HandyDate;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
-import org.lastaflute.job.exception.JobAlreadyExecutingSystemException;
+import org.lastaflute.job.exception.JobAlreadyIllegallyExecutingException;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.JobSubAttr;
+import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -101,7 +102,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             cronOption = varyingCron.getCronOption();
         }
         synchronized (executingLock) { // avoid duplicate execution, waiting for previous ending
-            doExecute(cronExp, cronOption, context);
+            final RunnerResult runnerResult = doExecute(cronExp, cronOption, context);
+            if (runnerResult.isSuccess()) {
+                job.triggerNext();
+            }
         }
     }
 
@@ -122,7 +126,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     protected void throwJobAlreadyExecutingSystemException(Cron4jJob job, List<TaskExecutor> executorList) {
         final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
-        throw new JobAlreadyExecutingSystemException("Already executing the job: " + job + " startTimes=" + startTimeList);
+        throw new JobAlreadyIllegallyExecutingException("Already executing the job: " + job + " startTimes=" + startTimeList);
     }
 
     protected List<LocalDateTime> extractExecutingStartTimes(List<TaskExecutor> executorList) {
@@ -135,9 +139,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                             Executing
     //                                             ---------
     // in execution lock, cannot use varingCron here
-    protected void doExecute(String cronExp, VaryingCronOption cronOption, TaskExecutionContext context) { // in synchronized world
+    protected RunnerResult doExecute(String cronExp, VaryingCronOption cronOption, TaskExecutionContext context) { // in synchronized world
         adjustThreadNameIfNeeds(cronOption);
-        runJob(cronExp, cronOption, context);
+        return runJob(cronExp, cronOption, context);
     }
 
     protected void adjustThreadNameIfNeeds(VaryingCronOption cronOption) { // because of too long name of cron4j
@@ -149,8 +153,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         currentThread.setName(supplied);
     }
 
-    protected void runJob(String cronExp, VaryingCronOption cronOption, TaskExecutionContext cron4jContext) {
-        jobRunner.run(jobType, () -> createCron4jRuntime(cronExp, cronOption, cron4jContext));
+    protected RunnerResult runJob(String cronExp, VaryingCronOption cronOption, TaskExecutionContext cron4jContext) {
+        return jobRunner.run(jobType, () -> createCron4jRuntime(cronExp, cronOption, cron4jContext));
     }
 
     protected Cron4jRuntime createCron4jRuntime(String cronExp, VaryingCronOption cronOption, TaskExecutionContext cron4jContext) {

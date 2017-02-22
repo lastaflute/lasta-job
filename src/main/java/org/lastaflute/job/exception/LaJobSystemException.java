@@ -13,23 +13,19 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.subsidiary;
+package org.lastaflute.job.exception;
 
-import java.util.List;
-
-import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.core.exception.LaSystemException;
 
 /**
  * @author jflute
- * @since 0.2.6 (2017/02/28 Saturday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public interface JobSubAttr {
+public abstract class LaJobSystemException extends LaSystemException {
 
-    OptionalThing<String> getJobTitle();
+    private static final long serialVersionUID = 1L;
 
-    OptionalThing<LaJobUnique> getJobUnique();
-
-    List<LaJobKey> getTriggeringJobKeyList();
+    public LaJobSystemException(String msg) {
+        super(msg);
+    }
 }

@@ -15,7 +15,12 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.LaScheduledJob;
+import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 
@@ -31,6 +36,7 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
     protected String jobTitle;
     protected LaJobUnique jobUnique;
     protected CronParamsSupplier paramsSupplier;
+    protected List<LaJobKey> triggeringJobKeyList;
     protected JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
 
     // ===================================================================================
@@ -67,6 +73,18 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
         return this;
     }
 
+    @Override
+    public CronOption triggeredBy(LaScheduledJob triggeringJob) {
+        if (triggeringJob == null) {
+            throw new IllegalArgumentException("The argument 'triggeringJob' should not be null or empty: " + triggeringJob);
+        }
+        if (triggeringJobKeyList == null) {
+            triggeringJobKeyList = new ArrayList<LaJobKey>();
+        }
+        triggeringJobKeyList.add(triggeringJob.getJobKey());
+        return this;
+    }
+
     // -----------------------------------------------------
     //                                      Notice Log Level
     //                                      ----------------
@@ -96,16 +114,16 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
     //                                                                            Accessor
     //                                                                            ========
     @Override
-    public OptionalThing<LaJobUnique> getJobUnique() {
-        return OptionalThing.ofNullable(jobUnique, () -> {
-            throw new IllegalStateException("Not found the application unique code.");
+    public OptionalThing<String> getJobTitle() {
+        return OptionalThing.ofNullable(jobTitle, () -> {
+            throw new IllegalStateException("Not found the application job title.");
         });
     }
 
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return OptionalThing.ofNullable(jobTitle, () -> {
-            throw new IllegalStateException("Not found the application job title.");
+    public OptionalThing<LaJobUnique> getJobUnique() {
+        return OptionalThing.ofNullable(jobUnique, () -> {
+            throw new IllegalStateException("Not found the application unique code.");
         });
     }
 
@@ -114,6 +132,11 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
         return OptionalThing.ofNullable(paramsSupplier, () -> {
             throw new IllegalStateException("Not found the parameters supplier.");
         });
+    }
+
+    @Override
+    public List<LaJobKey> getTriggeringJobKeyList() {
+        return triggeringJobKeyList;
     }
 
     @Override

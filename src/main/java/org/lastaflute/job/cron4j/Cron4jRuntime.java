@@ -49,6 +49,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final JobNoticeLogLevel noticeLogLevel;
     protected final TaskExecutionContext cron4jContext;
     protected EndTitleRoll endTitleRollData; // null allowed, specified by application in job
+    protected boolean nextTriggerSuppressed;
 
     // ===================================================================================
     //                                                                         Constructor
@@ -69,6 +70,24 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     // ===================================================================================
+    //                                                                      End-Title Roll
+    //                                                                      ==============
+    @Override
+    public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
+        assertArgumentNotNull("dataLambda", dataLambda);
+        if (endTitleRollData != null) {
+            String msg = "Already existing end-title roll data: " + endTitleRollData + " runtime=" + toString();
+            throw new IllegalStateException(msg);
+        }
+        endTitleRollData = newEndTitleRoll();
+        dataLambda.accept(endTitleRollData);
+    }
+
+    protected EndTitleRoll newEndTitleRoll() {
+        return new EndTitleRoll();
+    }
+
+    // ===================================================================================
     //                                                                            Stop Job
     //                                                                            ========
     @Override
@@ -80,6 +99,14 @@ public class Cron4jRuntime implements LaJobRuntime {
 
     protected boolean isStopRequested() {
         return cron4jContext.isStopped();
+    }
+
+    // ===================================================================================
+    //                                                                    Business Failure
+    //                                                                    ================
+    @Override
+    public void suppressNextTrigger() {
+        nextTriggerSuppressed = true;
     }
 
     // ===================================================================================
@@ -103,24 +130,6 @@ public class Cron4jRuntime implements LaJobRuntime {
 
     protected String buildJobUniqueSuffix() {
         return jobSubAttr.getJobUnique().map(uq -> " [" + uq + "]").orElse("");
-    }
-
-    // ===================================================================================
-    //                                                                      End-Title Roll
-    //                                                                      ==============
-    @Override
-    public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
-        assertArgumentNotNull("dataLambda", dataLambda);
-        if (endTitleRollData != null) {
-            String msg = "Already existing end-title roll data: " + endTitleRollData + " runtime=" + toString();
-            throw new IllegalStateException(msg);
-        }
-        endTitleRollData = newEndTitleRoll();
-        dataLambda.accept(endTitleRollData);
-    }
-
-    protected EndTitleRoll newEndTitleRoll() {
-        return new EndTitleRoll();
     }
 
     // ===================================================================================
@@ -192,5 +201,10 @@ public class Cron4jRuntime implements LaJobRuntime {
         return OptionalThing.ofNullable(endTitleRollData, () -> {
             throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
         });
+    }
+
+    @Override
+    public boolean isSuppressNextTrigger() {
+        return nextTriggerSuppressed;
     }
 }

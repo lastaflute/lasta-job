@@ -15,6 +15,7 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.util.Collections;
 import java.util.List;
 
 import org.dbflute.optional.OptionalThing;
@@ -47,6 +48,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final Cron4jTask cron4jTask;
     protected final Cron4jNow cron4jNow;
     protected volatile boolean unscheduled;
+    protected List<LaJobKey> triggeredJobKeyList;
 
     // ===================================================================================
     //                                                                         Constructor
@@ -69,7 +71,7 @@ public class Cron4jJob implements LaScheduledJob {
         return !findExecutorList().isEmpty();
     }
 
-    public List<TaskExecutor> findExecutorList() {
+    public List<TaskExecutor> findExecutorList() { // public for framework
         return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
     }
 
@@ -78,9 +80,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void launchNow() {
-        if (unscheduled) {
-            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
-        }
+        verifyScheduledState();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Launching now: {}", toString());
         }
@@ -92,7 +92,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            Stop Now
     //                                                                            ========
     @Override
-    public synchronized void stopNow() {
+    public synchronized void stopNow() { // can be called if unscheduled
         final List<TaskExecutor> executorList = findExecutorList();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Stopping {} execution(s) now: {}", executorList.size(), toString());
@@ -107,9 +107,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void reschedule(String cronExp, VaryingCronOpCall opLambda) {
-        if (unscheduled) {
-            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
-        }
+        verifyScheduledState();
         if (isNonCromExp(cronExp)) {
             throw new IllegalArgumentException("The cronExp for reschedule() should not be non-cron: " + toString());
         }
@@ -145,6 +143,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void unschedule() {
+        verifyScheduledState();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Unscheduling {}", toString());
         }
@@ -160,11 +159,18 @@ public class Cron4jJob implements LaScheduledJob {
         return unscheduled;
     }
 
+    protected void verifyScheduledState() {
+        if (unscheduled) {
+            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
+        }
+    }
+
     // ===================================================================================
     //                                                                            Non-Cron
     //                                                                            ========
     @Override
     public synchronized void becomeNonCron() {
+        verifyScheduledState();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Becoming non-cron: {}", toString());
         }
@@ -178,6 +184,30 @@ public class Cron4jJob implements LaScheduledJob {
     @Override
     public synchronized boolean isNonCron() {
         return !cron4jId.isPresent();
+    }
+
+    // ===================================================================================
+    //                                                                             Trigger
+    //                                                                             =======
+    @Override
+    public synchronized void registerNext(LaJobKey triggeredJobKey) {
+        verifyScheduledState();
+        if (triggeredJobKey == null) {
+            throw new IllegalArgumentException("The argument 'triggeredJobKey' should not be null.");
+        }
+        if (!cron4jNow.findJobByKey(triggeredJobKey).isPresent()) {
+            throw new IllegalArgumentException("Not found the job by the job key: " + triggeredJobKey);
+        }
+        triggeredJobKeyList.add(triggeredJobKey);
+    }
+
+    public synchronized void triggerNext() { // called in framework
+        verifyScheduledState();
+        for (LaJobKey jobKey : triggeredJobKeyList) { // expception if unscheduled
+            cron4jNow.findJobByKey(jobKey).alwaysPresent(job -> { // already checked
+                job.launchNow();
+            });
+        }
     }
 
     // ===================================================================================
@@ -211,7 +241,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public String getCronExp() {
+    public synchronized String getCronExp() { // synchronized for varying
         return cron4jTask.getVaryingCron().getCronExp();
     }
 
@@ -220,7 +250,12 @@ public class Cron4jJob implements LaScheduledJob {
         return cron4jTask.getJobType();
     }
 
-    public Cron4jTask getCron4jTask() {
+    public Cron4jTask getCron4jTask() { // for framework
         return cron4jTask;
+    }
+
+    @Override
+    public synchronized List<LaJobKey> getTriggeredJobList() { // synchronized for varying
+        return Collections.unmodifiableList(triggeredJobKeyList);
     }
 }

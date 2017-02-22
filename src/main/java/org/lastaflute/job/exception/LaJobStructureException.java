@@ -15,17 +15,15 @@
  */
 package org.lastaflute.job.exception;
 
-import org.lastaflute.core.exception.LaSystemException;
-
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public class JobAlreadyExecutingSystemException extends LaSystemException {
+public abstract class LaJobStructureException extends LaJobSystemException {
 
     private static final long serialVersionUID = 1L;
 
-    public JobAlreadyExecutingSystemException(String msg) {
+    public LaJobStructureException(String msg) {
         super(msg);
     }
 }

@@ -27,6 +27,7 @@ import org.dbflute.util.Srl;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaSchedulingNow;
 import org.lastaflute.job.cron4j.Cron4jCron.CronRegistrationType;
+import org.lastaflute.job.exception.JobNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
@@ -106,8 +107,14 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                             Cron4jJob
     //                                             ---------
     protected Cron4jJob createCron4jJob(LaJobKey jobKey, JobSubAttr jobSubAttr, OptionalThing<String> cron4jId, Cron4jTask cron4jTask) {
-        return newCron4jJob(jobKey, jobSubAttr.getJobTitle(), jobSubAttr.getJobUnique(), cron4jId.map(id -> Cron4jId.of(id)), cron4jTask,
-                this);
+        final Cron4jJob job = newCron4jJob(jobKey, jobSubAttr.getJobTitle(), jobSubAttr.getJobUnique(), cron4jId.map(id -> Cron4jId.of(id)),
+                cron4jTask, this);
+        jobSubAttr.getTriggeringJobKeyList().forEach(triggeringJobKey -> {
+            findJobByKey(triggeringJobKey).alwaysPresent(triggeringJob -> {
+                triggeringJob.registerNext(jobKey);
+            });
+        });
+        return job;
     }
 
     protected Cron4jJob newCron4jJob(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique,
@@ -146,7 +153,7 @@ public class Cron4jNow implements LaSchedulingNow {
         final Cron4jJob found = jobKeyJobMap.get(jobKey);
         return OptionalThing.ofNullable(found, () -> {
             String msg = "Not found the job by the key: " + jobKey + " existing=" + jobKeyJobMap.keySet();
-            throw new IllegalStateException(msg);
+            throw new JobNotFoundException(msg);
         });
     }
 
@@ -156,7 +163,7 @@ public class Cron4jNow implements LaSchedulingNow {
         final Cron4jJob found = jobUniqueJobMap.get(jobUnique);
         return OptionalThing.ofNullable(found, () -> {
             String msg = "Not found the job by the unique code: " + jobUnique + " existing=" + jobUniqueJobMap.keySet();
-            throw new IllegalStateException(msg);
+            throw new JobNotFoundException(msg);
         });
     }
 
@@ -165,7 +172,7 @@ public class Cron4jNow implements LaSchedulingNow {
         final Cron4jJob found = cron4jTaskJobMap.get(task);
         return OptionalThing.ofNullable(found, () -> {
             String msg = "Not found the job by the task: " + task + " existing=" + cron4jTaskJobMap.keySet();
-            throw new IllegalStateException(msg);
+            throw new JobNotFoundException(msg);
         });
     }
 

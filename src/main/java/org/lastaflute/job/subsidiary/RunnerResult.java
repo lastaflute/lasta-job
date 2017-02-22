@@ -15,21 +15,29 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import java.util.List;
-
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUnique;
 
 /**
  * @author jflute
- * @since 0.2.6 (2017/02/28 Saturday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public interface JobSubAttr {
+public class RunnerResult {
 
-    OptionalThing<String> getJobTitle();
+    protected final boolean success;
+    protected final Throwable cause; // null allowed
 
-    OptionalThing<LaJobUnique> getJobUnique();
+    public RunnerResult(boolean success, Throwable cause) {
+        this.success = success;
+        this.cause = cause;
+    }
 
-    List<LaJobKey> getTriggeringJobKeyList();
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public OptionalThing<Throwable> getCause() {
+        return OptionalThing.ofNullable(cause, () -> {
+            throw new IllegalStateException("Not found the cause.");
+        });
+    }
 }
