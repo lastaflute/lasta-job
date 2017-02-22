@@ -135,7 +135,6 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
         });
     }
 
-    @Override
     public List<LaJobKey> getTriggeringJobKeyList() {
         return triggeringJobKeyList != null ? Collections.unmodifiableList(triggeringJobKeyList) : Collections.emptyList();
     }

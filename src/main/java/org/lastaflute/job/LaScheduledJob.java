@@ -21,6 +21,7 @@ import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 
 /**
@@ -56,6 +57,11 @@ public interface LaScheduledJob {
      * @return The type of job component for your application. (NotNull)
      */
     Class<? extends LaJob> getJobType();
+
+    /**
+     * @return The execution type of concurrent. (NotNull)
+     */
+    ConcurrentExec getConcurrentExec();
 
     // ===================================================================================
     //                                                                            Behavior
@@ -132,8 +138,16 @@ public interface LaScheduledJob {
     void registerNext(LaJobKey triggeredJob);
 
     /**
-     * Get the list of triggered job.
+     * Get the list of triggered job key.
      * @return The list of job key for triggered job. (NotNull)
      */
-    List<LaJobKey> getTriggeredJobList();
+    List<LaJobKey> getTriggeredJobKeyList();
+
+    // ===================================================================================
+    //                                                                             Display
+    //                                                                             =======
+    /**
+     * @return The display string for identity. (NotNull)
+     */
+    String toIdentityDisp();
 }

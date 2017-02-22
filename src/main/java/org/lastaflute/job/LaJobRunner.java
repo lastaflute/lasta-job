@@ -21,6 +21,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
@@ -48,6 +49,7 @@ import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableS
 import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlStringFilter;
 import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
+import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogHook;
 import org.lastaflute.job.subsidiary.RunnerResult;
@@ -70,11 +72,13 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected AccessContextArranger accessContextArranger; // null allowed, option
-    protected JobNoticeLogHook noticeLogHook; // null allowed, option
-
+    @Resource
+    private JobManager jobManager; // injected simply
     @Resource
     private ExceptionTranslator exceptionTranslator; // injected simply
+
+    protected AccessContextArranger accessContextArranger; // null allowed, option
+    protected JobNoticeLogHook noticeLogHook; // null allowed, option
 
     // ===================================================================================
     //                                                                              Option
@@ -166,8 +170,12 @@ public class LaJobRunner {
     }
 
     protected void actuallyRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
-        final LaJob job = ContainerUtil.getComponent(jobType);
+        final LaJob job = getJobComponent(jobType);
         job.run(runtime);
+    }
+
+    protected LaJob getJobComponent(Class<? extends LaJob> jobType) {
+        return ContainerUtil.getComponent(jobType);
     }
 
     protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
@@ -215,15 +223,18 @@ public class LaJobRunner {
             sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
         });
         sb.append(LF).append(" runtime: ").append(runtime);
+        buildTriggeredNextJobExp(runtime).ifPresent(exp -> {
+            sb.append(LF).append(" triggeredNextJob: ").append(exp);
+        });
+        if (runtime.isSuppressNextTrigger()) {
+            sb.append(LF).append(" suppressNextTrigger: true");
+        }
         runtime.getEndTitleRoll().ifPresent(roll -> {
             sb.append(LF).append(" endTitleRoll:");
             roll.getDataMap().forEach((key, value) -> {
                 sb.append(LF).append("   ").append(key).append(": ").append(value);
             });
         });
-        if (runtime.isSuppressNextTrigger()) {
-            sb.append(LF).append(" suppressNextTrigger: true");
-        }
         if (cause != null) {
             sb.append(LF).append(" cause: ");
             sb.append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
@@ -231,6 +242,28 @@ public class LaJobRunner {
         }
         sb.append(LF).append(LF); // to separate from job logging
         return sb.toString();
+    }
+
+    protected OptionalThing<String> buildTriggeredNextJobExp(LaJobRuntime runtime) {
+        final LaJobKey jobKey = runtime.getJobKey();
+        final String exp = jobManager.findJobByKey(jobKey).map(job -> {
+            final List<LaJobKey> triggeredJobKeyList = job.getTriggeredJobKeyList();
+            if (!triggeredJobKeyList.isEmpty()) {
+                final List<String> dispList = triggeredJobKeyList.stream().map(triggeredJobKey -> {
+                    return jobManager.findJobByKey(triggeredJobKey).map(triggeredJob -> {
+                        return triggeredJob.toIdentityDisp();
+                    }).orElseGet(() -> "(*Not found the triggered job: " + triggeredJobKey + ")");
+                }).collect(Collectors.toList());
+                return dispList.size() == 1 ? dispList.get(0) : dispList.toString();
+            } else {
+                return ""; // no show
+            }
+        }).orElseGet(() -> { // no way but just in case for logging
+            return "(*Not found the current job: " + jobKey + ")";
+        });
+        return OptionalThing.ofNullable(!exp.isEmpty() ? exp : null, () -> {
+            throw new IllegalStateException("Not found the triggeredNextJob expression: " + exp);
+        });
     }
 
     protected String toPerformanceView(long before, long after) {

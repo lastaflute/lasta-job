@@ -115,7 +115,7 @@ public class Cron4jCron implements LaCron {
             CronOption cronOption) {
         final VaryingCron varyingCron = createVaryingCron(cronExp, cronOption);
         final Supplier<String> threadNaming = prepareThreadNaming(cronOption);
-        return new Cron4jTask(varyingCron, jobType, cronOption, concurrentExec, threadNaming, jobRunner, cron4jNow); // adapter task
+        return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow); // adapter task
     }
 
     protected VaryingCron createVaryingCron(String cronExp, VaryingCronOption cronOption) {
@@ -149,7 +149,7 @@ public class Cron4jCron implements LaCron {
     }
 
     protected Cron4jJob saveJob(Cron4jTask cron4jTask, CronOption cronOption, String cron4jId) {
-        return cron4jNow.saveJob(cron4jTask, cronOption, OptionalThing.ofNullable(cron4jId, () -> {
+        return cron4jNow.saveJob(cron4jTask, cronOption, cronOption.getTriggeringJobKeyList(), OptionalThing.ofNullable(cron4jId, () -> {
             throw new IllegalStateException("Not found the cron4jId: " + cron4jTask);
         }));
     }

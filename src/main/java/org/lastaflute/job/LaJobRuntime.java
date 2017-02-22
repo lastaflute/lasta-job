@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
 
@@ -32,6 +34,12 @@ public interface LaJobRuntime {
     // ===================================================================================
     //                                                                          Basic Info
     //                                                                          ==========
+    LaJobKey getJobKey(); // not null
+
+    OptionalThing<String> getJobTitle(); // not null
+
+    OptionalThing<LaJobUnique> getJobUnique(); // not null
+
     String getCronExp(); // not null
 
     Class<? extends LaJob> getJobType(); // not null

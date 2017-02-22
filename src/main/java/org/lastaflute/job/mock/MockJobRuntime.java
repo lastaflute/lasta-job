@@ -24,6 +24,8 @@ import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.cron4j.Cron4jRuntime;
+import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
@@ -53,11 +55,13 @@ public class MockJobRuntime implements LaJobRuntime {
     //                                                                         Constructor
     //                                                                         ===========
     public MockJobRuntime(String cronExp, Class<? extends LaJob> jobType, CronOption cronOption, TaskExecutionContext cron4jContext) {
+        final LaJobKey jobKey = LaJobKey.of("mockKey_" + jobType.getSimpleName());
         final Map<String, Object> parameterMap = cronOption.getParamsSupplier().map(supplier -> {
             return supplier.supply();
         }).orElse(Collections.emptyMap());
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
-        cron4jRuntime = new Cron4jRuntime(cronExp, jobType, cronOption, parameterMap, noticeLogLevel, cron4jContext);
+        cron4jRuntime = new Cron4jRuntime(jobKey, cronOption.getJobTitle(), cronOption.getJobUnique(), cronExp, jobType, parameterMap,
+                noticeLogLevel, cron4jContext);
     }
 
     // -----------------------------------------------------
@@ -113,6 +117,21 @@ public class MockJobRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                            Delegate
     //                                                                            ========
+    @Override
+    public LaJobKey getJobKey() {
+        return cron4jRuntime.getJobKey();
+    }
+
+    @Override
+    public OptionalThing<String> getJobTitle() {
+        return cron4jRuntime.getJobTitle();
+    }
+
+    @Override
+    public OptionalThing<LaJobUnique> getJobUnique() {
+        return cron4jRuntime.getJobUnique();
+    }
+
     @Override
     public String getCronExp() {
         return cron4jRuntime.getCronExp();

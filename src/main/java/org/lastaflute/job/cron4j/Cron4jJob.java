@@ -29,7 +29,9 @@ import org.lastaflute.job.exception.JobTriggeredNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
+import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.CronOption;
+import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -41,7 +43,7 @@ import it.sauronsoftware.cron4j.TaskExecutor;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class Cron4jJob implements LaScheduledJob {
+public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
 
     // ===================================================================================
     //                                                                          Definition
@@ -237,10 +239,11 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     protected void showPreparingNextTrigger(List<Cron4jJob> triggeredJobList) {
-        final List<String> nextJobExpList = triggeredJobList.stream().map(triggeredJob -> {
-            return buildTriggerNextJobExp(triggeredJob);
+        final List<String> expList = triggeredJobList.stream().map(triggeredJob -> {
+            return triggeredJob.toIdentityDisp();
         }).collect(Collectors.toList());
-        logger.info("#job ...Preparing next job {} triggered by {}", nextJobExpList, buildTriggerNextJobExp(this));
+        final String exp = expList.size() == 1 ? expList.get(0) : expList.toString();
+        logger.info("#job ...Preparing next job {} triggered by {}", exp, toIdentityDisp());
     }
 
     protected String buildTriggerNextJobExp(Cron4jJob triggeredJob) {
@@ -251,12 +254,20 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     // ===================================================================================
+    //                                                                             Display
+    //                                                                             =======
+    public String toIdentityDisp() {
+        final Class<? extends LaJob> jobType = cron4jTask.getJobType();
+        return jobType.getSimpleName() + ":{" + jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.value()) + "}";
+    }
+
+    // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
     @Override
     public String toString() {
         final String titlePrefix = jobTitle.map(title -> title + ", ").orElse("");
-        final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.toString());
+        final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.value());
         final String idExp = cron4jId.map(id -> id.value()).orElse("non-cron");
         final String hash = Integer.toHexString(hashCode());
         return DfTypeUtil.toClassTitle(this) + ":{" + titlePrefix + keyExp + ", " + idExp + ", " + cron4jTask + "}@" + hash;
@@ -290,12 +301,17 @@ public class Cron4jJob implements LaScheduledJob {
         return cron4jTask.getJobType();
     }
 
+    @Override
+    public ConcurrentExec getConcurrentExec() {
+        return cron4jTask.getConcurrentExec();
+    }
+
     public Cron4jTask getCron4jTask() { // for framework
         return cron4jTask;
     }
 
     @Override
-    public synchronized List<LaJobKey> getTriggeredJobList() { // synchronized for varying
+    public synchronized List<LaJobKey> getTriggeredJobKeyList() { // synchronized for varying
         return triggeredJobKeyList != null ? Collections.unmodifiableList(triggeredJobKeyList) : Collections.emptyList();
     }
 }
