@@ -21,7 +21,6 @@ import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 
 /**
@@ -59,9 +58,19 @@ public interface LaScheduledJob {
     Class<? extends LaJob> getJobType();
 
     /**
-     * @return The execution type of concurrent. (NotNull)
+     * @return true if execution type of concurrent is 'wait'.
      */
-    ConcurrentExec getConcurrentExec();
+    boolean isConcurrentExecWait();
+
+    /**
+     * @return true if execution type of concurrent is 'quit'.
+     */
+    boolean isConcurrentExecQuit();
+
+    /**
+     * @return true if execution type of concurrent is 'error'.
+     */
+    boolean isConcurrentExecError();
 
     // ===================================================================================
     //                                                                            Behavior

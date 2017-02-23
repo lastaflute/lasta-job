@@ -302,7 +302,21 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     @Override
-    public ConcurrentExec getConcurrentExec() {
+    public boolean isConcurrentExecWait() {
+        return ConcurrentExec.WAIT.equals(getConcurrentExec());
+    }
+
+    @Override
+    public boolean isConcurrentExecQuit() {
+        return ConcurrentExec.QUIT.equals(getConcurrentExec());
+    }
+
+    @Override
+    public boolean isConcurrentExecError() {
+        return ConcurrentExec.ERROR.equals(getConcurrentExec());
+    }
+
+    public ConcurrentExec getConcurrentExec() { // for framework
         return cron4jTask.getConcurrentExec();
     }
 
