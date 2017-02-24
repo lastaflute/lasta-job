@@ -292,8 +292,11 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     @Override
-    public synchronized String getCronExp() { // synchronized for varying
-        return cron4jTask.getVaryingCron().getCronExp();
+    public synchronized OptionalThing<String> getCronExp() { // synchronized for varying
+        final String cronExp = !isNonCron() ? cron4jTask.getVaryingCron().getCronExp() : null;
+        return OptionalThing.ofNullable(cronExp, () -> {
+            throw new IllegalStateException("Not found cron expression because of non-cron job: " + toString());
+        });
     }
 
     @Override

@@ -48,9 +48,9 @@ public interface LaScheduledJob {
     OptionalThing<LaJobUnique> getJobUnique();
 
     /**
-     * @return The cron expression of the job e.g. '10 * * * *' (NotNull)
+     * @return The optional cron expression of the job e.g. '10 * * * *' (NotNull, EmptyAllowed: if non-cron)
      */
-    String getCronExp();
+    OptionalThing<String> getCronExp();
 
     /**
      * @return The type of job component for your application. (NotNull)
