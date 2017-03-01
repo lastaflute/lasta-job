@@ -13,13 +13,19 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.subsidiary;
+package org.lastaflute.job.exception;
+
+import org.lastaflute.job.exception.base.LaJobOperationException;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/13 Wednesday)
+ * @since 0.2.0 (2016/01/11 Monday)
  */
-public enum ConcurrentExec {
+public class JobAlreadyIllegallyExecutingException extends LaJobOperationException {
 
-    WAIT, QUIT, ERROR
+    private static final long serialVersionUID = 1L;
+
+    public JobAlreadyIllegallyExecutingException(String msg) {
+        super(msg);
+    }
 }

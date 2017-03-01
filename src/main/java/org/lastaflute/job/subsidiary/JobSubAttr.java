@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ import org.lastaflute.job.key.LaJobUnique;
 
 /**
  * @author jflute
- * @since 0.2.6 (2017/02/28 Saturday)
+ * @since 0.2.6 (2017/02/18 Saturday)
  */
-public interface JobSubAttr {
+public interface JobSubAttr { // for internal assist
 
     OptionalThing<String> getJobTitle();
 

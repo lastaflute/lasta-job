@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,17 @@
  */
 package org.lastaflute.job.exception;
 
-import org.lastaflute.core.exception.LaSystemException;
+import org.lastaflute.job.exception.base.LaJobOperationException;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public class JobAlreadyExecutingSystemException extends LaSystemException {
+public class JobNotFoundException extends LaJobOperationException {
 
     private static final long serialVersionUID = 1L;
 
-    public JobAlreadyExecutingSystemException(String msg) {
+    public JobNotFoundException(String msg) {
         super(msg);
     }
 }

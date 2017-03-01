@@ -13,13 +13,23 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.subsidiary;
+package org.lastaflute.job.exception.base;
+
+import org.lastaflute.core.exception.LaSystemException;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/13 Wednesday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public enum ConcurrentExec {
+public abstract class LaJobSystemException extends LaSystemException {
 
-    WAIT, QUIT, ERROR
+    private static final long serialVersionUID = 1L;
+
+    public LaJobSystemException(String msg) {
+        super(msg);
+    }
+
+    public LaJobSystemException(String msg, Throwable cause) {
+        super(msg, cause);
+    }
 }

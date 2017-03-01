@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
@@ -48,8 +49,10 @@ import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableS
 import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlStringFilter;
 import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
+import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogHook;
+import org.lastaflute.job.subsidiary.RunnerResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,11 +72,13 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected AccessContextArranger accessContextArranger; // null allowed, option
-    protected JobNoticeLogHook noticeLogHook; // null allowed, option
-
+    @Resource
+    private JobManager jobManager; // injected simply
     @Resource
     private ExceptionTranslator exceptionTranslator; // injected simply
+
+    protected AccessContextArranger accessContextArranger; // null allowed, option
+    protected JobNoticeLogHook noticeLogHook; // null allowed, option
 
     // ===================================================================================
     //                                                                              Option
@@ -105,17 +110,16 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                                Run
     //                                                                               =====
-    public void run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
+    public RunnerResult run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         if (isPlainlyRun()) { // e.g. production, unit-test
-            doRun(jobType, runtimeSupplier);
-            return;
+            return doRun(jobType, runtimeSupplier);
         }
         // e.g. local development (hot deploy)
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
         final ClassLoader originalLoader = startHotdeploy();
         try {
-            doRun(jobType, runtimeSupplier);
+            return doRun(jobType, runtimeSupplier);
         } finally {
             stopHotdeploy(originalLoader);
         }
@@ -141,7 +145,7 @@ public class LaJobRunner {
         ManagedHotdeploy.stop(originalLoader);
     }
 
-    protected void doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
+    protected RunnerResult doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         // simplar to async manager's process
         final LaJobRuntime runtime = runtimeSupplier.get();
         arrangeThreadCacheContext(runtime);
@@ -162,11 +166,24 @@ public class LaJobRunner {
             clearCallbackContext();
             clearThreadCacheContext();
         }
+        return createRunnerResult(runtime, cause);
     }
 
     protected void actuallyRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
-        final LaJob job = ContainerUtil.getComponent(jobType);
+        final LaJob job = getJobComponent(jobType);
         job.run(runtime);
+    }
+
+    protected LaJob getJobComponent(Class<? extends LaJob> jobType) {
+        return ContainerUtil.getComponent(jobType);
+    }
+
+    protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
+        return new RunnerResult(isRunnerSuccess(runtime, cause), cause);
+    }
+
+    protected boolean isRunnerSuccess(LaJobRuntime runtime, Throwable cause) {
+        return cause == null;
     }
 
     // ===================================================================================
@@ -206,6 +223,12 @@ public class LaJobRunner {
             sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
         });
         sb.append(LF).append(" runtime: ").append(runtime);
+        buildTriggeredNextJobExp(runtime).ifPresent(exp -> {
+            sb.append(LF).append(" triggeredNextJob: ").append(exp);
+        });
+        if (runtime.isSuppressNextTrigger()) {
+            sb.append(LF).append(" suppressNextTrigger: true");
+        }
         runtime.getEndTitleRoll().ifPresent(roll -> {
             sb.append(LF).append(" endTitleRoll:");
             roll.getDataMap().forEach((key, value) -> {
@@ -213,10 +236,34 @@ public class LaJobRunner {
             });
         });
         if (cause != null) {
-            sb.append(LF).append(" cause: ").append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
+            sb.append(LF).append(" cause: ");
+            sb.append(cause.getClass().getSimpleName()).append(" *Read the exception message!");
+            sb.append(" ").append(Integer.toHexString(cause.hashCode()));
         }
         sb.append(LF).append(LF); // to separate from job logging
         return sb.toString();
+    }
+
+    protected OptionalThing<String> buildTriggeredNextJobExp(LaJobRuntime runtime) {
+        final LaJobKey jobKey = runtime.getJobKey();
+        final String exp = jobManager.findJobByKey(jobKey).map(job -> {
+            final List<LaJobKey> triggeredJobKeyList = job.getTriggeredJobKeyList();
+            if (!triggeredJobKeyList.isEmpty()) {
+                final List<String> dispList = triggeredJobKeyList.stream().map(triggeredJobKey -> {
+                    return jobManager.findJobByKey(triggeredJobKey).map(triggeredJob -> {
+                        return triggeredJob.toIdentityDisp();
+                    }).orElseGet(() -> "(*Not found the triggered job: " + triggeredJobKey + ")");
+                }).collect(Collectors.toList());
+                return dispList.size() == 1 ? dispList.get(0) : dispList.toString();
+            } else {
+                return ""; // no show
+            }
+        }).orElseGet(() -> { // no way but just in case for logging
+            return "(*Not found the current job: " + jobKey + ")";
+        });
+        return OptionalThing.ofNullable(!exp.isEmpty() ? exp : null, () -> {
+            throw new IllegalStateException("Not found the triggeredNextJob expression: " + exp);
+        });
     }
 
     protected String toPerformanceView(long before, long after) {
@@ -318,11 +365,18 @@ public class LaJobRunner {
     //                                                                  Exception Handling
     //                                                                  ==================
     protected void handleJobException(LaJobRuntime runtime, long before, Throwable cause) {
-        // not use second argument here, same reason as logging filter
-        final Throwable handled = exceptionTranslator.filterCause(cause);
-        logger.error(buildJobExceptionMessage(runtime, before, handled));
+        final Throwable filtered = exceptionTranslator.filterCause(cause);
+        showJobException(runtime, before, filtered);
     }
 
+    protected void showJobException(LaJobRuntime runtime, long before, Throwable cause) {
+        final String msg = buildJobExceptionMessage(runtime, before, cause);
+        logJobException(runtime, msg, cause);
+    }
+
+    // -----------------------------------------------------
+    //                                      Message Building
+    //                                      ----------------
     protected String buildJobExceptionMessage(LaJobRuntime runtime, long before, Throwable cause) {
         final StringBuilder sb = new StringBuilder();
         sb.append("Failed to run the job process: #flow #job");
@@ -423,6 +477,13 @@ public class LaJobRunner {
                 ps.close();
             }
         }
+    }
+
+    // -----------------------------------------------------
+    //                                     Exception Logging
+    //                                     -----------------
+    protected void logJobException(LaJobRuntime runtime, String msg, Throwable cause) { // msg contains stack-trace
+        logger.error(msg); // not use second argument here, same reason as logging filter
     }
 
     // ===================================================================================

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
  */
 package org.lastaflute.job.exception;
 
-import org.lastaflute.core.exception.LaSystemException;
+import org.lastaflute.job.exception.base.LaJobStructureException;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/13 Wednesday)
  */
-public class JobSchedulerNoInterfaceException extends LaSystemException {
+public class JobSchedulerNoInterfaceException extends LaJobStructureException {
 
     private static final long serialVersionUID = 1L;
 

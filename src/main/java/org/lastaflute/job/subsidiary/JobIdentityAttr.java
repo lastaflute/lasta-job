@@ -15,11 +15,19 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobUnique;
+
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/13 Wednesday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public enum ConcurrentExec {
+public interface JobIdentityAttr { // for internal assist
 
-    WAIT, QUIT, ERROR
+    LaJobKey getJobKey();
+
+    OptionalThing<String> getJobTitle();
+
+    OptionalThing<LaJobUnique> getJobUnique();
 }

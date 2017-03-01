@@ -15,11 +15,29 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import org.dbflute.optional.OptionalThing;
+
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/13 Wednesday)
+ * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public enum ConcurrentExec {
+public class RunnerResult {
 
-    WAIT, QUIT, ERROR
+    protected final boolean success; // e.g. no cause
+    protected final Throwable cause; // null allowed, already handled (e.g. logging)
+
+    public RunnerResult(boolean success, Throwable cause) {
+        this.success = success;
+        this.cause = cause;
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public OptionalThing<Throwable> getCause() {
+        return OptionalThing.ofNullable(cause, () -> {
+            throw new IllegalStateException("Not found the cause.");
+        });
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import org.lastaflute.job.LaScheduledJob;
+
 /**
  * @author jflute
  * @since 0.2.2 (2016/01/22 Friday at bay maihama)
@@ -24,7 +26,21 @@ public interface InitialCronOption extends VaryingCronOption { // also varying t
     // ===================================================================================
     //                                                                              Facade
     //                                                                              ======
+    /**
+     * @param jobTitle The title expression for the job. (NotNull)
+     * @return this. (NotNull)
+     */
+    InitialCronOption title(String jobTitle);
+
+    /**
+     * @param uniqueCode The unique code provided by application to identify job. (NotNull)
+     * @return this. (NotNull)
+     */
     InitialCronOption uniqueBy(String uniqueCode);
 
-    InitialCronOption title(String jobTitle);
+    /**
+     * @param triggeringJob The job triggering me when success, means previous job (NotNull) 
+     * @return this. (NotNull)
+     */
+    InitialCronOption triggeredBy(LaScheduledJob triggeringJob);
 }

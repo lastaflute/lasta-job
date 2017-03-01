@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,20 +23,49 @@ import org.lastaflute.job.subsidiary.ConcurrentExec;
  */
 public interface LaJobScheduler {
 
+    // ===================================================================================
+    //                                                                               Basic
+    //                                                                               =====
+    /**
+     * Schedule application jobs.
+     * @param cron The cron object to register jobs. (NotNull)
+     */
     void schedule(LaCron cron);
 
-    default LaJobRunner createRunner() {
+    /**
+     * Create job runner, which executes your jobs.
+     * @return The new-created job runner. (NotNull)
+     */
+    default LaJobRunner createRunner() { // you can override
         return new LaJobRunner();
     }
 
+    // ===================================================================================
+    //                                                                          Concurrent
+    //                                                                          ==========
+    /**
+     * Get the execution type of concurrent for 'wait', <br>
+     * means the second job waits for finishing the first job.
+     * @return The execution type of concurrent. (NotNull)
+     */
     default ConcurrentExec waitIfConcurrent() {
         return ConcurrentExec.WAIT;
     }
 
+    /**
+     * Get the execution type of concurrent for 'quit', <br>
+     * means the second job quits executing quietly.
+     * @return The execution type of concurrent. (NotNull)
+     */
     default ConcurrentExec quitIfConcurrent() {
         return ConcurrentExec.QUIT;
     }
 
+    /**
+     * Get the execution type of concurrent for 'error', <br>
+     * means the second job outputs error log (and quits).
+     * @return The execution type of concurrent. (NotNull)
+     */
     default ConcurrentExec errorIfConcurrent() {
         return ConcurrentExec.ERROR;
     }
