@@ -29,8 +29,10 @@ import org.lastaflute.job.exception.JobTriggeredNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
+import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.CronOption;
+import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
@@ -302,6 +304,16 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     @Override
     public Class<? extends LaJob> getJobType() {
         return cron4jTask.getJobType();
+    }
+
+    @Override
+    public OptionalThing<CronParamsSupplier> getParamsSupplier() {
+        return cron4jTask.getVaryingCron().getCronOption().getParamsSupplier();
+    }
+
+    @Override
+    public JobNoticeLogLevel getNoticeLogLevel() {
+        return cron4jTask.getVaryingCron().getCronOption().getNoticeLogLevel();
     }
 
     @Override

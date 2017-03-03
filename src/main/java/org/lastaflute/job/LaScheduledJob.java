@@ -21,6 +21,8 @@ import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.log.JobNoticeLogLevel;
+import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 
 /**
@@ -56,6 +58,16 @@ public interface LaScheduledJob {
      * @return The type of job component for your application. (NotNull)
      */
     Class<? extends LaJob> getJobType();
+
+    /**
+     * @return The optional supplier of cron parameters. (NotNull, EmptyAllowed: if no parameter)
+     */
+    OptionalThing<CronParamsSupplier> getParamsSupplier();
+
+    /**
+     * @return The level of notice log. (NotNull)
+     */
+    JobNoticeLogLevel getNoticeLogLevel();
 
     /**
      * @return true if execution type of concurrent is 'wait'.
