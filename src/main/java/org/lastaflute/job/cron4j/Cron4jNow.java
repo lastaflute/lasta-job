@@ -15,15 +15,18 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.dbflute.util.Srl;
+import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaSchedulingNow;
 import org.lastaflute.job.cron4j.Cron4jCron.CronRegistrationType;
@@ -45,6 +48,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                                                           =========
     protected final Cron4jScheduler cron4jScheduler;
     protected final LaJobRunner jobRunner;
+    protected final Supplier<LocalDateTime> currentTime;
     protected final Map<LaJobKey, Cron4jJob> jobKeyJobMap = new ConcurrentHashMap<LaJobKey, Cron4jJob>();
     protected final Map<LaJobUnique, Cron4jJob> jobUniqueJobMap = new ConcurrentHashMap<LaJobUnique, Cron4jJob>();
     protected final Map<Cron4jTask, Cron4jJob> cron4jTaskJobMap = new ConcurrentHashMap<Cron4jTask, Cron4jJob>();
@@ -53,9 +57,10 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner) {
+    public Cron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner, Supplier<LocalDateTime> currentTime) {
         this.cron4jScheduler = cron4jScheduler;
         this.jobRunner = jobRunner;
+        this.currentTime = currentTime;
     }
 
     // ===================================================================================
@@ -198,7 +203,7 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     protected Cron4jCron createCron4jCron() {
-        return new Cron4jCron(cron4jScheduler, jobRunner, this, CronRegistrationType.CHANGE);
+        return new Cron4jCron(cron4jScheduler, jobRunner, this, CronRegistrationType.CHANGE, currentTime);
     }
 
     // ===================================================================================
@@ -214,6 +219,14 @@ public class Cron4jNow implements LaSchedulingNow {
             job.getJobUnique().ifPresent(jobUnique -> jobUniqueJobMap.remove(jobUnique));
             cron4jTaskJobMap.remove(job.getCron4jTask());
         });
+    }
+
+    // ===================================================================================
+    //                                                                         Job History
+    //                                                                         ===========
+    @Override
+    public List<LaJobHistory> searchJobHistoryList() {
+        return Cron4jJobHistory.list();
     }
 
     // ===================================================================================

@@ -178,8 +178,8 @@ public class MockJobRuntime implements LaJobRuntime {
     }
 
     @Override
-    public boolean isSuppressNextTrigger() {
-        return cron4jRuntime.isSuppressNextTrigger();
+    public boolean isNextTriggerSuppressed() {
+        return cron4jRuntime.isNextTriggerSuppressed();
     }
 
     @Override

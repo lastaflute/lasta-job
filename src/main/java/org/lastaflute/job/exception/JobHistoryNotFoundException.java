@@ -13,30 +13,19 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job;
+package org.lastaflute.job.exception;
 
-import java.util.List;
-
-import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.key.LaJobUnique;
-import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.job.exception.base.LaJobOperationException;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.2.8 (2017/03/04 Saturday)
  */
-public interface LaSchedulingNow {
+public class JobHistoryNotFoundException extends LaJobOperationException {
 
-    OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey);
+    private static final long serialVersionUID = 1L;
 
-    OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique);
-
-    List<? extends LaScheduledJob> getJobList();
-
-    void schedule(CronConsumer oneArgLambda);
-
-    List<LaJobHistory> searchJobHistoryList();
-
-    void destroy();
+    public JobHistoryNotFoundException(String msg) {
+        super(msg);
+    }
 }

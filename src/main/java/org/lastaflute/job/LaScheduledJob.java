@@ -23,6 +23,7 @@ import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
+import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 
 /**
@@ -98,9 +99,10 @@ public interface LaScheduledJob {
      * Actually launch the job now (at other thread), no-related to cron time. <br>
      * If executing job exists, the launched job is waiting for <br>
      * finishing the executing job. (you can change the behavior by option)
+     * @return The launched process of the job. (NotNull)
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
-    void launchNow();
+    LaunchedProcess launchNow();
 
     /**
      * Stop the executing job by Thread.interrupt() and runtime.stopIfNeeds(). <br>

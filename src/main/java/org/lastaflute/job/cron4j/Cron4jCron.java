@@ -15,6 +15,7 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.time.LocalDateTime;
 import java.util.function.Supplier;
 
 import org.dbflute.optional.OptionalThing;
@@ -53,15 +54,18 @@ public class Cron4jCron implements LaCron {
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
     protected final CronRegistrationType registrationType;
+    protected final Supplier<LocalDateTime> currentTime;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner, Cron4jNow cron4jNow, CronRegistrationType registrationType) {
+    public Cron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner, Cron4jNow cron4jNow, CronRegistrationType registrationType,
+            Supplier<LocalDateTime> currentTime) {
         this.cron4jScheduler = cron4jScheduler;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
         this.registrationType = registrationType;
+        this.currentTime = currentTime;
     }
 
     public enum CronRegistrationType {
@@ -115,7 +119,7 @@ public class Cron4jCron implements LaCron {
             CronOption cronOption) {
         final VaryingCron varyingCron = createVaryingCron(cronExp, cronOption);
         final Supplier<String> threadNaming = prepareThreadNaming(cronOption);
-        return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow); // adapter task
+        return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow, currentTime); // adapter task
     }
 
     protected VaryingCron createVaryingCron(String cronExp, VaryingCronOption cronOption) {

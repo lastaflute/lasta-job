@@ -70,7 +70,7 @@ public interface LaJobRuntime {
     //                                                                    ================
     void suppressNextTrigger();
 
-    boolean isSuppressNextTrigger();
+    boolean isNextTriggerSuppressed();
 
     // ===================================================================================
     //                                                                             Display

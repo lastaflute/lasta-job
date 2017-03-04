@@ -76,8 +76,58 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     // ===================================================================================
+    //                                                                          Basic Info
+    //                                                                          ==========
+    @Override
+    public LaJobKey getJobKey() {
+        return jobKey;
+    }
+
+    @Override
+    public OptionalThing<String> getJobTitle() {
+        return jobTitle;
+    }
+
+    @Override
+    public OptionalThing<LaJobUnique> getJobUnique() {
+        return jobUnique;
+    }
+
+    @Override
+    public String getCronExp() {
+        return cronExp;
+    }
+
+    @Override
+    public Class<? extends LaJob> getJobType() {
+        return jobType;
+    }
+
+    @Override
+    public Method getRunMethod() {
+        return runMethod;
+    }
+
+    @Override
+    public Map<String, Object> getParameterMap() {
+        return parameterMap; // already unmodifiable
+    }
+
+    @Override
+    public JobNoticeLogLevel getNoticeLogLevel() {
+        return noticeLogLevel;
+    }
+
+    // ===================================================================================
     //                                                                      End-Title Roll
     //                                                                      ==============
+    @Override
+    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
+        return OptionalThing.ofNullable(endTitleRollData, () -> {
+            throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
+        });
+    }
+
     @Override
     public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
         assertArgumentNotNull("dataLambda", dataLambda);
@@ -108,11 +158,16 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     // ===================================================================================
-    //                                                                    Business Failure
-    //                                                                    ================
+    //                                                                        Next Trigger
+    //                                                                        ============
     @Override
     public void suppressNextTrigger() {
         nextTriggerSuppressed = true;
+    }
+
+    @Override
+    public boolean isNextTriggerSuppressed() {
+        return nextTriggerSuppressed;
     }
 
     // ===================================================================================
@@ -170,59 +225,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    @Override
-    public LaJobKey getJobKey() {
-        return jobKey;
-    }
-
-    @Override
-    public OptionalThing<String> getJobTitle() {
-        return jobTitle;
-    }
-
-    @Override
-    public OptionalThing<LaJobUnique> getJobUnique() {
-        return jobUnique;
-    }
-
-    @Override
-    public String getCronExp() {
-        return cronExp;
-    }
-
-    @Override
-    public Class<? extends LaJob> getJobType() {
-        return jobType;
-    }
-
-    @Override
-    public Method getRunMethod() {
-        return runMethod;
-    }
-
-    @Override
-    public Map<String, Object> getParameterMap() {
-        return parameterMap; // already unmodifiable
-    }
-
-    @Override
-    public JobNoticeLogLevel getNoticeLogLevel() {
-        return noticeLogLevel;
-    }
-
     public TaskExecutionContext getCron4jContext() { // not interface method because of cron4j's one 
         return cron4jContext;
-    }
-
-    @Override
-    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
-        return OptionalThing.ofNullable(endTitleRollData, () -> {
-            throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
-        });
-    }
-
-    @Override
-    public boolean isSuppressNextTrigger() {
-        return nextTriggerSuppressed;
     }
 }

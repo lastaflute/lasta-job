@@ -79,6 +79,7 @@ public class LaJobRunner {
 
     protected AccessContextArranger accessContextArranger; // null allowed, option
     protected JobNoticeLogHook noticeLogHook; // null allowed, option
+    protected int jobHistoryLimit = 100; // as framework default
 
     // ===================================================================================
     //                                                                              Option
@@ -105,6 +106,22 @@ public class LaJobRunner {
         }
         this.noticeLogHook = noticeLogHook;
         return this;
+    }
+
+    /**
+     * @param jobHistoryLimit The limit size of job history saved in memory. (NotNull)
+     * @return this. (NotNull)
+     */
+    public LaJobRunner limitJobHistory(int jobHistoryLimit) { // almost required if DBFlute
+        if (jobHistoryLimit < getJobHistoryMinimumLimit()) {
+            throw new IllegalArgumentException("The argument 'jobHistoryLimit' should not be over or equal 10: " + jobHistoryLimit);
+        }
+        this.jobHistoryLimit = jobHistoryLimit;
+        return this;
+    }
+
+    protected int getJobHistoryMinimumLimit() {
+        return 10; // as default, no history is not allowed for LaunchedProcess
     }
 
     // ===================================================================================
@@ -179,11 +196,11 @@ public class LaJobRunner {
     }
 
     protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
-        return new RunnerResult(isRunnerSuccess(runtime, cause), cause);
+        return RunnerResult.asExecuted(cause, runtime.isNextTriggerSuppressed());
     }
 
-    protected boolean isRunnerSuccess(LaJobRuntime runtime, Throwable cause) {
-        return cause == null;
+    protected boolean isBusinessSuccess(LaJobRuntime runtime, Throwable cause) {
+        return cause == null; // simple as default
     }
 
     // ===================================================================================
@@ -226,7 +243,7 @@ public class LaJobRunner {
         buildTriggeredNextJobExp(runtime).ifPresent(exp -> {
             sb.append(LF).append(" triggeredNextJob: ").append(exp);
         });
-        if (runtime.isSuppressNextTrigger()) {
+        if (runtime.isNextTriggerSuppressed()) {
             sb.append(LF).append(" suppressNextTrigger: true");
         }
         runtime.getEndTitleRoll().ifPresent(roll -> {

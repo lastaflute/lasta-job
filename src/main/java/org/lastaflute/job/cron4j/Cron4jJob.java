@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
+import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.exception.JobTriggeredNotFoundException;
@@ -34,6 +35,7 @@ import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
+import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -93,13 +95,31 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                          Launch Now
     //                                                                          ==========
     @Override
-    public synchronized void launchNow() {
+    public synchronized LaunchedProcess launchNow() {
         verifyScheduledState();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Launching now: {}", toString());
         }
         // if executed by cron here, duplicate execution occurs but task level synchronization exists
-        cron4jNow.getCron4jScheduler().launch(cron4jTask);
+        final TaskExecutor taskExecutor = cron4jNow.getCron4jScheduler().launch(cron4jTask);
+        return createLaunchedProcess(taskExecutor);
+    }
+
+    protected LaunchedProcess createLaunchedProcess(TaskExecutor taskExecutor) {
+        return new LaunchedProcess(this, () -> joinJobThread(taskExecutor), () -> findJobHistory(taskExecutor));
+    }
+
+    protected void joinJobThread(TaskExecutor taskExecutor) {
+        try {
+            taskExecutor.join();
+        } catch (InterruptedException e) {
+            String msg = "The current thread has been interrupted while join: taskExecutor=" + taskExecutor + ", job=" + this;
+            throw new IllegalStateException(msg, e);
+        }
+    }
+
+    protected OptionalThing<LaJobHistory> findJobHistory(TaskExecutor taskExecutor) {
+        return Cron4jJobHistory.find(taskExecutor);
     }
 
     // ===================================================================================
