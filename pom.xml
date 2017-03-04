@@ -16,6 +16,7 @@
 		<lastaflute.version>0.8.6</lastaflute.version>
 		<jta.version>1.2</jta.version>
 		<slf4j.version>1.7.12</slf4j.version>
+		<utflute.version>0.6.8</utflute.version>
 	</properties>
 
 	<licenses>
@@ -206,6 +207,12 @@
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.8.2</version> <!-- is latest version without hamcrest -->
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.dbflute.utflute</groupId>
+			<artifactId>utflute-lasta-di</artifactId>
+			<version>${utflute.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<!-- logging -->

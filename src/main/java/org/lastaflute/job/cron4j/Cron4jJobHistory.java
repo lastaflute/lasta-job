@@ -16,19 +16,14 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJobHistory;
-import org.lastaflute.job.exception.JobHistoryNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.ExecResultType;
+import org.lastaflute.job.subsidiary.SavedHistoryCache;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -41,59 +36,20 @@ public class Cron4jJobHistory implements LaJobHistory {
     // ===================================================================================
     //                                                                       History Cache
     //                                                                       =============
-    // basically synchronized but just in case
-    protected static final Map<String, LaJobHistory> historyMap = new ConcurrentHashMap<String, LaJobHistory>();
-    protected static final List<String> historyKeyList = new CopyOnWriteArrayList<String>();
+    protected static final SavedHistoryCache historyCache = new SavedHistoryCache();
 
-    // -----------------------------------------------------
-    //                                                 Find
-    //                                                ------
     public synchronized static OptionalThing<LaJobHistory> find(TaskExecutor taskExecutor) {
-        final String historyKey = generateHistoryKey(taskExecutor);
-        final LaJobHistory found = historyMap.get(historyKey);
-        return OptionalThing.ofNullable(found, () -> {
-            final ExceptionMessageBuilder br = new ExceptionMessageBuilder();
-            br.addNotice("Not found the job history by the job thread.");
-            br.addItem("Task Executor");
-            br.addElement(taskExecutor);
-            br.addItem("Generated History Key");
-            br.addElement(historyKey);
-            br.addItem("Existing Key");
-            if (!historyMap.isEmpty()) {
-                historyMap.forEach((key, value) -> {
-                    br.addElement(key + " = " + value);
-                });
-            } else {
-                br.addElement("*No history");
-            }
-            final String msg = br.buildExceptionMessage();
-            throw new JobHistoryNotFoundException(msg);
-        });
+        return historyCache.find(generateHistoryKey(taskExecutor));
     }
 
-    // -----------------------------------------------------
-    //                                                Record
-    //                                                ------
-    public synchronized static void record(TaskExecutor taskExecutor, Cron4jJobHistory jobHistory, int limit) {
-        final String historyKey = generateHistoryKey(taskExecutor);
-        if (historyMap.size() >= limit) {
-            final String removedKey = historyKeyList.remove(0);
-            historyMap.remove(removedKey);
-        }
-        historyMap.put(historyKey, jobHistory);
-        historyKeyList.add(historyKey);
+    public synchronized static void record(TaskExecutor taskExecutor, LaJobHistory jobHistory, int limit) {
+        historyCache.record(generateHistoryKey(taskExecutor), jobHistory, limit);
     }
 
-    // -----------------------------------------------------
-    //                                                 List
-    //                                                ------
     public synchronized static List<LaJobHistory> list() {
-        return new ArrayList<LaJobHistory>(historyMap.values());
+        return historyCache.list();
     }
 
-    // -----------------------------------------------------
-    //                                           History Key
-    //                                           -----------
     protected static String generateHistoryKey(TaskExecutor taskExecutor) {
         return taskExecutor.getGuid(); // trust it
     }
