@@ -16,11 +16,11 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 
 import org.dbflute.optional.OptionalThing;
@@ -51,6 +51,7 @@ public class Cron4jNow implements LaSchedulingNow {
     protected final LaJobRunner jobRunner;
     protected final Supplier<LocalDateTime> currentTime;
     protected final Map<LaJobKey, Cron4jJob> jobKeyJobMap = new ConcurrentHashMap<LaJobKey, Cron4jJob>();
+    protected final List<Cron4jJob> jobOrderedList = new CopyOnWriteArrayList<Cron4jJob>(); // same lifecycle as jobKeyJobMap
     protected final Map<LaJobUnique, Cron4jJob> jobUniqueJobMap = new ConcurrentHashMap<LaJobUnique, Cron4jJob>();
     protected final Map<Cron4jTask, Cron4jJob> cron4jTaskJobMap = new ConcurrentHashMap<Cron4jTask, Cron4jJob>();
     protected int incrementedJobNumber;
@@ -83,6 +84,7 @@ public class Cron4jNow implements LaSchedulingNow {
         final Cron4jJob cron4jJob = createCron4jJob(jobKey, jobSubAttr, triggeringJobKeyList, cron4jId, cron4jTask);
         assertDuplicateJobKey(jobKey);
         jobKeyJobMap.put(jobKey, cron4jJob);
+        jobOrderedList.add(cron4jJob);
         jobSubAttr.getJobUnique().ifPresent(uniqueCode -> {
             assertDuplicateUniqueCode(jobKey, uniqueCode);
             jobUniqueJobMap.put(uniqueCode, cron4jJob);
@@ -187,11 +189,11 @@ public class Cron4jNow implements LaSchedulingNow {
 
     @Override
     public List<Cron4jJob> getJobList() {
-        return Collections.unmodifiableList(new ArrayList<Cron4jJob>(jobKeyJobMap.values()));
+        return Collections.unmodifiableList(jobOrderedList);
     }
 
     public List<Cron4jJob> getCron4jJobList() {
-        return Collections.unmodifiableList(new ArrayList<Cron4jJob>(jobKeyJobMap.values()));
+        return Collections.unmodifiableList(jobOrderedList);
     }
 
     // ===================================================================================
@@ -217,6 +219,7 @@ public class Cron4jNow implements LaSchedulingNow {
         getCron4jJobList().stream().filter(job -> job.isUnscheduled()).forEach(job -> {
             final LaJobKey jobKey = job.getJobKey();
             jobKeyJobMap.remove(jobKey);
+            jobOrderedList.remove(job);
             job.getJobUnique().ifPresent(jobUnique -> jobUniqueJobMap.remove(jobUnique));
             cron4jTaskJobMap.remove(job.getCron4jTask());
         });

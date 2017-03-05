@@ -48,7 +48,8 @@ public interface JobManager {
     OptionalThing<LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique);
 
     /**
-     * Get the list of all jobs in the scheduled jobs.
+     * Get the list of all jobs in the scheduled jobs. <br>
+     * Sorted as registration order.
      * @return The list of all jobs. (NotNull)
      */
     List<LaScheduledJob> getJobList();
