@@ -21,6 +21,7 @@ import java.util.List;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.ExecResultType;
 import org.lastaflute.job.subsidiary.SavedHistoryCache;
@@ -58,7 +59,7 @@ public class Cron4jJobHistory implements LaJobHistory {
     //                                                                           Attribute
     //                                                                           =========
     protected final LaJobKey jobKey; // not null
-    protected final OptionalThing<String> jobTitle; // not null
+    protected final OptionalThing<LaJobNote> jobNote; // not null
     protected final OptionalThing<LaJobUnique> jobUnique; // not null
     protected final OptionalThing<String> cronExp; // not null
     protected final String jobTypeFqcn; // not null, not save class directly to avoid hot-deploy trouble
@@ -70,12 +71,12 @@ public class Cron4jJobHistory implements LaJobHistory {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJobHistory(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique // identity
+    public Cron4jJobHistory(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique // identity
             , OptionalThing<String> cronExp, String jobTypeFqcn // cron
             , LocalDateTime beginTime, LocalDateTime endTime, ExecResultType execResultType, Throwable cause // execution
     ) {
         this.jobKey = jobKey;
-        this.jobTitle = jobTitle;
+        this.jobNote = jobNote;
         this.jobUnique = jobUnique;
         this.cronExp = cronExp;
         this.jobTypeFqcn = jobTypeFqcn;
@@ -93,7 +94,7 @@ public class Cron4jJobHistory implements LaJobHistory {
         final StringBuilder sb = new StringBuilder();
         sb.append("history:{");
         sb.append(jobKey);
-        sb.append(jobTitle.map(title -> ", " + title).orElse(""));
+        sb.append(jobNote.map(title -> ", " + title).orElse(""));
         sb.append(jobUnique.map(uq -> ", " + uq).orElse(""));
         sb.append(cronExp.map(cron -> ", " + cron).orElse(""));
         sb.append(", ").append(jobTypeFqcn);
@@ -117,8 +118,8 @@ public class Cron4jJobHistory implements LaJobHistory {
     }
 
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return jobTitle;
+    public OptionalThing<LaJobNote> getJobNote() {
+        return jobNote;
     }
 
     @Override

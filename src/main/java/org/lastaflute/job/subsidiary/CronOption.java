@@ -22,6 +22,7 @@ import java.util.List;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 
@@ -35,6 +36,7 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
     //                                                                           Attribute
     //                                                                           =========
     protected String jobTitle;
+    protected String jobDesc;
     protected LaJobUnique jobUnique;
     protected CronParamsSupplier paramsSupplier;
     protected List<LaJobKey> triggeringJobKeyList;
@@ -49,6 +51,15 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
             throw new IllegalArgumentException("The argument 'jobTitle' should not be null or empty: " + jobTitle);
         }
         this.jobTitle = jobTitle;
+        return this;
+    }
+
+    @Override
+    public CronOption desc(String jobDesc) {
+        if (jobDesc == null || jobDesc.trim().isEmpty()) {
+            throw new IllegalArgumentException("The argument 'jobDesc' should not be null or empty: " + jobDesc);
+        }
+        this.jobDesc = jobDesc;
         return this;
     }
 
@@ -115,9 +126,10 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
     //                                                                            Accessor
     //                                                                            ========
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return OptionalThing.ofNullable(jobTitle, () -> {
-            throw new IllegalStateException("Not found the application job title.");
+    public OptionalThing<LaJobNote> getJobNote() {
+        final LaJobNote note = (jobTitle != null || jobDesc != null) ? LaJobNote.of(jobTitle, jobDesc) : null;
+        return OptionalThing.ofNullable(note, () -> {
+            throw new IllegalStateException("Not found the job note (both title and description).");
         });
     }
 

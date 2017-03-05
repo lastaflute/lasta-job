@@ -30,6 +30,7 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyIllegallyExecutingException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentExec;
@@ -195,11 +196,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected Cron4jRuntime createCron4jRuntime(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
             TaskExecutionContext cron4jContext) {
         final LaJobKey jobKey = identityProvider.getJobKey();
-        final OptionalThing<String> jobTitle = identityProvider.getJobTitle();
+        final OptionalThing<LaJobNote> jobNote = identityProvider.getJobNote();
         final OptionalThing<LaJobUnique> jobUnique = identityProvider.getJobUnique();
         final Map<String, Object> parameterMap = extractParameterMap(cronOption);
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
-        return new Cron4jRuntime(jobKey, jobTitle, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
+        return new Cron4jRuntime(jobKey, jobNote, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
     }
 
     protected Map<String, Object> extractParameterMap(VaryingCronOption cronOption) {
@@ -251,12 +252,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected Cron4jJobHistory createJobHistory(Cron4jJob job, LocalDateTime beginTime, LocalDateTime endTime,
             Supplier<ExecResultType> execResultTypeProvider, Throwable cause) {
         final LaJobKey jobKey = job.getJobKey();
-        final OptionalThing<String> jobTitle = job.getJobTitle();
+        final OptionalThing<LaJobNote> jobNote = job.getJobNote();
         final OptionalThing<LaJobUnique> jobUnique = job.getJobUnique();
         final OptionalThing<String> cronExp = job.getCronExp();
         final String jobTypeFqcn = job.getJobType().getName();
         final ExecResultType execResultType = execResultTypeProvider.get();
-        return new Cron4jJobHistory(jobKey, jobTitle, jobUnique, cronExp, jobTypeFqcn, beginTime, endTime, execResultType, cause);
+        return new Cron4jJobHistory(jobKey, jobNote, jobUnique, cronExp, jobTypeFqcn, beginTime, endTime, execResultType, cause);
     }
 
     protected int getHistoryLimit() {

@@ -32,6 +32,7 @@ import org.lastaflute.job.LaSchedulingNow;
 import org.lastaflute.job.cron4j.Cron4jCron.CronRegistrationType;
 import org.lastaflute.job.exception.JobNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.subsidiary.CronConsumer;
@@ -115,7 +116,7 @@ public class Cron4jNow implements LaSchedulingNow {
     //                                             ---------
     protected Cron4jJob createCron4jJob(LaJobKey jobKey, JobSubAttr jobSubAttr, List<LaJobKey> triggeringJobKeyList,
             OptionalThing<String> cron4jId, Cron4jTask cron4jTask) {
-        final Cron4jJob job = newCron4jJob(jobKey, jobSubAttr.getJobTitle(), jobSubAttr.getJobUnique(), cron4jId.map(id -> Cron4jId.of(id)),
+        final Cron4jJob job = newCron4jJob(jobKey, jobSubAttr.getJobNote(), jobSubAttr.getJobUnique(), cron4jId.map(id -> Cron4jId.of(id)),
                 cron4jTask, this);
         triggeringJobKeyList.forEach(triggeringJobKey -> {
             findJobByKey(triggeringJobKey).alwaysPresent(triggeringJob -> {
@@ -125,9 +126,9 @@ public class Cron4jNow implements LaSchedulingNow {
         return job;
     }
 
-    protected Cron4jJob newCron4jJob(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique,
+    protected Cron4jJob newCron4jJob(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique,
             OptionalThing<Cron4jId> cron4jId, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
-        return new Cron4jJob(jobKey, jobTitle, jobUnique, cron4jId, cron4jTask, cron4jNow);
+        return new Cron4jJob(jobKey, jobNote, jobUnique, cron4jId, cron4jTask, cron4jNow);
     }
 
     // -----------------------------------------------------

@@ -21,6 +21,7 @@ import java.util.function.Consumer;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
@@ -36,7 +37,7 @@ public interface LaJobRuntime {
     //                                                                          ==========
     LaJobKey getJobKey(); // not null
 
-    OptionalThing<String> getJobTitle(); // not null
+    OptionalThing<LaJobNote> getJobNote(); // not null
 
     OptionalThing<LaJobUnique> getJobUnique(); // not null
 

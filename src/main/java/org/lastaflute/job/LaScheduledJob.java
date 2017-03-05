@@ -20,6 +20,7 @@ import java.util.List;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
@@ -41,9 +42,9 @@ public interface LaScheduledJob {
     LaJobKey getJobKey();
 
     /**
-     * @return The title expression of the job. (NotNull, EmptyAllowed)
+     * @return The optional note (title, description) of the job. (NotNull, EmptyAllowed: if both is no value)
      */
-    OptionalThing<String> getJobTitle();
+    OptionalThing<LaJobNote> getJobNote();
 
     /**
      * @return The optional job unique code provided by application when schedule registration. (NotNull, EmptyAllowed)

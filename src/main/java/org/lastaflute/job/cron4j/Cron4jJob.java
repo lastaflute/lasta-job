@@ -28,6 +28,7 @@ import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.exception.JobTriggeredNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.log.JobNoticeLogLevel;
@@ -58,7 +59,7 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                           Attribute
     //                                                                           =========
     protected final LaJobKey jobKey;
-    protected final OptionalThing<String> jobTitle;
+    protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
     protected final Cron4jTask cron4jTask;
@@ -69,10 +70,10 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique,
+    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique,
             OptionalThing<Cron4jId> cron4jId, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
         this.jobKey = jobKey;
-        this.jobTitle = jobTitle;
+        this.jobNote = jobNote;
         this.jobUnique = jobUnique;
         this.cron4jId = cron4jId;
         this.cron4jTask = cron4jTask;
@@ -288,7 +289,7 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                      ==============
     @Override
     public String toString() {
-        final String titlePrefix = jobTitle.map(title -> title + ", ").orElse("");
+        final String titlePrefix = jobNote.map(title -> title + ", ").orElse("");
         final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.value());
         final String idExp = cron4jId.map(id -> id.value()).orElse("non-cron");
         final String hash = Integer.toHexString(hashCode());
@@ -304,8 +305,8 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return jobTitle;
+    public OptionalThing<LaJobNote> getJobNote() {
+        return jobNote;
     }
 
     @Override

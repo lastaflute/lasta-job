@@ -33,6 +33,12 @@ public interface InitialCronOption extends VaryingCronOption { // also varying t
     InitialCronOption title(String jobTitle);
 
     /**
+     * @param jobDesc The description expression for the job. (NotNull)
+     * @return this. (NotNull)
+     */
+    InitialCronOption desc(String jobDesc);
+
+    /**
      * @param uniqueCode The unique code provided by application to identify job. (NotNull)
      * @return this. (NotNull)
      */

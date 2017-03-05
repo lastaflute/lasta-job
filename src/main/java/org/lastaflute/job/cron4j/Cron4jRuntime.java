@@ -26,6 +26,7 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.exception.JobStoppedException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
@@ -43,7 +44,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                           =========
     // all 'final' attributes are not null
     protected final LaJobKey jobKey;
-    protected final OptionalThing<String> jobTitle;
+    protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected final String cronExp;
     protected final Class<? extends LaJob> jobType;
@@ -57,11 +58,11 @@ public class Cron4jRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jRuntime(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique, String cronExp,
+    public Cron4jRuntime(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique, String cronExp,
             Class<? extends LaJob> jobType, Map<String, Object> parameterMap, JobNoticeLogLevel noticeLogLevel,
             TaskExecutionContext cron4jContext) {
         this.jobKey = jobKey;
-        this.jobTitle = jobTitle;
+        this.jobNote = jobNote;
         this.jobUnique = jobUnique;
         this.cronExp = cronExp;
         this.jobType = jobType;
@@ -84,8 +85,8 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return jobTitle;
+    public OptionalThing<LaJobNote> getJobNote() {
+        return jobNote;
     }
 
     @Override
@@ -213,7 +214,7 @@ public class Cron4jRuntime implements LaJobRuntime {
         final StringBuilder sb = new StringBuilder();
         sb.append(DfTypeUtil.toClassTitle(this));
         sb.append(":{").append(jobKey);
-        sb.append(jobTitle.map(title -> ", " + title).orElse(""));
+        sb.append(jobNote.map(title -> ", " + title).orElse(""));
         sb.append(jobUnique.map(uq -> ", " + uq).orElse(""));
         sb.append(", ").append(cronExp);
         sb.append(", ").append(jobType.getSimpleName()).append("@").append(runMethod.getName()).append("()");

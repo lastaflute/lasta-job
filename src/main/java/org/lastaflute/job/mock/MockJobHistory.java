@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.ExecResultType;
 
@@ -35,8 +36,8 @@ public class MockJobHistory implements LaJobHistory {
     }
 
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return OptionalThing.of("Sea Job");
+    public OptionalThing<LaJobNote> getJobNote() {
+        return OptionalThing.of(LaJobNote.of("Sea Job", "birthdate is 904"));
     }
 
     @Override

@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.ExecResultType;
 
@@ -33,7 +34,7 @@ public interface LaJobHistory {
     //                                                                       =============
     LaJobKey getJobKey();
 
-    OptionalThing<String> getJobTitle();
+    OptionalThing<LaJobNote> getJobNote();
 
     OptionalThing<LaJobUnique> getJobUnique();
 

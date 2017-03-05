@@ -16,6 +16,7 @@
 package org.lastaflute.job.subsidiary;
 
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 
 /**
@@ -24,7 +25,7 @@ import org.lastaflute.job.key.LaJobUnique;
  */
 public interface JobSubAttr { // for internal assist
 
-    OptionalThing<String> getJobTitle();
+    OptionalThing<LaJobNote> getJobNote();
 
     OptionalThing<LaJobUnique> getJobUnique();
 }
