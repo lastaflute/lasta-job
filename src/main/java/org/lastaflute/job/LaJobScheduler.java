@@ -15,7 +15,7 @@
  */
 package org.lastaflute.job;
 
-import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 
 /**
  * @author jflute
@@ -48,8 +48,8 @@ public interface LaJobScheduler {
      * means the second job waits for finishing the first job.
      * @return The execution type of concurrent. (NotNull)
      */
-    default ConcurrentExec waitIfConcurrent() {
-        return ConcurrentExec.WAIT;
+    default JobConcurrentExec waitIfConcurrent() {
+        return JobConcurrentExec.WAIT;
     }
 
     /**
@@ -57,8 +57,8 @@ public interface LaJobScheduler {
      * means the second job quits executing quietly.
      * @return The execution type of concurrent. (NotNull)
      */
-    default ConcurrentExec quitIfConcurrent() {
-        return ConcurrentExec.QUIT;
+    default JobConcurrentExec quitIfConcurrent() {
+        return JobConcurrentExec.QUIT;
     }
 
     /**
@@ -66,7 +66,7 @@ public interface LaJobScheduler {
      * means the second job outputs error log (and quits).
      * @return The execution type of concurrent. (NotNull)
      */
-    default ConcurrentExec errorIfConcurrent() {
-        return ConcurrentExec.ERROR;
+    default JobConcurrentExec errorIfConcurrent() {
+        return JobConcurrentExec.ERROR;
     }
 }

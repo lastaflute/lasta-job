@@ -19,7 +19,7 @@ package org.lastaflute.job.subsidiary;
  * @author jflute
  * @since 0.2.0 (2016/01/13 Wednesday)
  */
-public enum ConcurrentExec {
+public enum JobConcurrentExec {
 
     WAIT, QUIT, ERROR
 }

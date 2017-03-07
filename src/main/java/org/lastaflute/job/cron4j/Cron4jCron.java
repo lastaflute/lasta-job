@@ -25,7 +25,7 @@ import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
-import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.InitialCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCron;
@@ -76,7 +76,7 @@ public class Cron4jCron implements LaCron {
     //                                                                            Register
     //                                                                            ========
     @Override
-    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
+    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
             InitialCronOpCall opLambda) {
         assertArgumentNotNull("cronExp", cronExp);
         if (isNonCrom(cronExp)) {
@@ -93,14 +93,14 @@ public class Cron4jCron implements LaCron {
     }
 
     @Override
-    public LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, InitialCronOpCall opLambda) {
+    public LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, InitialCronOpCall opLambda) {
         assertArgumentNotNull("jobType", jobType);
         assertArgumentNotNull("concurrentExec", concurrentExec);
         assertArgumentNotNull("opLambda (cronOptionConsumer)", opLambda);
         return doRegister(NON_CRON, jobType, concurrentExec, opLambda);
     }
 
-    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
+    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
             InitialCronOpCall opLambda) {
         final CronOption cronOption = createCronOption(opLambda);
         final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, concurrentExec, cronOption);
@@ -115,7 +115,7 @@ public class Cron4jCron implements LaCron {
         return option;
     }
 
-    protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec,
+    protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
             CronOption cronOption) {
         final VaryingCron varyingCron = createVaryingCron(cronExp, cronOption);
         final Supplier<String> threadNaming = prepareThreadNaming(cronOption);

@@ -24,6 +24,7 @@ import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 
@@ -72,19 +73,9 @@ public interface LaScheduledJob {
     JobNoticeLogLevel getNoticeLogLevel();
 
     /**
-     * @return true if execution type of concurrent is 'wait'.
+     * @return The execution type of concurrent. (NotNull)
      */
-    boolean isConcurrentExecWait();
-
-    /**
-     * @return true if execution type of concurrent is 'quit'.
-     */
-    boolean isConcurrentExecQuit();
-
-    /**
-     * @return true if execution type of concurrent is 'error'.
-     */
-    boolean isConcurrentExecError();
+    JobConcurrentExec getConcurrentExec();
 
     // ===================================================================================
     //                                                                            Behavior

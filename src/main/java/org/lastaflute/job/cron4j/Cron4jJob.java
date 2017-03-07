@@ -32,9 +32,9 @@ import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.log.JobNoticeLogLevel;
-import org.lastaflute.job.subsidiary.ConcurrentExec;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
@@ -338,21 +338,7 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     @Override
-    public boolean isConcurrentExecWait() {
-        return ConcurrentExec.WAIT.equals(getConcurrentExec());
-    }
-
-    @Override
-    public boolean isConcurrentExecQuit() {
-        return ConcurrentExec.QUIT.equals(getConcurrentExec());
-    }
-
-    @Override
-    public boolean isConcurrentExecError() {
-        return ConcurrentExec.ERROR.equals(getConcurrentExec());
-    }
-
-    public ConcurrentExec getConcurrentExec() { // for framework
+    public JobConcurrentExec getConcurrentExec() {
         return cron4jTask.getConcurrentExec();
     }
 

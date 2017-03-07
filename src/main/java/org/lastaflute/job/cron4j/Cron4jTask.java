@@ -33,7 +33,7 @@ import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
-import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.ExecResultType;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.RunnerResult;
@@ -62,7 +62,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                           =========
     protected VaryingCron varyingCron; // not null, can be switched
     protected final Class<? extends LaJob> jobType;
-    protected final ConcurrentExec concurrentExec;
+    protected final JobConcurrentExec concurrentExec;
     protected final Supplier<String> threadNaming;
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
@@ -73,7 +73,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, Supplier<String> threadNaming,
+    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, Supplier<String> threadNaming,
             LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime) {
         this.varyingCron = varyingCron;
         this.jobType = jobType;
@@ -127,10 +127,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final VaryingCronOption cronOption;
         synchronized (varyingLock) {
             if (executorList.size() >= 2) { // other executions of same task exist
-                if (concurrentExec.equals(ConcurrentExec.QUIT)) {
+                if (concurrentExec.equals(JobConcurrentExec.QUIT)) {
                     noticeSilentlyQuit(job, executorList);
                     return RunnerResult.asQuitByConcurrent();
-                } else if (concurrentExec.equals(ConcurrentExec.ERROR)) {
+                } else if (concurrentExec.equals(JobConcurrentExec.ERROR)) {
                     throwJobAlreadyIllegallyExecutingException(job, executorList);
                 }
                 // will wait by executing synchronization as default
@@ -321,7 +321,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return jobType;
     }
 
-    public ConcurrentExec getConcurrentExec() {
+    public JobConcurrentExec getConcurrentExec() {
         return concurrentExec;
     }
 
