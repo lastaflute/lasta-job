@@ -165,6 +165,7 @@ public class LaJobRunner {
     protected RunnerResult doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         // simplar to async manager's process
         final LaJobRuntime runtime = runtimeSupplier.get();
+        checkJobPrecondition(jobType, runtime);
         arrangeThreadCacheContext(runtime);
         arrangePreparedAccessContext(runtime);
         arrangeCallbackContext(runtime);
@@ -184,6 +185,10 @@ public class LaJobRunner {
             clearThreadCacheContext();
         }
         return createRunnerResult(runtime, cause);
+    }
+
+    protected void checkJobPrecondition(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
+        // you can check your rule
     }
 
     protected void actuallyRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
