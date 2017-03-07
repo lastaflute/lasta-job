@@ -129,14 +129,14 @@ public class LaJobRunner {
     //                                                                               =====
     public RunnerResult run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         if (isPlainlyRun()) { // e.g. production, unit-test
-            return doRun(jobType, runtimeSupplier);
+            return doRun(jobType, runtimeSupplier.get());
         }
         // e.g. local development (hot deploy)
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
         final ClassLoader originalLoader = startHotdeploy();
         try {
-            return doRun(jobType, runtimeSupplier);
+            return doRun(jobType, runtimeSupplier.get());
         } finally {
             stopHotdeploy(originalLoader);
         }
@@ -162,10 +162,8 @@ public class LaJobRunner {
         ManagedHotdeploy.stop(originalLoader);
     }
 
-    protected RunnerResult doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
+    protected RunnerResult doRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
         // simplar to async manager's process
-        final LaJobRuntime runtime = runtimeSupplier.get();
-        checkJobPrecondition(jobType, runtime);
         arrangeThreadCacheContext(runtime);
         arrangePreparedAccessContext(runtime);
         arrangeCallbackContext(runtime);
@@ -173,11 +171,16 @@ public class LaJobRunner {
         final long before = showRunning(runtime);
         Throwable cause = null;
         try {
+            hookBefore(runtime);
             actuallyRun(jobType, runtime);
         } catch (Throwable e) {
-            handleJobException(runtime, before, e);
-            cause = e;
+            final Throwable filtered = filterCause(e);
+            cause = filtered;
+            showJobException(runtime, before, filtered);
         } finally {
+            hookFinally(runtime, OptionalThing.ofNullable(cause, () -> {
+                throw new IllegalStateException("Not found the cause: " + runtime);
+            }));
             showFinishing(runtime, before, cause); // should be before clearing because of using them
             clearVariousContext(runtime, variousPreparedObj);
             clearPreparedAccessContext();
@@ -187,7 +190,7 @@ public class LaJobRunner {
         return createRunnerResult(runtime, cause);
     }
 
-    protected void checkJobPrecondition(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
+    protected void hookBefore(LaJobRuntime runtime) {
         // you can check your rule
     }
 
@@ -198,6 +201,10 @@ public class LaJobRunner {
 
     protected LaJob getJobComponent(Class<? extends LaJob> jobType) {
         return ContainerUtil.getComponent(jobType);
+    }
+
+    protected void hookFinally(LaJobRuntime runtime, OptionalThing<Throwable> cause) {
+        // you can check your rule
     }
 
     protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
@@ -386,9 +393,8 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                  Exception Handling
     //                                                                  ==================
-    protected void handleJobException(LaJobRuntime runtime, long before, Throwable cause) {
-        final Throwable filtered = exceptionTranslator.filterCause(cause);
-        showJobException(runtime, before, filtered);
+    protected Throwable filterCause(Throwable e) {
+        return exceptionTranslator.filterCause(e);
     }
 
     protected void showJobException(LaJobRuntime runtime, long before, Throwable cause) {
