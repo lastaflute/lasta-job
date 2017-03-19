@@ -20,7 +20,12 @@ import java.util.List;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.log.JobNoticeLogLevel;
+import org.lastaflute.job.subsidiary.CronParamsSupplier;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
+import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 
 /**
@@ -38,9 +43,9 @@ public interface LaScheduledJob {
     LaJobKey getJobKey();
 
     /**
-     * @return The title expression of the job. (NotNull, EmptyAllowed)
+     * @return The optional note (title, description) of the job. (NotNull, EmptyAllowed: if both is no value)
      */
-    OptionalThing<String> getJobTitle();
+    OptionalThing<LaJobNote> getJobNote();
 
     /**
      * @return The optional job unique code provided by application when schedule registration. (NotNull, EmptyAllowed)
@@ -58,19 +63,19 @@ public interface LaScheduledJob {
     Class<? extends LaJob> getJobType();
 
     /**
-     * @return true if execution type of concurrent is 'wait'.
+     * @return The optional supplier of cron parameters. (NotNull, EmptyAllowed: if no parameter)
      */
-    boolean isConcurrentExecWait();
+    OptionalThing<CronParamsSupplier> getParamsSupplier();
 
     /**
-     * @return true if execution type of concurrent is 'quit'.
+     * @return The level of notice log. (NotNull)
      */
-    boolean isConcurrentExecQuit();
+    JobNoticeLogLevel getNoticeLogLevel();
 
     /**
-     * @return true if execution type of concurrent is 'error'.
+     * @return The execution type of concurrent. (NotNull)
      */
-    boolean isConcurrentExecError();
+    JobConcurrentExec getConcurrentExec();
 
     // ===================================================================================
     //                                                                            Behavior
@@ -86,9 +91,10 @@ public interface LaScheduledJob {
      * Actually launch the job now (at other thread), no-related to cron time. <br>
      * If executing job exists, the launched job is waiting for <br>
      * finishing the executing job. (you can change the behavior by option)
+     * @return The launched process of the job. (NotNull)
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
-    void launchNow();
+    LaunchedProcess launchNow();
 
     /**
      * Stop the executing job by Thread.interrupt() and runtime.stopIfNeeds(). <br>

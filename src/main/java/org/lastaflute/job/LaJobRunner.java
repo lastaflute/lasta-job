@@ -79,6 +79,7 @@ public class LaJobRunner {
 
     protected AccessContextArranger accessContextArranger; // null allowed, option
     protected JobNoticeLogHook noticeLogHook; // null allowed, option
+    protected int jobHistoryLimit = 100; // as framework default
 
     // ===================================================================================
     //                                                                              Option
@@ -107,19 +108,35 @@ public class LaJobRunner {
         return this;
     }
 
+    /**
+     * @param jobHistoryLimit The limit size of job history saved in memory. (NotNull)
+     * @return this. (NotNull)
+     */
+    public LaJobRunner limitJobHistory(int jobHistoryLimit) { // almost required if DBFlute
+        if (jobHistoryLimit < getJobHistoryMinimumLimit()) {
+            throw new IllegalArgumentException("The argument 'jobHistoryLimit' should not be over or equal 10: " + jobHistoryLimit);
+        }
+        this.jobHistoryLimit = jobHistoryLimit;
+        return this;
+    }
+
+    protected int getJobHistoryMinimumLimit() {
+        return 10; // as default, no history is not allowed for LaunchedProcess
+    }
+
     // ===================================================================================
     //                                                                                Run
     //                                                                               =====
     public RunnerResult run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         if (isPlainlyRun()) { // e.g. production, unit-test
-            return doRun(jobType, runtimeSupplier);
+            return doRun(jobType, runtimeSupplier.get());
         }
         // e.g. local development (hot deploy)
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
         final ClassLoader originalLoader = startHotdeploy();
         try {
-            return doRun(jobType, runtimeSupplier);
+            return doRun(jobType, runtimeSupplier.get());
         } finally {
             stopHotdeploy(originalLoader);
         }
@@ -145,9 +162,8 @@ public class LaJobRunner {
         ManagedHotdeploy.stop(originalLoader);
     }
 
-    protected RunnerResult doRun(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
+    protected RunnerResult doRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
         // simplar to async manager's process
-        final LaJobRuntime runtime = runtimeSupplier.get();
         arrangeThreadCacheContext(runtime);
         arrangePreparedAccessContext(runtime);
         arrangeCallbackContext(runtime);
@@ -155,11 +171,16 @@ public class LaJobRunner {
         final long before = showRunning(runtime);
         Throwable cause = null;
         try {
+            hookBefore(runtime);
             actuallyRun(jobType, runtime);
         } catch (Throwable e) {
-            handleJobException(runtime, before, e);
-            cause = e;
+            final Throwable filtered = filterCause(e);
+            cause = filtered;
+            showJobException(runtime, before, filtered);
         } finally {
+            hookFinally(runtime, OptionalThing.ofNullable(cause, () -> {
+                throw new IllegalStateException("Not found the cause: " + runtime);
+            }));
             showFinishing(runtime, before, cause); // should be before clearing because of using them
             clearVariousContext(runtime, variousPreparedObj);
             clearPreparedAccessContext();
@@ -167,6 +188,10 @@ public class LaJobRunner {
             clearThreadCacheContext();
         }
         return createRunnerResult(runtime, cause);
+    }
+
+    protected void hookBefore(LaJobRuntime runtime) {
+        // you can check your rule
     }
 
     protected void actuallyRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
@@ -178,12 +203,16 @@ public class LaJobRunner {
         return ContainerUtil.getComponent(jobType);
     }
 
-    protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
-        return new RunnerResult(isRunnerSuccess(runtime, cause), cause);
+    protected void hookFinally(LaJobRuntime runtime, OptionalThing<Throwable> cause) {
+        // you can check your rule
     }
 
-    protected boolean isRunnerSuccess(LaJobRuntime runtime, Throwable cause) {
-        return cause == null;
+    protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
+        return RunnerResult.asExecuted(cause, runtime.isNextTriggerSuppressed());
+    }
+
+    protected boolean isBusinessSuccess(LaJobRuntime runtime, Throwable cause) {
+        return cause == null; // simple as default
     }
 
     // ===================================================================================
@@ -226,7 +255,7 @@ public class LaJobRunner {
         buildTriggeredNextJobExp(runtime).ifPresent(exp -> {
             sb.append(LF).append(" triggeredNextJob: ").append(exp);
         });
-        if (runtime.isSuppressNextTrigger()) {
+        if (runtime.isNextTriggerSuppressed()) {
             sb.append(LF).append(" suppressNextTrigger: true");
         }
         runtime.getEndTitleRoll().ifPresent(roll -> {
@@ -364,9 +393,8 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                  Exception Handling
     //                                                                  ==================
-    protected void handleJobException(LaJobRuntime runtime, long before, Throwable cause) {
-        final Throwable filtered = exceptionTranslator.filterCause(cause);
-        showJobException(runtime, before, filtered);
+    protected Throwable filterCause(Throwable e) {
+        return exceptionTranslator.filterCause(e);
     }
 
     protected void showJobException(LaJobRuntime runtime, long before, Throwable cause) {

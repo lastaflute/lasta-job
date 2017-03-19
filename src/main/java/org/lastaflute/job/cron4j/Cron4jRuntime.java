@@ -26,6 +26,7 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.exception.JobStoppedException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
@@ -43,7 +44,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                           =========
     // all 'final' attributes are not null
     protected final LaJobKey jobKey;
-    protected final OptionalThing<String> jobTitle;
+    protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected final String cronExp;
     protected final Class<? extends LaJob> jobType;
@@ -57,11 +58,11 @@ public class Cron4jRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jRuntime(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique, String cronExp,
+    public Cron4jRuntime(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique, String cronExp,
             Class<? extends LaJob> jobType, Map<String, Object> parameterMap, JobNoticeLogLevel noticeLogLevel,
             TaskExecutionContext cron4jContext) {
         this.jobKey = jobKey;
-        this.jobTitle = jobTitle;
+        this.jobNote = jobNote;
         this.jobUnique = jobUnique;
         this.cronExp = cronExp;
         this.jobType = jobType;
@@ -76,8 +77,58 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     // ===================================================================================
+    //                                                                          Basic Info
+    //                                                                          ==========
+    @Override
+    public LaJobKey getJobKey() {
+        return jobKey;
+    }
+
+    @Override
+    public OptionalThing<LaJobNote> getJobNote() {
+        return jobNote;
+    }
+
+    @Override
+    public OptionalThing<LaJobUnique> getJobUnique() {
+        return jobUnique;
+    }
+
+    @Override
+    public String getCronExp() {
+        return cronExp;
+    }
+
+    @Override
+    public Class<? extends LaJob> getJobType() {
+        return jobType;
+    }
+
+    @Override
+    public Method getRunMethod() {
+        return runMethod;
+    }
+
+    @Override
+    public Map<String, Object> getParameterMap() {
+        return parameterMap; // already unmodifiable
+    }
+
+    @Override
+    public JobNoticeLogLevel getNoticeLogLevel() {
+        return noticeLogLevel;
+    }
+
+    // ===================================================================================
     //                                                                      End-Title Roll
     //                                                                      ==============
+    @Override
+    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
+        return OptionalThing.ofNullable(endTitleRollData, () -> {
+            throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
+        });
+    }
+
     @Override
     public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
         assertArgumentNotNull("dataLambda", dataLambda);
@@ -108,11 +159,16 @@ public class Cron4jRuntime implements LaJobRuntime {
     }
 
     // ===================================================================================
-    //                                                                    Business Failure
-    //                                                                    ================
+    //                                                                        Next Trigger
+    //                                                                        ============
     @Override
     public void suppressNextTrigger() {
         nextTriggerSuppressed = true;
+    }
+
+    @Override
+    public boolean isNextTriggerSuppressed() {
+        return nextTriggerSuppressed;
     }
 
     // ===================================================================================
@@ -158,7 +214,7 @@ public class Cron4jRuntime implements LaJobRuntime {
         final StringBuilder sb = new StringBuilder();
         sb.append(DfTypeUtil.toClassTitle(this));
         sb.append(":{").append(jobKey);
-        sb.append(jobTitle.map(title -> ", " + title).orElse(""));
+        sb.append(jobNote.map(title -> ", " + title).orElse(""));
         sb.append(jobUnique.map(uq -> ", " + uq).orElse(""));
         sb.append(", ").append(cronExp);
         sb.append(", ").append(jobType.getSimpleName()).append("@").append(runMethod.getName()).append("()");
@@ -170,59 +226,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    @Override
-    public LaJobKey getJobKey() {
-        return jobKey;
-    }
-
-    @Override
-    public OptionalThing<String> getJobTitle() {
-        return jobTitle;
-    }
-
-    @Override
-    public OptionalThing<LaJobUnique> getJobUnique() {
-        return jobUnique;
-    }
-
-    @Override
-    public String getCronExp() {
-        return cronExp;
-    }
-
-    @Override
-    public Class<? extends LaJob> getJobType() {
-        return jobType;
-    }
-
-    @Override
-    public Method getRunMethod() {
-        return runMethod;
-    }
-
-    @Override
-    public Map<String, Object> getParameterMap() {
-        return parameterMap; // already unmodifiable
-    }
-
-    @Override
-    public JobNoticeLogLevel getNoticeLogLevel() {
-        return noticeLogLevel;
-    }
-
     public TaskExecutionContext getCron4jContext() { // not interface method because of cron4j's one 
         return cron4jContext;
-    }
-
-    @Override
-    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
-        return OptionalThing.ofNullable(endTitleRollData, () -> {
-            throw new IllegalStateException("Not found the end-title roll data in the runtime: " + toString());
-        });
-    }
-
-    @Override
-    public boolean isSuppressNextTrigger() {
-        return nextTriggerSuppressed;
     }
 }

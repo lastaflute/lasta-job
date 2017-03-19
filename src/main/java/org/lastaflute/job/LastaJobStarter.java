@@ -21,6 +21,7 @@ import java.util.List;
 import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.util.DfReflectionUtil;
 import org.lastaflute.core.smartdeploy.ManagedHotdeploy;
+import org.lastaflute.core.time.TimeManager;
 import org.lastaflute.core.util.ContainerUtil;
 import org.lastaflute.di.naming.NamingConvention;
 import org.lastaflute.job.cron4j.Cron4jCron;
@@ -159,11 +160,17 @@ public class LastaJobStarter {
     }
 
     protected Cron4jNow createCron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner) {
-        return new Cron4jNow(cron4jScheduler, jobRunner);
+        final TimeManager timeManager = getTimeManager();
+        return new Cron4jNow(cron4jScheduler, jobRunner, () -> {
+            return timeManager.currentDateTime();
+        });
     }
 
     protected Cron4jCron createCron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner runner, Cron4jNow cron4jNow) {
-        return new Cron4jCron(cron4jScheduler, runner, cron4jNow, CronRegistrationType.START);
+        final TimeManager timeManager = getTimeManager();
+        return new Cron4jCron(cron4jScheduler, runner, cron4jNow, CronRegistrationType.START, () -> {
+            return timeManager.currentDateTime();
+        });
     }
 
     // -----------------------------------------------------
@@ -226,6 +233,10 @@ public class LastaJobStarter {
     //                                                                           =========
     protected NamingConvention getNamingConvention() {
         return ContainerUtil.getComponent(NamingConvention.class);
+    }
+
+    protected TimeManager getTimeManager() {
+        return ContainerUtil.getComponent(TimeManager.class);
     }
 
     protected void inject(Object target) {

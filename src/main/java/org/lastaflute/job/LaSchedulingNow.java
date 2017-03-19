@@ -36,5 +36,7 @@ public interface LaSchedulingNow {
 
     void schedule(CronConsumer oneArgLambda);
 
+    List<LaJobHistory> searchJobHistoryList();
+
     void destroy();
 }

@@ -30,9 +30,11 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobAlreadyIllegallyExecutingException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
-import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
+import org.lastaflute.job.subsidiary.ExecResultType;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.VaryingCron;
@@ -60,66 +62,89 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                           =========
     protected VaryingCron varyingCron; // not null, can be switched
     protected final Class<? extends LaJob> jobType;
-    protected final ConcurrentExec concurrentExec;
+    protected final JobConcurrentExec concurrentExec;
     protected final Supplier<String> threadNaming;
     protected final LaJobRunner jobRunner;
     protected final Cron4jNow cron4jNow;
+    protected final Supplier<LocalDateTime> currentTime;
     protected final Object executingLock = new Object();
     protected final Object varyingLock = new Object();
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, ConcurrentExec concurrentExec, Supplier<String> threadNaming,
-            LaJobRunner jobRunner, Cron4jNow cron4jNow) {
+    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, Supplier<String> threadNaming,
+            LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime) {
         this.varyingCron = varyingCron;
         this.jobType = jobType;
         this.concurrentExec = concurrentExec;
         this.threadNaming = threadNaming;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
+        this.currentTime = currentTime;
     }
 
     // ===================================================================================
     //                                                                             Execute
     //                                                                             =======
+    // -----------------------------------------------------
+    //                                              Top Flow
+    //                                              --------
     @Override
     public void execute(TaskExecutionContext context) {
         try {
-            doExecute(context);
-        } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
-            logger.error("Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName(), cause);
-        }
-    }
-
-    protected void doExecute(TaskExecutionContext context) {
-        final Cron4jJob job = findJob();
-        final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
-        final String cronExp;
-        final VaryingCronOption cronOption;
-        synchronized (varyingLock) {
-            if (executorList.size() >= 2) { // other executions of same task exist
-                if (concurrentExec.equals(ConcurrentExec.QUIT)) {
-                    noticeSilentlyQuit(job, executorList);
-                    return;
-                } else if (concurrentExec.equals(ConcurrentExec.ERROR)) {
-                    throwJobAlreadyIllegallyExecutingException(job, executorList);
-                }
-                // wait by synchronization as default
+            final LocalDateTime beginTime = currentTime.get();
+            final Cron4jJob job = findJob();
+            final Thread jobThread = Thread.currentThread();
+            RunnerResult runnerResult = null;
+            Throwable controllerCause = null;
+            try {
+                runnerResult = doExecute(job, context); // not null
+            } catch (JobAlreadyIllegallyExecutingException e) {
+                logger.error("Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName(), e);
+                controllerCause = e;
+            } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
+                logger.error("Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName(), cause);
+                controllerCause = cause;
             }
-            cronExp = varyingCron.getCronExp();
-            cronOption = varyingCron.getCronOption();
-        }
-        synchronized (executingLock) { // avoid duplicate execution, waiting for previous ending
-            final RunnerResult runnerResult = doExecute(job, cronExp, cronOption, context);
-            if (runnerResult.isSuccess()) {
-                job.triggerNext();
-            }
+            final LocalDateTime endTime = currentTime.get();
+            recordJobHistory(context, job, jobThread, runnerResult, beginTime, endTime, controllerCause);
+        } catch (Throwable coreCause) { // controller dead
+            logger.error("Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName(), coreCause);
         }
     }
 
     protected Cron4jJob findJob() {
         return cron4jNow.findJobByTask(this).get();
+    }
+
+    // -----------------------------------------------------
+    //                                           Job Control 
+    //                                           -----------
+    protected RunnerResult doExecute(Cron4jJob job, TaskExecutionContext context) {
+        final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
+        final String cronExp;
+        final VaryingCronOption cronOption;
+        synchronized (varyingLock) {
+            if (executorList.size() >= 2) { // other executions of same task exist
+                if (concurrentExec.equals(JobConcurrentExec.QUIT)) {
+                    noticeSilentlyQuit(job, executorList);
+                    return RunnerResult.asQuitByConcurrent();
+                } else if (concurrentExec.equals(JobConcurrentExec.ERROR)) {
+                    throwJobAlreadyIllegallyExecutingException(job, executorList);
+                }
+                // will wait by executing synchronization as default
+            }
+            cronExp = varyingCron.getCronExp();
+            cronOption = varyingCron.getCronOption();
+        }
+        synchronized (executingLock) { // avoid duplicate execution, waiting for previous ending
+            final RunnerResult runnerResult = actuallyExecute(job, cronExp, cronOption, context);
+            if (canTriggerNext(job, runnerResult)) {
+                job.triggerNext();
+            }
+            return runnerResult;
+        }
     }
 
     protected void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) { // in varying lock
@@ -148,7 +173,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                             Executing
     //                                             ---------
     // in execution lock, cannot use varingCron here
-    protected RunnerResult doExecute(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
+    protected RunnerResult actuallyExecute(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
             TaskExecutionContext context) { // in synchronized world
         adjustThreadNameIfNeeds(cronOption);
         return runJob(identityProvider, cronExp, cronOption, context);
@@ -171,15 +196,72 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected Cron4jRuntime createCron4jRuntime(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
             TaskExecutionContext cron4jContext) {
         final LaJobKey jobKey = identityProvider.getJobKey();
-        final OptionalThing<String> jobTitle = identityProvider.getJobTitle();
+        final OptionalThing<LaJobNote> jobNote = identityProvider.getJobNote();
         final OptionalThing<LaJobUnique> jobUnique = identityProvider.getJobUnique();
         final Map<String, Object> parameterMap = extractParameterMap(cronOption);
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
-        return new Cron4jRuntime(jobKey, jobTitle, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
+        return new Cron4jRuntime(jobKey, jobNote, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel, cron4jContext);
     }
 
     protected Map<String, Object> extractParameterMap(VaryingCronOption cronOption) {
         return cronOption.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
+    }
+
+    // -----------------------------------------------------
+    //                                          Next Trigger
+    //                                          ------------
+    protected boolean canTriggerNext(Cron4jJob job, RunnerResult runnerResult) {
+        return !runnerResult.getCause().isPresent() && !runnerResult.isNextTriggerSuppressed();
+    }
+
+    // -----------------------------------------------------
+    //                                           Job History
+    //                                           -----------
+    protected void recordJobHistory(TaskExecutionContext context, Cron4jJob job, Thread jobThread, RunnerResult runnerResult,
+            LocalDateTime beginTime, LocalDateTime endTime, Throwable controllerCause) {
+        final TaskExecutor taskExecutor = context.getTaskExecutor();
+        final Cron4jJobHistory jobHistory = prepareJobHistory(job, runnerResult, beginTime, endTime, controllerCause);
+        Cron4jJobHistory.record(taskExecutor, jobHistory, getHistoryLimit());
+    }
+
+    protected Cron4jJobHistory prepareJobHistory(Cron4jJob job, RunnerResult runnerResult, LocalDateTime beginTime, LocalDateTime endTime,
+            Throwable controllerCause) {
+        final Cron4jJobHistory jobHistory;
+        if (controllerCause == null) { // mainly here, and runnerResult is not null here
+            jobHistory = createJobHistory(job, beginTime, endTime, () -> {
+                return deriveRunnerExecResultType(runnerResult);
+            }, runnerResult.getCause().orElse(null));
+        } else if (controllerCause instanceof JobAlreadyIllegallyExecutingException) {
+            jobHistory = createJobHistory(job, beginTime, endTime, () -> ExecResultType.ERROR_BY_CONCURRENT, controllerCause);
+        } else { // may be framework exception
+            jobHistory = createJobHistory(job, beginTime, endTime, () -> ExecResultType.CAUSED_BY_FRAMEWORK, controllerCause);
+        }
+        return jobHistory;
+    }
+
+    protected ExecResultType deriveRunnerExecResultType(RunnerResult runnerResult) {
+        if (runnerResult.getCause().isPresent()) {
+            return ExecResultType.CAUSED_BY_APPLICATION;
+        } else if (runnerResult.isQuitByConcurrent()) {
+            return ExecResultType.QUIT_BY_CONCURRENT;
+        } else {
+            return ExecResultType.SUCCESS;
+        }
+    }
+
+    protected Cron4jJobHistory createJobHistory(Cron4jJob job, LocalDateTime beginTime, LocalDateTime endTime,
+            Supplier<ExecResultType> execResultTypeProvider, Throwable cause) {
+        final LaJobKey jobKey = job.getJobKey();
+        final OptionalThing<LaJobNote> jobNote = job.getJobNote();
+        final OptionalThing<LaJobUnique> jobUnique = job.getJobUnique();
+        final OptionalThing<String> cronExp = job.getCronExp();
+        final String jobTypeFqcn = job.getJobType().getName();
+        final ExecResultType execResultType = execResultTypeProvider.get();
+        return new Cron4jJobHistory(jobKey, jobNote, jobUnique, cronExp, jobTypeFqcn, beginTime, endTime, execResultType, cause);
+    }
+
+    protected int getHistoryLimit() {
+        return 300;
     }
 
     // ===================================================================================
@@ -239,7 +321,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return jobType;
     }
 
-    public ConcurrentExec getConcurrentExec() {
+    public JobConcurrentExec getConcurrentExec() {
         return concurrentExec;
     }
 

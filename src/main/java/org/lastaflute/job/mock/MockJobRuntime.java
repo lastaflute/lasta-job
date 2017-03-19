@@ -25,6 +25,7 @@ import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRuntime;
 import org.lastaflute.job.cron4j.Cron4jRuntime;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronOption;
@@ -60,7 +61,7 @@ public class MockJobRuntime implements LaJobRuntime {
             return supplier.supply();
         }).orElse(Collections.emptyMap());
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
-        cron4jRuntime = new Cron4jRuntime(jobKey, cronOption.getJobTitle(), cronOption.getJobUnique(), cronExp, jobType, parameterMap,
+        cron4jRuntime = new Cron4jRuntime(jobKey, cronOption.getJobNote(), cronOption.getJobUnique(), cronExp, jobType, parameterMap,
                 noticeLogLevel, cron4jContext);
     }
 
@@ -123,8 +124,8 @@ public class MockJobRuntime implements LaJobRuntime {
     }
 
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return cron4jRuntime.getJobTitle();
+    public OptionalThing<LaJobNote> getJobNote() {
+        return cron4jRuntime.getJobNote();
     }
 
     @Override
@@ -178,8 +179,8 @@ public class MockJobRuntime implements LaJobRuntime {
     }
 
     @Override
-    public boolean isSuppressNextTrigger() {
-        return cron4jRuntime.isSuppressNextTrigger();
+    public boolean isNextTriggerSuppressed() {
+        return cron4jRuntime.isNextTriggerSuppressed();
     }
 
     @Override

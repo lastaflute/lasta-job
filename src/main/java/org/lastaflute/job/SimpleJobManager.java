@@ -126,7 +126,7 @@ public class SimpleJobManager implements JobManager {
     }
 
     // ===================================================================================
-    //                                                                              Reload
+    //                                                                              Reboot
     //                                                                              ======
     @Override
     public synchronized void reboot() {
@@ -140,6 +140,14 @@ public class SimpleJobManager implements JobManager {
     @Override
     public synchronized boolean isSchedulingDone() {
         return schedulingDone;
+    }
+
+    // ===================================================================================
+    //                                                                         Job History
+    //                                                                         ===========
+    @Override
+    public List<LaJobHistory> searchJobHistoryList() {
+        return schedulingNow.searchJobHistoryList();
     }
 
     // ===================================================================================
@@ -167,12 +175,18 @@ public class SimpleJobManager implements JobManager {
             @Override
             public List<LaScheduledJob> getJobList() {
                 throwJobManagerNotInitializedYetException();
-                return Collections.emptyList();
+                return Collections.emptyList(); // unreachable
             }
 
             @Override
             public void schedule(CronConsumer oneArgLambda) {
                 throwJobManagerNotInitializedYetException();
+            }
+
+            @Override
+            public List<LaJobHistory> searchJobHistoryList() {
+                throwJobManagerNotInitializedYetException();
+                return Collections.emptyList(); // unreachable
             }
 
             @Override

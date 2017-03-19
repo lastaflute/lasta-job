@@ -23,15 +23,20 @@ import java.util.stream.Collectors;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
+import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.exception.JobTriggeredNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
-import org.lastaflute.job.subsidiary.ConcurrentExec;
+import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronOption;
+import org.lastaflute.job.subsidiary.CronParamsSupplier;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
+import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -54,7 +59,7 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                           Attribute
     //                                                                           =========
     protected final LaJobKey jobKey;
-    protected final OptionalThing<String> jobTitle;
+    protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
     protected final Cron4jTask cron4jTask;
@@ -65,10 +70,10 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jJob(LaJobKey jobKey, OptionalThing<String> jobTitle, OptionalThing<LaJobUnique> jobUnique,
+    public Cron4jJob(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique,
             OptionalThing<Cron4jId> cron4jId, Cron4jTask cron4jTask, Cron4jNow cron4jNow) {
         this.jobKey = jobKey;
-        this.jobTitle = jobTitle;
+        this.jobNote = jobNote;
         this.jobUnique = jobUnique;
         this.cron4jId = cron4jId;
         this.cron4jTask = cron4jTask;
@@ -91,13 +96,31 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                          Launch Now
     //                                                                          ==========
     @Override
-    public synchronized void launchNow() {
+    public synchronized LaunchedProcess launchNow() {
         verifyScheduledState();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Launching now: {}", toString());
         }
         // if executed by cron here, duplicate execution occurs but task level synchronization exists
-        cron4jNow.getCron4jScheduler().launch(cron4jTask);
+        final TaskExecutor taskExecutor = cron4jNow.getCron4jScheduler().launch(cron4jTask);
+        return createLaunchedProcess(taskExecutor);
+    }
+
+    protected LaunchedProcess createLaunchedProcess(TaskExecutor taskExecutor) {
+        return new LaunchedProcess(this, () -> joinJobThread(taskExecutor), () -> findJobHistory(taskExecutor));
+    }
+
+    protected void joinJobThread(TaskExecutor taskExecutor) {
+        try {
+            taskExecutor.join();
+        } catch (InterruptedException e) {
+            String msg = "The current thread has been interrupted while join: taskExecutor=" + taskExecutor + ", job=" + this;
+            throw new IllegalStateException(msg, e);
+        }
+    }
+
+    protected OptionalThing<LaJobHistory> findJobHistory(TaskExecutor taskExecutor) {
+        return Cron4jJobHistory.find(taskExecutor);
     }
 
     // ===================================================================================
@@ -266,7 +289,7 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                      ==============
     @Override
     public String toString() {
-        final String titlePrefix = jobTitle.map(title -> title + ", ").orElse("");
+        final String titlePrefix = jobNote.map(title -> title + ", ").orElse("");
         final String keyExp = jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.value());
         final String idExp = cron4jId.map(id -> id.value()).orElse("non-cron");
         final String hash = Integer.toHexString(hashCode());
@@ -282,8 +305,8 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     @Override
-    public OptionalThing<String> getJobTitle() {
-        return jobTitle;
+    public OptionalThing<LaJobNote> getJobNote() {
+        return jobNote;
     }
 
     @Override
@@ -305,21 +328,17 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     @Override
-    public boolean isConcurrentExecWait() {
-        return ConcurrentExec.WAIT.equals(getConcurrentExec());
+    public OptionalThing<CronParamsSupplier> getParamsSupplier() {
+        return cron4jTask.getVaryingCron().getCronOption().getParamsSupplier();
     }
 
     @Override
-    public boolean isConcurrentExecQuit() {
-        return ConcurrentExec.QUIT.equals(getConcurrentExec());
+    public JobNoticeLogLevel getNoticeLogLevel() {
+        return cron4jTask.getVaryingCron().getCronOption().getNoticeLogLevel();
     }
 
     @Override
-    public boolean isConcurrentExecError() {
-        return ConcurrentExec.ERROR.equals(getConcurrentExec());
-    }
-
-    public ConcurrentExec getConcurrentExec() { // for framework
+    public JobConcurrentExec getConcurrentExec() {
         return cron4jTask.getConcurrentExec();
     }
 

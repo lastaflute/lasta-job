@@ -69,8 +69,8 @@ public class Cron4jScheduler {
         return Stream.of(nativeScheduler.getExecutingTasks()).collect(Collectors.toList());
     }
 
-    public void launch(Cron4jTask cron4jTask) {
-        nativeScheduler.launch(cron4jTask);
+    public TaskExecutor launch(Cron4jTask cron4jTask) {
+        return nativeScheduler.launch(cron4jTask);
     }
 
     public void stop() {

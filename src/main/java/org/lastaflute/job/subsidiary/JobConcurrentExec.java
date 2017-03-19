@@ -15,17 +15,11 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.key.LaJobNote;
-import org.lastaflute.job.key.LaJobUnique;
-
 /**
  * @author jflute
- * @since 0.2.6 (2017/02/18 Saturday)
+ * @since 0.2.0 (2016/01/13 Wednesday)
  */
-public interface JobSubAttr { // for internal assist
+public enum JobConcurrentExec {
 
-    OptionalThing<LaJobNote> getJobNote();
-
-    OptionalThing<LaJobUnique> getJobUnique();
+    WAIT, QUIT, ERROR
 }

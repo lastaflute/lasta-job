@@ -15,52 +15,54 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import java.util.function.Supplier;
+
+import org.dbflute.helper.function.IndependentProcessor;
 import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.LaJobHistory;
+import org.lastaflute.job.LaScheduledJob;
 
 /**
  * @author jflute
- * @since 0.2.7 (2017/02/22 Wednesday)
+ * @since 0.2.8 (2017/03/04 Saturday)
  */
-public class RunnerResult {
+public class LaunchedProcess {
 
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Throwable cause; // null allowed, already handled (e.g. logging)
-    protected final boolean nextTriggerSuppressed; // by runtime
-    protected final boolean quitByConcurrent; // by runner
+    protected final LaScheduledJob scheduledJob; // not null
+    protected final IndependentProcessor jobEndingWaiter; // not null
+    protected final Supplier<OptionalThing<LaJobHistory>> jobHistoryFinder; // not null
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    protected RunnerResult(Throwable cause, boolean nextTriggerSuppressed, boolean quitByConcurrent) {
-        this.cause = cause;
-        this.nextTriggerSuppressed = nextTriggerSuppressed;
-        this.quitByConcurrent = quitByConcurrent;
+    public LaunchedProcess(LaScheduledJob scheduledJob, IndependentProcessor jobEndingWaiter,
+            Supplier<OptionalThing<LaJobHistory>> jobHistoryFinder) {
+        this.scheduledJob = scheduledJob;
+        this.jobEndingWaiter = jobEndingWaiter;
+        this.jobHistoryFinder = jobHistoryFinder;
     }
 
-    public static RunnerResult asExecuted(Throwable cause, boolean nextTriggerSuppressed) {
-        return new RunnerResult(cause, nextTriggerSuppressed, false);
-    }
-
-    public static RunnerResult asQuitByConcurrent() {
-        return new RunnerResult(null, false, true);
+    // ===================================================================================
+    //                                                                              Facade
+    //                                                                              ======
+    /**
+     * Wait for ending of the job. <br>
+     * (current thread waits for closing job thread)
+     * @return The optional job history of the launched job. (NotNull, EmptyAllowed: when too old process)
+     */
+    public OptionalThing<LaJobHistory> waitForEnding() {
+        // no logging here, caller application should determine log level
+        jobEndingWaiter.process();
+        return jobHistoryFinder.get();
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public OptionalThing<Throwable> getCause() {
-        return OptionalThing.ofNullable(cause, () -> {
-            throw new IllegalStateException("Not found the cause.");
-        });
-    }
-
-    public boolean isNextTriggerSuppressed() {
-        return nextTriggerSuppressed;
-    }
-
-    public boolean isQuitByConcurrent() {
-        return quitByConcurrent;
+    public LaScheduledJob getScheduledJob() {
+        return scheduledJob;
     }
 }
