@@ -23,8 +23,8 @@ import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.log.SavedHistoryCache;
 import org.lastaflute.job.subsidiary.ExecResultType;
-import org.lastaflute.job.subsidiary.SavedHistoryCache;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
 

@@ -78,8 +78,8 @@ public interface LaScheduledJob {
     JobConcurrentExec getConcurrentExec();
 
     // ===================================================================================
-    //                                                                            Behavior
-    //                                                                            ========
+    //                                                                          Scheduling
+    //                                                                          ==========
     /**
      * Is the job actually executing now? <br>
      * If you want to stop it, use stopNow().

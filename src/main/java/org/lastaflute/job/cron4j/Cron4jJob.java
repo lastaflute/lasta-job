@@ -37,6 +37,7 @@ import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
+import org.lastaflute.job.subsidiary.ReadableJobAttr;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -48,7 +49,7 @@ import it.sauronsoftware.cron4j.TaskExecutor;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
+public class Cron4jJob implements LaScheduledJob, JobIdentityAttr, ReadableJobAttr {
 
     // ===================================================================================
     //                                                                          Definition
@@ -85,10 +86,10 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                       =============
     @Override
     public boolean isExecutingNow() {
-        return !findExecutorList().isEmpty();
+        return !findNativeExecutorList().isEmpty();
     }
 
-    public List<TaskExecutor> findExecutorList() { // public for framework
+    public List<TaskExecutor> findNativeExecutorList() { // public for framework
         return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
     }
 
@@ -128,7 +129,7 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                            ========
     @Override
     public synchronized void stopNow() { // can be called if unscheduled
-        final List<TaskExecutor> executorList = findExecutorList();
+        final List<TaskExecutor> executorList = findNativeExecutorList();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Stopping {} execution(s) now: {}", executorList.size(), toString());
         }

@@ -17,7 +17,6 @@ package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -32,15 +31,18 @@ import org.lastaflute.job.exception.JobAlreadyIllegallyExecutingException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
+import org.lastaflute.job.log.JobErrorLog;
+import org.lastaflute.job.log.JobErrorStackTracer;
+import org.lastaflute.job.log.JobHistoryResource;
 import org.lastaflute.job.log.JobNoticeLogLevel;
-import org.lastaflute.job.subsidiary.JobConcurrentExec;
+import org.lastaflute.job.subsidiary.ConcurrentJobStopper;
+import org.lastaflute.job.subsidiary.CrossVMState;
 import org.lastaflute.job.subsidiary.ExecResultType;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskExecutionContext;
@@ -55,7 +57,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    private static final Logger logger = LoggerFactory.getLogger(Cron4jTask.class);
+    protected static final String LF = "\n";
 
     // ===================================================================================
     //                                                                           Attribute
@@ -73,8 +75,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, Supplier<String> threadNaming,
-            LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime) {
+    public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
+            Supplier<String> threadNaming, LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime) {
         this.varyingCron = varyingCron;
         this.jobType = jobType;
         this.concurrentExec = concurrentExec;
@@ -99,18 +101,29 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             RunnerResult runnerResult = null;
             Throwable controllerCause = null;
             try {
-                runnerResult = doExecute(job, context); // not null
+                final OptionalThing<CrossVMState> crossVMState = jobRunner.getCrossVMHook().map(hook -> {
+                    return hook.hookBeginning(job, beginTime);
+                });
+                try {
+                    runnerResult = doExecute(job, context, beginTime); // not null
+                } finally {
+                    if (crossVMState.isPresent()) { // hook exists
+                        jobRunner.getCrossVMHook().ifPresent(hook -> { // always present here
+                            hook.hookEnding(job, crossVMState.get(), currentTime.get());
+                        });
+                    }
+                }
             } catch (JobAlreadyIllegallyExecutingException e) {
-                logger.error("Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName(), e);
+                error("Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName(), e);
                 controllerCause = e;
             } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
-                logger.error("Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName(), cause);
+                error("Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName(), cause);
                 controllerCause = cause;
             }
             final LocalDateTime endTime = currentTime.get();
             recordJobHistory(context, job, jobThread, runnerResult, beginTime, endTime, controllerCause);
         } catch (Throwable coreCause) { // controller dead
-            logger.error("Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName(), coreCause);
+            error("Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName(), coreCause);
         }
     }
 
@@ -121,17 +134,15 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                           Job Control 
     //                                           -----------
-    protected RunnerResult doExecute(Cron4jJob job, TaskExecutionContext context) {
-        final List<TaskExecutor> executorList = job.findExecutorList(); // myself included
+    protected RunnerResult doExecute(Cron4jJob job, TaskExecutionContext context, LocalDateTime beginTime) {
         final String cronExp;
         final VaryingCronOption cronOption;
         synchronized (varyingLock) {
-            if (executorList.size() >= 2) { // other executions of same task exist
-                if (concurrentExec.equals(JobConcurrentExec.QUIT)) {
-                    noticeSilentlyQuit(job, executorList);
-                    return RunnerResult.asQuitByConcurrent();
-                } else if (concurrentExec.equals(JobConcurrentExec.ERROR)) {
-                    throwJobAlreadyIllegallyExecutingException(job, executorList);
+            final List<TaskExecutor> executorList = job.findNativeExecutorList();
+            if (executorList.size() >= 2) { // contains myself
+                final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job, executorList);
+                if (concurrentResult.isPresent()) {
+                    return concurrentResult.get();
                 }
                 // will wait by executing synchronization as default
             }
@@ -147,26 +158,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         }
     }
 
-    protected void noticeSilentlyQuit(Cron4jJob job, List<TaskExecutor> executorList) { // in varying lock
-        final JobNoticeLogLevel noticeLogLevel = varyingCron.getCronOption().getNoticeLogLevel();
-        final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
-        final String msg = "...Quitting the job because of already existing job: " + job + " startTimes=" + startTimeList;
-        if (noticeLogLevel.equals(JobNoticeLogLevel.INFO)) {
-            logger.info(msg);
-        } else if (noticeLogLevel.equals(JobNoticeLogLevel.DEBUG)) {
-            logger.debug(msg);
-        }
-    }
-
-    protected void throwJobAlreadyIllegallyExecutingException(Cron4jJob job, List<TaskExecutor> executorList) {
-        final List<LocalDateTime> startTimeList = extractExecutingStartTimes(executorList);
-        throw new JobAlreadyIllegallyExecutingException("Already executing the job: " + job + " startTimes=" + startTimeList);
-    }
-
-    protected List<LocalDateTime> extractExecutingStartTimes(List<TaskExecutor> executorList) {
-        return executorList.stream().map(executor -> {
-            return new HandyDate(new Date(executor.getStartTime())).getLocalDateTime();
-        }).collect(Collectors.toList());
+    protected OptionalThing<RunnerResult> stopConcurrentJobIfNeeds(Cron4jJob job, List<TaskExecutor> executorList) {
+        return new ConcurrentJobStopper().stopIfNeeds(job, () -> {
+            return executorList.stream().map(meta -> {
+                // #thinking timeZone? by jflute (2017/03/20)
+                return new HandyDate(new java.util.Date(meta.getStartTime())).getLocalDateTime();
+            }).collect(Collectors.toList()).toString();
+        });
     }
 
     // -----------------------------------------------------
@@ -221,7 +219,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             LocalDateTime beginTime, LocalDateTime endTime, Throwable controllerCause) {
         final TaskExecutor taskExecutor = context.getTaskExecutor();
         final Cron4jJobHistory jobHistory = prepareJobHistory(job, runnerResult, beginTime, endTime, controllerCause);
-        Cron4jJobHistory.record(taskExecutor, jobHistory, getHistoryLimit());
+        final int historyLimit = getHistoryLimit();
+        jobRunner.getHistoryHook().ifPresent(hook -> {
+            hook.hookRecord(jobHistory, new JobHistoryResource(historyLimit));
+        });
+        Cron4jJobHistory.record(taskExecutor, jobHistory, historyLimit);
     }
 
     protected Cron4jJobHistory prepareJobHistory(Cron4jJob job, RunnerResult runnerResult, LocalDateTime beginTime, LocalDateTime endTime,
@@ -262,6 +264,17 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     protected int getHistoryLimit() {
         return 300;
+    }
+
+    // -----------------------------------------------------
+    //                                             Error Log
+    //                                             ---------
+    protected void error(String msg, Throwable cause) {
+        final String unifiedMsg = msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause);
+        jobRunner.getErrorLogHook().ifPresent(hook -> {
+            hook.hookError(unifiedMsg);
+        });
+        JobErrorLog.log(unifiedMsg);
     }
 
     // ===================================================================================

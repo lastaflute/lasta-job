@@ -15,9 +15,6 @@
  */
 package org.lastaflute.job;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Supplier;
@@ -50,11 +47,14 @@ import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableS
 import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.log.JobErrorLog;
+import org.lastaflute.job.log.JobErrorLogHook;
+import org.lastaflute.job.log.JobErrorStackTracer;
+import org.lastaflute.job.log.JobHistoryHook;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogHook;
+import org.lastaflute.job.subsidiary.CrossVMHook;
 import org.lastaflute.job.subsidiary.RunnerResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author jflute
@@ -65,19 +65,27 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                          Definition
     //                                                                          ==========
-    private static final Logger logger = LoggerFactory.getLogger(LaJobRunner.class);
     protected static final String LF = "\n";
     protected static final String EX_IND = "  "; // indent for exception message
 
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
+    // -----------------------------------------------------
+    //                                          DI Component
+    //                                          ------------
     @Resource
     private JobManager jobManager; // injected simply
     @Resource
     private ExceptionTranslator exceptionTranslator; // injected simply
 
+    // -----------------------------------------------------
+    //                                                Option
+    //                                                ------
     protected AccessContextArranger accessContextArranger; // null allowed, option
+    protected CrossVMHook crossVMHook;
+    protected JobErrorLogHook errorLogHook; // null allowed, option
+    protected JobHistoryHook historyHook; // null allowed, option
     protected JobNoticeLogHook noticeLogHook; // null allowed, option
     protected int jobHistoryLimit = 100; // as framework default
 
@@ -89,10 +97,38 @@ public class LaJobRunner {
      * @return this. (NotNull)
      */
     public LaJobRunner useAccessContext(AccessContextArranger oneArgLambda) { // almost required if DBFlute
-        if (oneArgLambda == null) {
-            throw new IllegalArgumentException("The argument 'oneArgLambda' (accessContextArranger) should not be null.");
-        }
+        assertArgumentNotNull("oneArgLambda(accessContextArranger)", oneArgLambda);
         this.accessContextArranger = oneArgLambda;
+        return this;
+    }
+
+    /**
+     * @param crossVMHook The callback of cross-VM hook for sharing with other JavaVMs. (NotNull)
+     * @return this. (NotNull)
+     */
+    public LaJobRunner useCrossVMHook(CrossVMHook crossVMHook) {
+        assertArgumentNotNull("crossVMHook", crossVMHook);
+        this.crossVMHook = crossVMHook;
+        return this;
+    }
+
+    /**
+     * @param errorLogHook The callback of error log hook for e.g. saving to database, sending mail. (NotNull)
+     * @return this. (NotNull)
+     */
+    public LaJobRunner useErrorLogHook(JobErrorLogHook errorLogHook) {
+        assertArgumentNotNull("errorLogHook", errorLogHook);
+        this.errorLogHook = errorLogHook;
+        return this;
+    }
+
+    /**
+     * @param historyHook The callback of history hook for e.g. saving to database. (NotNull)
+     * @return this. (NotNull)
+     */
+    public LaJobRunner useHistoryHook(JobHistoryHook historyHook) {
+        assertArgumentNotNull("historyHook", historyHook);
+        this.historyHook = historyHook;
         return this;
     }
 
@@ -100,7 +136,7 @@ public class LaJobRunner {
      * @param noticeLogHook The callback of notice log hook for e.g. saving to database. (NotNull)
      * @return this. (NotNull)
      */
-    public LaJobRunner useNoticeLogHook(JobNoticeLogHook noticeLogHook) { // almost required if DBFlute
+    public LaJobRunner useNoticeLogHook(JobNoticeLogHook noticeLogHook) {
         if (noticeLogHook == null) {
             throw new IllegalArgumentException("The argument 'noticeLogHook' should not be null.");
         }
@@ -486,32 +522,18 @@ public class LaJobRunner {
         });
     }
 
-    protected void buildExceptionStackTrace(Throwable cause, StringBuilder sb) { // similar to logging filter
-        sb.append(LF);
-        final ByteArrayOutputStream out = new ByteArrayOutputStream(1024);
-        PrintStream ps = null;
-        try {
-            ps = new PrintStream(out);
-            cause.printStackTrace(ps);
-            final String encoding = "UTF-8";
-            try {
-                sb.append(out.toString(encoding));
-            } catch (UnsupportedEncodingException continued) {
-                logger.warn("Unknown encoding: " + encoding, continued);
-                sb.append(out.toString()); // retry without encoding
-            }
-        } finally {
-            if (ps != null) {
-                ps.close();
-            }
-        }
+    protected void buildExceptionStackTrace(Throwable cause, StringBuilder sb) {
+        sb.append(LF).append(new JobErrorStackTracer().buildExceptionStackTrace(cause));
     }
 
     // -----------------------------------------------------
     //                                     Exception Logging
     //                                     -----------------
     protected void logJobException(LaJobRuntime runtime, String msg, Throwable cause) { // msg contains stack-trace
-        logger.error(msg); // not use second argument here, same reason as logging filter
+        if (errorLogHook != null) {
+            errorLogHook.hookError(msg);
+        }
+        JobErrorLog.log(msg); // not use second argument here, same reason as logging filter
     }
 
     // ===================================================================================
@@ -539,10 +561,40 @@ public class LaJobRunner {
     }
 
     // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    protected void assertArgumentNotNull(String variableName, Object obj) {
+        if (obj == null) {
+            throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
+        }
+    }
+
+    // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
     @Override
     public String toString() {
         return DfTypeUtil.toClassTitle(this) + ":{accessContext=" + accessContextArranger + "}@" + Integer.toHexString(hashCode());
+    }
+
+    // ===================================================================================
+    //                                                                            Accessor
+    //                                                                            ========
+    public OptionalThing<CrossVMHook> getCrossVMHook() {
+        return OptionalThing.ofNullable(crossVMHook, () -> {
+            throw new IllegalStateException("Not found the crossVMHook.");
+        });
+    }
+
+    public OptionalThing<JobErrorLogHook> getErrorLogHook() {
+        return OptionalThing.ofNullable(errorLogHook, () -> {
+            throw new IllegalStateException("Not found the errorLogHook.");
+        });
+    }
+
+    public OptionalThing<JobHistoryHook> getHistoryHook() {
+        return OptionalThing.ofNullable(historyHook, () -> {
+            throw new IllegalStateException("Not found the historyHook.");
+        });
     }
 }

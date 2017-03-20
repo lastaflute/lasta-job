@@ -161,9 +161,7 @@ public class LastaJobStarter {
 
     protected Cron4jNow createCron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner) {
         final TimeManager timeManager = getTimeManager();
-        return new Cron4jNow(cron4jScheduler, jobRunner, () -> {
-            return timeManager.currentDateTime();
-        });
+        return new Cron4jNow(cron4jScheduler, jobRunner, () -> timeManager.currentDateTime());
     }
 
     protected Cron4jCron createCron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner runner, Cron4jNow cron4jNow) {

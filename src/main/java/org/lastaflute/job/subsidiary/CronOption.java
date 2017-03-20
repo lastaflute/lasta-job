@@ -30,7 +30,7 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class CronOption implements InitialCronOption, VaryingCronOption, JobSubAttr {
+public class CronOption implements InitialCronOption, VaryingCronOption, JobSubIdentityAttr {
 
     // ===================================================================================
     //                                                                           Attribute

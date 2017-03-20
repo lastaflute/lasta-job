@@ -23,9 +23,15 @@ import org.lastaflute.job.key.LaJobUnique;
  * @author jflute
  * @since 0.2.6 (2017/02/18 Saturday)
  */
-public interface JobSubAttr { // for internal assist
+public interface JobSubIdentityAttr { // for internal assist
 
+    /**
+     * @return The optional note (title, description) of the job. (NotNull, EmptyAllowed: if both is no value)
+     */
     OptionalThing<LaJobNote> getJobNote();
 
+    /**
+     * @return The optional job unique code provided by application when schedule registration. (NotNull, EmptyAllowed)
+     */
     OptionalThing<LaJobUnique> getJobUnique();
 }
