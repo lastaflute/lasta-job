@@ -26,8 +26,8 @@ public interface CrossVMHook {
     // e.g.
     // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
     // public CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime beginTime) {
-    //     OptionalThing<JobExecution> jobExecution = jobExecutionBhv.selectByUniqueOf(job.getJobUnique().get());
-    //     if (jobExecution.isPresent()) { // concurrent
+    //     OptionalThing<JobExecControl> jobExecControl = jobExecControlBhv.selectByUniqueOf(job.getJobUnique().get());
+    //     if (jobExecControl.isPresent()) { // concurrent
     //         ConcurrentJobStopper stopper = new ConcurrentJobStopper();
     //         return stopper.stopIfNeeds(...).map(result -> { // quit (or exception)
     //             return asQuitState();
@@ -43,18 +43,28 @@ public interface CrossVMHook {
     //     return new CrossVMState().asQuit();
     // }
     // private CrossVMState asNormalState() {
-    //     JobExecution jobExecution = jobExecutionBhv.insert(...);
-    //     return new CrossVMState().withAttribute("jobExecutionId", jobExecution.getJobExecutionId());
+    //     JobExecControl jobExecControl = jobExecControlBhv.insert(...);
+    //     return new CrossVMState().withAttribute("jobExecControlId", jobExecControl.getJobExecControlId());
     // }
     // _/_/_/_/_/_/_/_/_/_/
+    /**
+     * @param jobAttr The object that can provide attributes of job. (NotNull)
+     * @param beginTime The date-time of job beginning. (NotNull)
+     * @return The state object of hook runtime, can be used at ending hook. (NotNull)
+     */
     CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime beginTime);
 
     // e.g.
     // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
     // public void hookEnding(ReadableJobAttr jobAttr, CrossVMState state) {
-    //     Long jobExecutionId = state.getAttribute("jobExecutionId", Long.class).get();
-    //     jobExecutionBhv.delete(...);
+    //     Long jobExecControlId = state.getAttribute("jobExecControlId", Long.class).get();
+    //     jobExecControlBhv.delete(...);
     // }
     // _/_/_/_/_/_/_/_/_/_/
+    /**
+     * @param jobAttr The object that can provide attributes of job. (NotNull)
+     * @param state The state object of hook runtime, can be used at ending hook. (NotNull)
+     * @param endTime The date-time of job ending. (NotNull)
+     */
     void hookEnding(ReadableJobAttr jobAttr, CrossVMState state, LocalDateTime endTime);
 }
