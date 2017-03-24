@@ -37,6 +37,7 @@ import org.lastaflute.job.log.JobHistoryResource;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentJobStopper;
 import org.lastaflute.job.subsidiary.CrossVMState;
+import org.lastaflute.job.subsidiary.EndTitleRoll;
 import org.lastaflute.job.subsidiary.ExecResultType;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
@@ -232,11 +233,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         if (controllerCause == null) { // mainly here, and runnerResult is not null here
             jobHistory = createJobHistory(job, beginTime, endTime, () -> {
                 return deriveRunnerExecResultType(runnerResult);
-            }, runnerResult.getCause().orElse(null));
+            }, runnerResult.getEndTitleRoll(), runnerResult.getCause());
         } else if (controllerCause instanceof JobAlreadyIllegallyExecutingException) {
-            jobHistory = createJobHistory(job, beginTime, endTime, () -> ExecResultType.ERROR_BY_CONCURRENT, controllerCause);
+            jobHistory = createJobHistory(job, beginTime, endTime, () -> ExecResultType.ERROR_BY_CONCURRENT, OptionalThing.empty(),
+                    OptionalThing.of(controllerCause));
         } else { // may be framework exception
-            jobHistory = createJobHistory(job, beginTime, endTime, () -> ExecResultType.CAUSED_BY_FRAMEWORK, controllerCause);
+            jobHistory = createJobHistory(job, beginTime, endTime, () -> ExecResultType.CAUSED_BY_FRAMEWORK, OptionalThing.empty(),
+                    OptionalThing.of(controllerCause));
         }
         return jobHistory;
     }
@@ -252,14 +255,15 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected Cron4jJobHistory createJobHistory(Cron4jJob job, LocalDateTime beginTime, LocalDateTime endTime,
-            Supplier<ExecResultType> execResultTypeProvider, Throwable cause) {
+            Supplier<ExecResultType> execResultTypeProvider, OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause) {
         final LaJobKey jobKey = job.getJobKey();
         final OptionalThing<LaJobNote> jobNote = job.getJobNote();
         final OptionalThing<LaJobUnique> jobUnique = job.getJobUnique();
         final OptionalThing<String> cronExp = job.getCronExp();
         final String jobTypeFqcn = job.getJobType().getName();
         final ExecResultType execResultType = execResultTypeProvider.get();
-        return new Cron4jJobHistory(jobKey, jobNote, jobUnique, cronExp, jobTypeFqcn, beginTime, endTime, execResultType, cause);
+        return new Cron4jJobHistory(jobKey, jobNote, jobUnique, cronExp, jobTypeFqcn, beginTime, endTime, execResultType, endTitleRoll,
+                cause);
     }
 
     protected int getHistoryLimit() {

@@ -16,6 +16,7 @@
 package org.lastaflute.job;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
@@ -50,6 +51,8 @@ public interface LaJobHistory {
     LocalDateTime getEndTime();
 
     ExecResultType getExecResultType();
+
+    Map<String, String> getEndTitleRollSnapshotMap(); // not to keep application instance
 
     OptionalThing<Throwable> getCause();
 }

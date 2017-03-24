@@ -16,7 +16,10 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJobHistory;
@@ -24,6 +27,7 @@ import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.SavedHistoryCache;
+import org.lastaflute.job.subsidiary.EndTitleRoll;
 import org.lastaflute.job.subsidiary.ExecResultType;
 
 import it.sauronsoftware.cron4j.TaskExecutor;
@@ -66,14 +70,16 @@ public class Cron4jJobHistory implements LaJobHistory {
     protected final LocalDateTime beginTime; // not null
     protected final LocalDateTime endTime; // not null
     protected final ExecResultType execResultType; // not null
-    protected final Throwable cause; // null allowed
+    protected final Map<String, String> endTitleRollSnapshotMap; // not null, empty allowed, read-only
+    protected final OptionalThing<Throwable> cause; // not null, empty allowed
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
     public Cron4jJobHistory(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique // identity
             , OptionalThing<String> cronExp, String jobTypeFqcn // cron
-            , LocalDateTime beginTime, LocalDateTime endTime, ExecResultType execResultType, Throwable cause // execution
+            , LocalDateTime beginTime, LocalDateTime endTime, ExecResultType execResultType // execution basic
+            , OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause // execution option
     ) {
         this.jobKey = jobKey;
         this.jobNote = jobNote;
@@ -83,7 +89,20 @@ public class Cron4jJobHistory implements LaJobHistory {
         this.beginTime = beginTime;
         this.endTime = endTime;
         this.execResultType = execResultType;
+        this.endTitleRollSnapshotMap = prepareEndTitleRollSnapshotMap(endTitleRoll);
         this.cause = cause;
+    }
+
+    protected Map<String, String> prepareEndTitleRollSnapshotMap(OptionalThing<EndTitleRoll> endTitleRoll) {
+        return endTitleRoll.map(roll -> {
+            final Map<String, String> map = new LinkedHashMap<String, String>();
+            roll.getDataMap().forEach((key, value) -> {
+                map.put(key, value != null ? value.toString() : null);
+            });
+            return Collections.unmodifiableMap(map);
+        }).orElseGet(() -> {
+            return Collections.emptyMap();
+        });
     }
 
     // ===================================================================================
@@ -156,9 +175,12 @@ public class Cron4jJobHistory implements LaJobHistory {
     }
 
     @Override
+    public Map<String, String> getEndTitleRollSnapshotMap() {
+        return endTitleRollSnapshotMap;
+    }
+
+    @Override
     public OptionalThing<Throwable> getCause() {
-        return OptionalThing.ofNullable(cause, () -> {
-            throw new IllegalStateException("Not found the cause: " + toString());
-        });
+        return cause;
     }
 }

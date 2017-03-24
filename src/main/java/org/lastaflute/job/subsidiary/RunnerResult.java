@@ -26,34 +26,40 @@ public class RunnerResult {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Throwable cause; // null allowed, already handled (e.g. logging)
+    protected final OptionalThing<EndTitleRoll> endTitleRoll; // not null, empty allowed
+    protected final OptionalThing<Throwable> cause; // null allowed, already handled (e.g. logging)
     protected final boolean nextTriggerSuppressed; // by runtime
     protected final boolean quitByConcurrent; // by runner
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    protected RunnerResult(Throwable cause, boolean nextTriggerSuppressed, boolean quitByConcurrent) {
+    protected RunnerResult(OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause, boolean nextTriggerSuppressed,
+            boolean quitByConcurrent) {
+        this.endTitleRoll = endTitleRoll;
         this.cause = cause;
         this.nextTriggerSuppressed = nextTriggerSuppressed;
         this.quitByConcurrent = quitByConcurrent;
     }
 
-    public static RunnerResult asExecuted(Throwable cause, boolean nextTriggerSuppressed) {
-        return new RunnerResult(cause, nextTriggerSuppressed, false);
+    public static RunnerResult asExecuted(OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause,
+            boolean nextTriggerSuppressed) {
+        return new RunnerResult(endTitleRoll, cause, nextTriggerSuppressed, false);
     }
 
     public static RunnerResult asQuitByConcurrent() {
-        return new RunnerResult(null, false, true);
+        return new RunnerResult(OptionalThing.empty(), OptionalThing.empty(), false, true);
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
+        return endTitleRoll;
+    }
+
     public OptionalThing<Throwable> getCause() {
-        return OptionalThing.ofNullable(cause, () -> {
-            throw new IllegalStateException("Not found the cause.");
-        });
+        return cause;
     }
 
     public boolean isNextTriggerSuppressed() {

@@ -16,6 +16,8 @@
 package org.lastaflute.job.mock;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Map;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJobHistory;
@@ -68,6 +70,11 @@ public class MockJobHistory implements LaJobHistory {
     @Override
     public ExecResultType getExecResultType() {
         return ExecResultType.SUCCESS;
+    }
+
+    @Override
+    public Map<String, String> getEndTitleRollSnapshotMap() {
+        return Collections.emptyMap();
     }
 
     @Override

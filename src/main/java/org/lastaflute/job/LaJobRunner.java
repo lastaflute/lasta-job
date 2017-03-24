@@ -244,7 +244,9 @@ public class LaJobRunner {
     }
 
     protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
-        return RunnerResult.asExecuted(cause, runtime.isNextTriggerSuppressed());
+        return RunnerResult.asExecuted(runtime.getEndTitleRoll(), OptionalThing.ofNullable(cause, () -> {
+            throw new IllegalStateException("Not found the cause.");
+        }), runtime.isNextTriggerSuppressed());
     }
 
     protected boolean isBusinessSuccess(LaJobRuntime runtime, Throwable cause) {
