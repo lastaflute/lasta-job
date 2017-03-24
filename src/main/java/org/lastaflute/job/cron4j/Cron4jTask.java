@@ -27,7 +27,7 @@ import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
-import org.lastaflute.job.exception.JobAlreadyIllegallyExecutingException;
+import org.lastaflute.job.exception.JobConcurrentlyExecutingException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
@@ -114,7 +114,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                         });
                     }
                 }
-            } catch (JobAlreadyIllegallyExecutingException e) {
+            } catch (JobConcurrentlyExecutingException e) {
                 error("Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName(), e);
                 controllerCause = e;
             } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
@@ -147,6 +147,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 }
                 // will wait by executing synchronization as default
             }
+            final OptionalThing<RunnerResult> neighborConcurrentResult = stopNeighborConcurrentJobIfNeeds(job, executorList);
+            if (neighborConcurrentResult.isPresent()) {
+                return neighborConcurrentResult.get();
+                // waiting for neighbor job is unsupported #for_now (how do I wait?) 
+            }
             cronExp = varyingCron.getCronExp();
             cronOption = varyingCron.getCronOption();
         }
@@ -159,13 +164,34 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         }
     }
 
+    // -----------------------------------------------------
+    //                                            Concurrent
+    //                                            ----------
     protected OptionalThing<RunnerResult> stopConcurrentJobIfNeeds(Cron4jJob job, List<TaskExecutor> executorList) {
-        return new ConcurrentJobStopper().stopIfNeeds(job, () -> {
-            return executorList.stream().map(meta -> {
-                // #thinking timeZone? by jflute (2017/03/20)
-                return new HandyDate(new java.util.Date(meta.getStartTime())).getLocalDateTime();
-            }).collect(Collectors.toList()).toString();
+        return createConcurrentJobStopper().stopIfNeeds(job, () -> {
+            return executorList.stream().map(meta -> convertToBeginTime(meta)).collect(Collectors.toList()).toString();
         });
+    }
+
+    protected OptionalThing<RunnerResult> stopNeighborConcurrentJobIfNeeds(Cron4jJob job, List<TaskExecutor> executorList) {
+        return createConcurrentJobStopper().stopIfNeighborNeeds(job, jobKey -> {
+            return cron4jNow.findJobByKey(jobKey);
+        }, () -> {
+            return buildConcurrentSupplementDisp(executorList);
+        });
+    }
+
+    protected ConcurrentJobStopper createConcurrentJobStopper() {
+        return new ConcurrentJobStopper();
+    }
+
+    protected String buildConcurrentSupplementDisp(List<TaskExecutor> executorList) {
+        return executorList.stream().map(meta -> convertToBeginTime(meta)).collect(Collectors.toList()).toString();
+    }
+
+    protected LocalDateTime convertToBeginTime(TaskExecutor meta) {
+        // #thinking timeZone? by jflute (2017/03/20)
+        return new HandyDate(new java.util.Date(meta.getStartTime())).getLocalDateTime();
     }
 
     // -----------------------------------------------------
@@ -234,7 +260,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             jobHistory = createJobHistory(job, beginTime, endTime, () -> {
                 return deriveRunnerExecResultType(runnerResult);
             }, runnerResult.getEndTitleRoll(), runnerResult.getCause());
-        } else if (controllerCause instanceof JobAlreadyIllegallyExecutingException) {
+        } else if (controllerCause instanceof JobConcurrentlyExecutingException) {
             jobHistory = createJobHistory(job, beginTime, endTime, () -> ExecResultType.ERROR_BY_CONCURRENT, OptionalThing.empty(),
                     OptionalThing.of(controllerCause));
         } else { // may be framework exception

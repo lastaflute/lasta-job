@@ -15,10 +15,17 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.exception.JobAlreadyIllegallyExecutingException;
+import org.lastaflute.job.exception.JobConcurrentlyExecutingException;
+import org.lastaflute.job.exception.JobConcurrentlyNeighborExecutingException;
+import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 
@@ -28,13 +35,16 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
  */
 public class ConcurrentJobStopper {
 
+    // ===================================================================================
+    //                                                                 (Myself) Concurrent
+    //                                                                 ===================
     public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobAttr jobAttr, Supplier<String> concurrentDisp) {
         final JobConcurrentExec concurrentExec = jobAttr.getConcurrentExec();
         if (concurrentExec.equals(JobConcurrentExec.QUIT)) {
             noticeSilentlyQuit(jobAttr, concurrentDisp);
             return OptionalThing.of(RunnerResult.asQuitByConcurrent());
         } else if (concurrentExec.equals(JobConcurrentExec.ERROR)) {
-            throwJobAlreadyIllegallyExecutingException(jobAttr, concurrentDisp);
+            throwJobConcurrentlyExecutingException(jobAttr, concurrentDisp);
         }
         return OptionalThing.empty();
     }
@@ -42,15 +52,64 @@ public class ConcurrentJobStopper {
     protected void noticeSilentlyQuit(ReadableJobAttr jobAttr, Supplier<String> concurrentDisp) { // in varying lock
         final JobNoticeLogLevel noticeLogLevel = jobAttr.getNoticeLogLevel();
         JobNoticeLog.log(noticeLogLevel, () -> {
-            return "...Quitting the job because of already existing job: " + jobAttr.toIdentityDisp() + ", " + concurrentDisp.get();
+            return "...Quitting the job for already executing job: " + jobAttr.toIdentityDisp() + ", " + concurrentDisp.get();
         });
     }
 
-    protected void throwJobAlreadyIllegallyExecutingException(ReadableJobAttr jobAttr, Supplier<String> concurrentDisp) {
-        throw new JobAlreadyIllegallyExecutingException(buildJobAlreadyIllegallyExecutingMessage(jobAttr, concurrentDisp));
+    protected void throwJobConcurrentlyExecutingException(ReadableJobAttr jobAttr, Supplier<String> concurrentDisp) {
+        throw new JobConcurrentlyExecutingException(buildJobConcurrentlyExecutingMessage(jobAttr, concurrentDisp));
     }
 
-    protected String buildJobAlreadyIllegallyExecutingMessage(ReadableJobAttr jobAttr, Supplier<String> concurrentDisp) {
+    protected String buildJobConcurrentlyExecutingMessage(ReadableJobAttr jobAttr, Supplier<String> concurrentDisp) {
         return "Already executing the job: " + jobAttr.toIdentityDisp() + ", " + concurrentDisp.get();
+    }
+
+    // ===================================================================================
+    //                                                                 Neighbor Concurrent
+    //                                                                 ===================
+    public OptionalThing<RunnerResult> stopIfNeighborNeeds(ReadableJobAttr jobAttr,
+            Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder, Supplier<String> concurrentDisp) {
+        final Map<JobConcurrentExec, Set<LaJobKey>> concurrentMap = jobAttr.getNeighborConcurrentMap();
+        doStopIfNeighborNeeds(jobFinder, concurrentMap, JobConcurrentExec.QUIT, jobState -> {
+            noticeSilentlyQuitByNeighbor(jobAttr, jobState, concurrentDisp);
+        });
+        doStopIfNeighborNeeds(jobFinder, concurrentMap, JobConcurrentExec.ERROR, jobState -> {
+            throwJobConcurrentlyNeighborExecutingException(jobAttr, jobState, concurrentDisp);
+        });
+        return OptionalThing.empty();
+    }
+
+    protected void doStopIfNeighborNeeds(Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder,
+            Map<JobConcurrentExec, Set<LaJobKey>> concurrentMap, JobConcurrentExec concurrentExec, Consumer<ReadableJobState> action) {
+        concurrentMap.getOrDefault(concurrentExec, Collections.emptySet()).forEach(jobKey -> {
+            jobFinder.apply(jobKey).ifPresent(jobState -> { // ignoring unscheduled job, no problem
+                if (jobState.isExecutingNow()) {
+                    action.accept(jobState);
+                }
+            });
+        });
+    }
+
+    protected void noticeSilentlyQuitByNeighbor(ReadableJobAttr me, ReadableJobAttr neighbor, Supplier<String> concurrentDisp) { // in varying lock
+        final JobNoticeLogLevel noticeLogLevel = me.getNoticeLogLevel();
+        final String meDisp = me.toIdentityDisp();
+        final String neighborDisp = neighbor.toIdentityDisp();
+        final String rearDisp = concurrentDisp.get();
+        JobNoticeLog.log(noticeLogLevel, () -> {
+            return "...Quitting the job for already executing neighbor job: me=" + meDisp + ", neighbor=" + neighborDisp + ", " + rearDisp;
+        });
+    }
+
+    protected void throwJobConcurrentlyNeighborExecutingException(ReadableJobAttr me, ReadableJobAttr neighbor,
+            Supplier<String> concurrentDisp) {
+        throw new JobConcurrentlyNeighborExecutingException(buildJobConcurrentlyNeighborExecutingMessage(me, neighbor, concurrentDisp));
+    }
+
+    protected String buildJobConcurrentlyNeighborExecutingMessage(ReadableJobAttr me, ReadableJobAttr neighbor,
+            Supplier<String> concurrentDisp) {
+        final String meDisp = me.toIdentityDisp();
+        final String neighborDisp = neighbor.toIdentityDisp();
+        final String rearDisp = concurrentDisp.get();
+        return "Already executing the neighbor job: me=" + meDisp + ", neighbor=" + neighborDisp + ", " + rearDisp;
     }
 }

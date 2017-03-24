@@ -17,6 +17,7 @@ package org.lastaflute.job;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -314,7 +315,7 @@ public class LaJobRunner {
     protected OptionalThing<String> buildTriggeredNextJobExp(LaJobRuntime runtime) {
         final LaJobKey jobKey = runtime.getJobKey();
         final String exp = jobManager.findJobByKey(jobKey).map(job -> {
-            final List<LaJobKey> triggeredJobKeyList = job.getTriggeredJobKeyList();
+            final Set<LaJobKey> triggeredJobKeyList = job.getTriggeredJobKeySet();
             if (!triggeredJobKeyList.isEmpty()) {
                 final List<String> dispList = triggeredJobKeyList.stream().map(triggeredJobKey -> {
                     return jobManager.findJobByKey(triggeredJobKey).map(triggeredJob -> {

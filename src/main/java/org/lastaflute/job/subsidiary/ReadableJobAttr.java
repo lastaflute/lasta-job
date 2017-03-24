@@ -15,7 +15,8 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaJob;
@@ -28,7 +29,7 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
  * @author jflute
  * @since 0.4.1 (2017/03/20 Monday)
  */
-public interface ReadableJobAttr { // for internal assist
+public interface ReadableJobAttr extends JobIdentityAttr { // for internal assist
 
     // ===================================================================================
     //                                                                          Basic Info
@@ -74,13 +75,22 @@ public interface ReadableJobAttr { // for internal assist
     JobConcurrentExec getConcurrentExec();
 
     // ===================================================================================
-    //                                                                             Trigger
-    //                                                                             =======
+    //                                                                        Next Trigger
+    //                                                                        ============
     /**
-     * Get the list of triggered job key.
-     * @return The list of job key for triggered job. (NotNull)
+     * Get the set of triggered job key.
+     * @return The read-only set of job key for triggered job. (NotNull)
      */
-    List<LaJobKey> getTriggeredJobKeyList();
+    Set<LaJobKey> getTriggeredJobKeySet();
+
+    // ===================================================================================
+    //                                                                 Neighbor Concurrent
+    //                                                                 ===================
+    /**
+     * Get the map of job keys for neighbor concurrent.
+     * @return The read-only map that the key is concurrent execution type. (NotNull)
+     */
+    Map<JobConcurrentExec, Set<LaJobKey>> getNeighborConcurrentMap();
 
     // ===================================================================================
     //                                                                             Display

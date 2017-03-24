@@ -21,11 +21,11 @@ import org.lastaflute.job.exception.base.LaJobOperationException;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class JobAlreadyIllegallyExecutingException extends LaJobOperationException {
+public class JobConcurrentlyExecutingException extends LaJobOperationException {
 
     private static final long serialVersionUID = 1L;
 
-    public JobAlreadyIllegallyExecutingException(String msg) {
+    public JobConcurrentlyExecutingException(String msg) {
         super(msg);
     }
 }
