@@ -180,7 +180,7 @@ public class Cron4jCron implements LaCron {
                 if (me.getJobKey().equals(neighborKey)) { // myself
                     continue;
                 }
-                me.registerNeighborConcurrent(JobConcurrentExec.ERROR, neighborKey);
+                me.registerNeighborConcurrent(concurrentExec, neighborKey);
             }
         }
     }
