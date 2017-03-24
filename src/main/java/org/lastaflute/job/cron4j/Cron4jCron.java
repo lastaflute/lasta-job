@@ -16,6 +16,7 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.function.Supplier;
 
 import org.dbflute.optional.OptionalThing;
@@ -166,6 +167,9 @@ public class Cron4jCron implements LaCron {
     @Override
     public void setupNeighborConcurrent(JobConcurrentExec concurrentExec, RegisteredJob... jobs) {
         assertArgumentNotNull("jobs", jobs);
+        if (jobs.length <= 1) {
+            throw new IllegalArgumentException("The specified jobs should be two or more: " + Arrays.asList(jobs));
+        }
         for (RegisteredJob job : jobs) {
             if (!(job instanceof LaScheduledJob)) {
                 throw new IllegalArgumentException("The registered job should be instance of scheduled job: " + job);
