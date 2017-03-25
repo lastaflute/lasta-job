@@ -46,9 +46,11 @@ public interface LaJobHistory {
     // ===================================================================================
     //                                                                    Execution Result
     //                                                                    ================
-    LocalDateTime getBeginTime();
+    LocalDateTime getActivationTime();
 
-    LocalDateTime getEndTime();
+    OptionalThing<LocalDateTime> getBeginTime();
+
+    OptionalThing<LocalDateTime> getEndTime();
 
     ExecResultType getExecResultType();
 

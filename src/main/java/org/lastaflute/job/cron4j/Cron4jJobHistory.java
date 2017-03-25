@@ -67,8 +67,9 @@ public class Cron4jJobHistory implements LaJobHistory {
     protected final OptionalThing<LaJobUnique> jobUnique; // not null
     protected final OptionalThing<String> cronExp; // not null
     protected final String jobTypeFqcn; // not null, not save class directly to avoid hot-deploy trouble
-    protected final LocalDateTime beginTime; // not null
-    protected final LocalDateTime endTime; // not null
+    protected final LocalDateTime activationTime; // not null
+    protected final OptionalThing<LocalDateTime> beginTime; // not null, empty allowed if no execution
+    protected final OptionalThing<LocalDateTime> endTime; // not null, empty allowed if no execution
     protected final ExecResultType execResultType; // not null
     protected final Map<String, String> endTitleRollSnapshotMap; // not null, empty allowed, read-only
     protected final OptionalThing<Throwable> cause; // not null, empty allowed
@@ -78,14 +79,15 @@ public class Cron4jJobHistory implements LaJobHistory {
     //                                                                         ===========
     public Cron4jJobHistory(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique // identity
             , OptionalThing<String> cronExp, String jobTypeFqcn // cron
-            , LocalDateTime beginTime, LocalDateTime endTime, ExecResultType execResultType // execution basic
-            , OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause // execution option
+            , LocalDateTime activationTime, OptionalThing<LocalDateTime> beginTime, OptionalThing<LocalDateTime> endTime // execution time
+            , ExecResultType execResultType, OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause // execution result
     ) {
         this.jobKey = jobKey;
         this.jobNote = jobNote;
         this.jobUnique = jobUnique;
         this.cronExp = cronExp;
         this.jobTypeFqcn = jobTypeFqcn;
+        this.activationTime = activationTime;
         this.beginTime = beginTime;
         this.endTime = endTime;
         this.execResultType = execResultType;
@@ -160,12 +162,17 @@ public class Cron4jJobHistory implements LaJobHistory {
     //                                      Execution Result
     //                                      ----------------
     @Override
-    public LocalDateTime getBeginTime() {
+    public LocalDateTime getActivationTime() {
+        return activationTime;
+    }
+
+    @Override
+    public OptionalThing<LocalDateTime> getBeginTime() {
         return beginTime;
     }
 
     @Override
-    public LocalDateTime getEndTime() {
+    public OptionalThing<LocalDateTime> getEndTime() {
         return endTime;
     }
 

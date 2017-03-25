@@ -25,7 +25,7 @@ public interface CrossVMHook {
 
     // e.g.
     // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-    // public CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime beginTime) {
+    // public CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime activationTime) {
     //     OptionalThing<JobExecControl> jobExecControl = jobExecControlBhv.selectByUniqueOf(job.getJobUnique().get());
     //     if (jobExecControl.isPresent()) { // concurrent
     //         ConcurrentJobStopper stopper = new ConcurrentJobStopper();
@@ -49,10 +49,10 @@ public interface CrossVMHook {
     // _/_/_/_/_/_/_/_/_/_/
     /**
      * @param jobAttr The object that can provide attributes of job. (NotNull)
-     * @param beginTime The date-time of job beginning. (NotNull)
+     * @param activationTime The date-time of job activation. (NotNull)
      * @return The state object of hook runtime, can be used at ending hook. (NotNull)
      */
-    CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime beginTime);
+    CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime activationTime);
 
     // e.g.
     // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/

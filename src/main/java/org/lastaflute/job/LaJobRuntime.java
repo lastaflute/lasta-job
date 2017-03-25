@@ -16,6 +16,7 @@
 package org.lastaflute.job;
 
 import java.lang.reflect.Method;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -50,6 +51,11 @@ public interface LaJobRuntime {
     Map<String, Object> getParameterMap(); // not null, read-only
 
     JobNoticeLogLevel getNoticeLogLevel(); // not null
+
+    // ===================================================================================
+    //                                                                           Job State
+    //                                                                           =========
+    LocalDateTime getBeginTime();
 
     // ===================================================================================
     //                                                                      End-Title Roll

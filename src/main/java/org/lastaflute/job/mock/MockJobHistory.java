@@ -58,13 +58,18 @@ public class MockJobHistory implements LaJobHistory {
     }
 
     @Override
-    public LocalDateTime getBeginTime() {
+    public LocalDateTime getActivationTime() {
         return LocalDateTime.now();
     }
 
     @Override
-    public LocalDateTime getEndTime() {
-        return LocalDateTime.now();
+    public OptionalThing<LocalDateTime> getBeginTime() {
+        return OptionalThing.of(LocalDateTime.now());
+    }
+
+    @Override
+    public OptionalThing<LocalDateTime> getEndTime() {
+        return OptionalThing.of(LocalDateTime.now());
     }
 
     @Override
