@@ -15,7 +15,7 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.dbflute.optional.OptionalThing;
@@ -87,10 +87,10 @@ public interface ReadableJobAttr extends JobIdentityAttr { // for internal assis
     //                                                                 Neighbor Concurrent
     //                                                                 ===================
     /**
-     * Get the list of group for neighbor concurrent.
-     * @return The read-only list of neighbor concurrent group. (NotNull)
+     * Get the map of group for neighbor concurrent.
+     * @return The read-only map of neighbor concurrent group, key is group name. (NotNull)
      */
-    List<NeighborConcurrentGroup> getNeighborConcurrentGroupList();
+    Map<String, NeighborConcurrentGroup> getNeighborConcurrentGroupMap();
 
     // ===================================================================================
     //                                                                             Display

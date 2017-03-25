@@ -16,11 +16,13 @@
 package org.lastaflute.job;
 
 import java.util.List;
+import java.util.Set;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 
 /**
  * @author jflute
@@ -37,6 +39,8 @@ public interface LaSchedulingNow {
     void schedule(CronConsumer oneArgLambda);
 
     List<LaJobHistory> searchJobHistoryList();
+
+    void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, Set<LaJobKey> jobKeySet);
 
     void destroy();
 }

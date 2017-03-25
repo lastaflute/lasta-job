@@ -17,6 +17,7 @@ package org.lastaflute.job;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -26,6 +27,7 @@ import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.web.servlet.filter.bowgun.BowgunCurtainBefore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,6 +189,11 @@ public class SimpleJobManager implements JobManager {
             public List<LaJobHistory> searchJobHistoryList() {
                 throwJobManagerNotInitializedYetException();
                 return Collections.emptyList(); // unreachable
+            }
+
+            @Override
+            public void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, Set<LaJobKey> jobKeySet) {
+                throwJobManagerNotInitializedYetException();
             }
 
             @Override

@@ -18,8 +18,9 @@ package org.lastaflute.job.cron4j;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -73,7 +74,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
     protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
-    protected List<NeighborConcurrentGroup> neighborConcurrentGroupList; // null allowed if no neighbor
+    protected Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap; // null allowed if no neighbor
 
     // ===================================================================================
     //                                                                         Constructor
@@ -312,28 +313,12 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                 Neighbor Concurrent
     //                                                                 ===================
-    public synchronized void registerNeighborConcurrent(JobConcurrentExec concurrentExec, Set<LaJobKey> neighborJobKeySet,
-            Object groupPreparingLock, Object groupRunningLock) {
+    public synchronized void registerNeighborConcurrent(String groupName, NeighborConcurrentGroup neighborConcurrentGroup) {
         verifyScheduledState();
-        assertArgumentNotNull("concurrentExec", concurrentExec);
-        assertArgumentNotNull("neighborJobKeySet", neighborJobKeySet);
-        assertArgumentNotNull("groupPreparingLock", groupPreparingLock);
-        assertArgumentNotNull("groupRunningLock", groupRunningLock);
-        for (LaJobKey neighborJobKey : neighborJobKeySet) {
-            if (neighborJobKey.equals(jobKey)) { // myself
-                throw new IllegalArgumentException("Cannot register myself job as neighbor concurrent: " + toIdentityDisp());
-            }
+        if (neighborConcurrentGroupMap == null) {
+            neighborConcurrentGroupMap = new ConcurrentHashMap<String, NeighborConcurrentGroup>(); // just in case
         }
-        if (neighborConcurrentGroupList == null) {
-            neighborConcurrentGroupList = new CopyOnWriteArrayList<NeighborConcurrentGroup>(); // just in case
-        }
-        final CopyOnWriteArraySet<LaJobKey> safeSet = new CopyOnWriteArraySet<>(neighborJobKeySet); // just in case
-        neighborConcurrentGroupList.add(newNeighborConcurrentGroup(concurrentExec, safeSet, groupPreparingLock, groupRunningLock));
-    }
-
-    protected NeighborConcurrentGroup newNeighborConcurrentGroup(JobConcurrentExec concurrentExec, Set<LaJobKey> neighborJobKeySet,
-            Object groupPreparingLock, Object groupRunningLock) {
-        return new NeighborConcurrentGroup(concurrentExec, neighborJobKeySet, groupPreparingLock, groupRunningLock);
+        neighborConcurrentGroupMap.put(groupName, neighborConcurrentGroup);
     }
 
     // ===================================================================================
@@ -423,7 +408,7 @@ public class Cron4jJob implements LaScheduledJob {
         return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
     }
 
-    public synchronized List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() {
-        return neighborConcurrentGroupList != null ? Collections.unmodifiableList(neighborConcurrentGroupList) : Collections.emptyList();
+    public synchronized Map<String, NeighborConcurrentGroup> getNeighborConcurrentGroupMap() {
+        return neighborConcurrentGroupMap != null ? Collections.unmodifiableMap(neighborConcurrentGroupMap) : Collections.emptyMap();
     }
 }

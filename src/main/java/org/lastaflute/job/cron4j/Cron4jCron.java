@@ -16,8 +16,6 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -168,23 +166,15 @@ public class Cron4jCron implements LaCron {
     //                                                                 Neighbor Concurrent
     //                                                                 ===================
     @Override
-    public void setupNeighborConcurrent(JobConcurrentExec concurrentExec, RegisteredJob... jobs) {
+    public void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, RegisteredJob... jobs) {
+        assertArgumentNotNull("groupName", groupName);
+        if (groupName.trim().isEmpty()) {
+            throw new IllegalArgumentException("The argument 'groupName' should not be empty: [" + groupName + "]");
+        }
+        assertArgumentNotNull("concurrentExec", concurrentExec);
         assertArgumentNotNull("jobs", jobs);
-        if (jobs.length <= 1) {
-            throw new IllegalArgumentException("The specified jobs should be two or more: " + Arrays.asList(jobs));
-        }
-        final Set<LaJobKey> neighborJobKeySet = Stream.of(jobs).map(job -> job.getJobKey()).collect(Collectors.toSet());
-        final Object groupPreparingLock = new Object();
-        final Object groupRunningLock = new Object();
-        for (RegisteredJob job : jobs) {
-            if (!(job instanceof Cron4jJob)) {
-                throw new IllegalArgumentException("The registered job should be instance of cron4j job: " + job);
-            }
-            final Cron4jJob me = (Cron4jJob) job;
-            final Set<LaJobKey> filteredSet = new LinkedHashSet<LaJobKey>(neighborJobKeySet);
-            filteredSet.remove(me.getJobKey());
-            me.registerNeighborConcurrent(concurrentExec, filteredSet, groupPreparingLock, groupRunningLock);
-        }
+        final Set<LaJobKey> jobKeySet = Stream.of(jobs).map(job -> job.getJobKey()).collect(Collectors.toSet());
+        cron4jNow.setupNeighborConcurrent(groupName, concurrentExec, jobKeySet);
     }
 
     // ===================================================================================

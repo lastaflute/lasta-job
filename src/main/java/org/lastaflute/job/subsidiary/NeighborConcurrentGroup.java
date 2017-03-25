@@ -29,6 +29,7 @@ public class NeighborConcurrentGroup {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
+    protected final String groupName; // not null
     protected final JobConcurrentExec concurrentExec; // not null
     protected final Set<LaJobKey> neighborJobKeySet; // not null
     protected final Object groupPreparingLock; // not null
@@ -37,20 +38,17 @@ public class NeighborConcurrentGroup {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public NeighborConcurrentGroup(JobConcurrentExec concurrentExec, Set<LaJobKey> neighborJobKeySet, Object groupPreparingLock,
-            Object groupRunningLock) {
-        if (concurrentExec == null) {
-            throw new IllegalArgumentException("The argument 'concurrentExec' should not be null.");
+    public NeighborConcurrentGroup(String groupName, JobConcurrentExec concurrentExec, Set<LaJobKey> neighborJobKeySet,
+            Object groupPreparingLock, Object groupRunningLock) {
+        assertArgumentNotNull("groupName", groupName);
+        if (groupName.trim().isEmpty()) {
+            throw new IllegalArgumentException("The argument 'groupName' should not be empty: [" + groupName + "]");
         }
-        if (neighborJobKeySet == null) {
-            throw new IllegalArgumentException("The argument 'neighborJobKeySet' should not be null.");
-        }
-        if (groupPreparingLock == null) {
-            throw new IllegalArgumentException("The argument 'groupPreparingLock' should not be null.");
-        }
-        if (groupRunningLock == null) {
-            throw new IllegalArgumentException("The argument 'groupRunningLock' should not be null.");
-        }
+        assertArgumentNotNull("concurrentExec", concurrentExec);
+        assertArgumentNotNull("neighborJobKeySet", neighborJobKeySet);
+        assertArgumentNotNull("groupPreparingLock", groupPreparingLock);
+        assertArgumentNotNull("groupRunningLock", groupRunningLock);
+        this.groupName = groupName;
         this.concurrentExec = concurrentExec;
         this.neighborJobKeySet = neighborJobKeySet;
         this.groupPreparingLock = groupPreparingLock;
@@ -58,16 +56,32 @@ public class NeighborConcurrentGroup {
     }
 
     // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    protected void assertArgumentNotNull(String variableName, Object value) {
+        if (variableName == null) {
+            throw new IllegalArgumentException("The variableName should not be null.");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
+        }
+    }
+
+    // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
     @Override
     public String toString() {
-        return "group:{" + concurrentExec + ", " + neighborJobKeySet + "}";
+        return "group:{" + groupName + ", " + concurrentExec + ", " + neighborJobKeySet + "}";
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    public String getGroupName() {
+        return groupName;
+    }
+
     public JobConcurrentExec getConcurrentExec() {
         return concurrentExec;
     }

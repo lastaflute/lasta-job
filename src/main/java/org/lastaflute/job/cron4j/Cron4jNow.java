@@ -19,8 +19,10 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Supplier;
 
 import org.dbflute.optional.OptionalThing;
@@ -36,7 +38,9 @@ import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
 import org.lastaflute.job.subsidiary.CronConsumer;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobSubIdentityAttr;
+import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
 
 /**
  * @author jflute
@@ -54,6 +58,7 @@ public class Cron4jNow implements LaSchedulingNow {
     protected final List<Cron4jJob> jobOrderedList = new CopyOnWriteArrayList<Cron4jJob>(); // same lifecycle as jobKeyJobMap
     protected final Map<LaJobUnique, Cron4jJob> jobUniqueJobMap = new ConcurrentHashMap<LaJobUnique, Cron4jJob>();
     protected final Map<Cron4jTask, Cron4jJob> cron4jTaskJobMap = new ConcurrentHashMap<Cron4jTask, Cron4jJob>();
+    protected final Map<String, NeighborConcurrentGroup> neighborConcurrentMap = new ConcurrentHashMap<String, NeighborConcurrentGroup>();
     protected int incrementedJobNumber;
 
     // ===================================================================================
@@ -236,6 +241,42 @@ public class Cron4jNow implements LaSchedulingNow {
         }).orElseGet(() -> {
             return nativeSearcher.get();
         });
+    }
+
+    // ===================================================================================
+    //                                                                 Neighbor Concurrent
+    //                                                                 ===================
+    @Override
+    public void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, Set<LaJobKey> jobKeySet) {
+        assertArgumentNotNull("groupName", groupName);
+        if (groupName.trim().isEmpty()) {
+            throw new IllegalArgumentException("The argument 'groupName' should not be empty: [" + groupName + "]");
+        }
+        assertArgumentNotNull("concurrentExec", concurrentExec);
+        assertArgumentNotNull("jobKeySet", jobKeySet);
+        if (jobKeySet.size() <= 1) {
+            throw new IllegalArgumentException("The specified jobs should be two or more: " + jobKeySet);
+        }
+        synchronized (neighborConcurrentMap) {
+            checkDuplicateNeighborConcurrentGroup(groupName);
+            final Object groupPreparingLock = new Object();
+            final Object groupRunningLock = new Object();
+            final CopyOnWriteArraySet<LaJobKey> safeSet = new CopyOnWriteArraySet<LaJobKey>(jobKeySet);
+            final NeighborConcurrentGroup group =
+                    new NeighborConcurrentGroup(groupName, concurrentExec, safeSet, groupPreparingLock, groupRunningLock);
+            neighborConcurrentMap.put(groupName, group);
+            safeSet.stream().map(jobKey -> findJobByKey(jobKey).get()).forEach(job -> { // or job not found
+                job.registerNeighborConcurrent(groupName, group);
+            });
+        }
+    }
+
+    protected void checkDuplicateNeighborConcurrentGroup(String groupName) {
+        final NeighborConcurrentGroup existingGroup = neighborConcurrentMap.get(groupName);
+        if (existingGroup != null) {
+            String msg = "The groupName already exists: specified=" + groupName + ", existing=" + existingGroup;
+            throw new IllegalArgumentException(msg);
+        }
     }
 
     // ===================================================================================

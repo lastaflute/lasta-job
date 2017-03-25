@@ -56,8 +56,9 @@ public interface LaCron {
      * <span style="color: #3F7E5E">// cannot executes LandJob if SeaJob is running and vice versa</span>
      * cron.setupNeighborConcurrent(errorIfConcurrent(), seaJob, landJob);
      * </pre>
+     * @param groupName The unique name of neighbor concurrent group. (NotNull, NotEmpty)
      * @param concurrentExec The handling type when concurrent execution of neighbor job. (NotNull)
      * @param jobs The array of job. (NotNull)
      */
-    void setupNeighborConcurrent(JobConcurrentExec concurrentExec, RegisteredJob... jobs);
+    void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, RegisteredJob... jobs);
 }
