@@ -151,17 +151,17 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         // ...may be hard to read, it's synchronized hell
         final Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap = job.getNeighborConcurrentGroupMap();
         final Collection<NeighborConcurrentGroup> groupList = neighborConcurrentGroupMap.values();
-        synchronized (preparingLock) {
+        synchronized (preparingLock) { // to avoid duplicate concurrent check, waiting for previous ready 
             final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job);
             if (concurrentResult.isPresent()) {
                 return concurrentResult.get();
             }
-            final OptionalThing<RunnerResult> neighborConcurrentResult = syncNeighborPreparing(groupList.iterator(), () -> {
+            final OptionalThing<RunnerResult> neighborConcurrentResult = synchronizedNeighborPreparing(groupList.iterator(), () -> {
                 final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job, neighborConcurrentGroupMap);
                 if (!result.isPresent()) { // no neighbor concurrent
-                    synchronized (runningLock) {
-                        synchronized (runningState) {
-                            runningState.begin();
+                    synchronized (runningLock) { // allowed job wait here to get running state
+                        synchronized (runningState) { // to protect running state, begin() and end()
+                            runningState.begin(); // needs to get it in preparing lock, to suppress duplicate begin()
                         }
                     }
                 }
@@ -171,9 +171,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 return neighborConcurrentResult.get();
             }
         }
-        synchronized (runningLock) { // avoid duplicate execution, waiting for previous ending
+        synchronized (runningLock) { // to avoid duplicate execution, waiting for previous ending
             try {
-                return syncNeighborRunning(groupList.iterator(), () -> {
+                return synchronizedNeighborRunning(groupList.iterator(), () -> {
                     final RunnerResult runnerResult = actuallyExecute(job, cronExp, cronOption, context);
                     if (canTriggerNext(job, runnerResult)) {
                         job.triggerNext();
@@ -213,23 +213,23 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                   Neighbor Concurrent
     //                                   -------------------
-    protected OptionalThing<RunnerResult> syncNeighborPreparing(Iterator<NeighborConcurrentGroup> groupIte,
+    protected OptionalThing<RunnerResult> synchronizedNeighborPreparing(Iterator<NeighborConcurrentGroup> groupIte,
             Supplier<OptionalThing<RunnerResult>> runner) { // in preparing lock
         if (groupIte.hasNext()) {
             final NeighborConcurrentGroup group = groupIte.next();
             synchronized (group.getGroupPreparingLock()) {
-                return syncNeighborPreparing(groupIte, runner);
+                return synchronizedNeighborPreparing(groupIte, runner);
             }
         } else {
             return runner.get();
         }
     }
 
-    protected RunnerResult syncNeighborRunning(Iterator<NeighborConcurrentGroup> groupIte, Supplier<RunnerResult> runner) { // in running lock
+    protected RunnerResult synchronizedNeighborRunning(Iterator<NeighborConcurrentGroup> groupIte, Supplier<RunnerResult> runner) { // in running lock
         if (groupIte.hasNext()) {
             final NeighborConcurrentGroup group = groupIte.next();
             synchronized (group.getGroupRunningLock()) {
-                return syncNeighborRunning(groupIte, runner);
+                return synchronizedNeighborRunning(groupIte, runner);
             }
         } else {
             return runner.get();
