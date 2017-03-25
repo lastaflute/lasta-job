@@ -15,6 +15,8 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import java.time.LocalDateTime;
+
 import org.dbflute.optional.OptionalThing;
 
 /**
@@ -26,34 +28,64 @@ public class RunnerResult {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Throwable cause; // null allowed, already handled (e.g. logging)
+    protected final OptionalThing<LocalDateTime> beginTime; // not null, empty allowed if cannot begin
+    protected OptionalThing<LocalDateTime> endTime = OptionalThing.empty(); // not null, empty allowed if cannot begin or not loaded yet
+    protected final OptionalThing<EndTitleRoll> endTitleRoll; // not null, empty allowed
+    protected final OptionalThing<Throwable> cause; // null allowed, already handled (e.g. logging)
     protected final boolean nextTriggerSuppressed; // by runtime
     protected final boolean quitByConcurrent; // by runner
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    protected RunnerResult(Throwable cause, boolean nextTriggerSuppressed, boolean quitByConcurrent) {
+    protected RunnerResult(OptionalThing<LocalDateTime> beginTime, OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause,
+            boolean nextTriggerSuppressed, boolean quitByConcurrent) {
+        this.beginTime = beginTime;
+        this.endTitleRoll = endTitleRoll;
         this.cause = cause;
         this.nextTriggerSuppressed = nextTriggerSuppressed;
         this.quitByConcurrent = quitByConcurrent;
     }
 
-    public static RunnerResult asExecuted(Throwable cause, boolean nextTriggerSuppressed) {
-        return new RunnerResult(cause, nextTriggerSuppressed, false);
+    public static RunnerResult asExecuted(LocalDateTime beginTime, OptionalThing<EndTitleRoll> endTitleRoll, OptionalThing<Throwable> cause,
+            boolean nextTriggerSuppressed) {
+        return new RunnerResult(OptionalThing.of(beginTime), endTitleRoll, cause, nextTriggerSuppressed, false);
     }
 
     public static RunnerResult asQuitByConcurrent() {
-        return new RunnerResult(null, false, true);
+        return new RunnerResult(OptionalThing.empty(), OptionalThing.empty(), OptionalThing.empty(), false, true);
+    }
+
+    public RunnerResult acceptEndTime(LocalDateTime endTime) { // because hard to get current time in job runner
+        this.endTime = OptionalThing.of(endTime);
+        return this;
+    }
+
+    // ===================================================================================
+    //                                                                      Basic Override
+    //                                                                      ==============
+    @Override
+    public String toString() {
+        return "result:{begin=" + beginTime + ", endTitleRoll=" + endTitleRoll.isPresent() + ", cause=" + cause.isPresent() + "}";
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    public OptionalThing<LocalDateTime> getBeginTime() {
+        return beginTime;
+    }
+
+    public OptionalThing<LocalDateTime> getEndTime() {
+        return endTime;
+    }
+
+    public OptionalThing<EndTitleRoll> getEndTitleRoll() {
+        return endTitleRoll;
+    }
+
     public OptionalThing<Throwable> getCause() {
-        return OptionalThing.ofNullable(cause, () -> {
-            throw new IllegalStateException("Not found the cause.");
-        });
+        return cause;
     }
 
     public boolean isNextTriggerSuppressed() {

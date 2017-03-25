@@ -15,8 +15,9 @@
  */
 package org.lastaflute.job;
 
-import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.InitialCronOpCall;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
+import org.lastaflute.job.subsidiary.RegisteredJob;
 
 /**
  * @author jflute
@@ -27,7 +28,7 @@ public interface LaCron {
     /**
      * Register job with scheduling with option.
      * <pre>
-     * cron.register("* * * * *", SeaJob.class, waitIfDuplicate(), op -&gt; op.params(...)); // per one minute
+     * cron.register("* * * * *", SeaJob.class, waitIfConcurrent(), op -&gt; op.params(...)); // per one minute
      * </pre>
      * @param cronExp The cron expression e.g. "10 * * * *". (NotNull)
      * @param jobType The type of registered job that implements the provided interface. (NotNull)
@@ -35,17 +36,29 @@ public interface LaCron {
      * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
      * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, InitialCronOpCall opLambda);
+    RegisteredJob register(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, InitialCronOpCall opLambda);
 
     /**
      * Register non-cron job with scheduling with option.
      * <pre>
-     * cron.registerNonCron(SeaJob.class, waitIfDuplicate(), op -&gt; op.params(...)); // per one minute
+     * cron.registerNonCron(SeaJob.class, waitIfConcurrent(), op -&gt; op.params(...)); // per one minute
      * </pre>
      * @param jobType The type of registered job that implements the provided interface. (NotNull)
      * @param concurrentExec The handling type when concurrent execution of same job. (NotNull)
      * @param opLambda The callback to setup option for e.g. parameter. (NotNull)
      * @return The registered job which is scheduled by the cron. (NotNull)
      */
-    LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, InitialCronOpCall opLambda);
+    RegisteredJob registerNonCron(Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, InitialCronOpCall opLambda);
+
+    /**
+     * Set up neighbor concurrent control.
+     * <pre>
+     * <span style="color: #3F7E5E">// cannot executes LandJob if SeaJob is running and vice versa</span>
+     * cron.setupNeighborConcurrent(errorIfConcurrent(), seaJob, landJob);
+     * </pre>
+     * @param groupName The unique name of neighbor concurrent group. (NotNull, NotEmpty)
+     * @param concurrentExec The handling type when concurrent execution of neighbor job. (NotNull)
+     * @param jobs The array of job. (NotNull)
+     */
+    void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, RegisteredJob... jobs);
 }

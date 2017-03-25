@@ -16,6 +16,7 @@
 package org.lastaflute.job.cron4j;
 
 import java.lang.reflect.Method;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -51,6 +52,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final Method runMethod;
     protected final Map<String, Object> parameterMap;
     protected final JobNoticeLogLevel noticeLogLevel;
+    protected final LocalDateTime beginTime;
     protected final TaskExecutionContext cron4jContext;
     protected EndTitleRoll endTitleRollData; // null allowed, specified by application in job
     protected boolean nextTriggerSuppressed;
@@ -59,7 +61,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                         Constructor
     //                                                                         ===========
     public Cron4jRuntime(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique, String cronExp,
-            Class<? extends LaJob> jobType, Map<String, Object> parameterMap, JobNoticeLogLevel noticeLogLevel,
+            Class<? extends LaJob> jobType, Map<String, Object> parameterMap, JobNoticeLogLevel noticeLogLevel, LocalDateTime beginTime,
             TaskExecutionContext cron4jContext) {
         this.jobKey = jobKey;
         this.jobNote = jobNote;
@@ -73,6 +75,7 @@ public class Cron4jRuntime implements LaJobRuntime {
         }
         this.parameterMap = Collections.unmodifiableMap(parameterMap);
         this.noticeLogLevel = noticeLogLevel;
+        this.beginTime = beginTime;
         this.cron4jContext = cron4jContext;
     }
 
@@ -117,6 +120,14 @@ public class Cron4jRuntime implements LaJobRuntime {
     @Override
     public JobNoticeLogLevel getNoticeLogLevel() {
         return noticeLogLevel;
+    }
+
+    // ===================================================================================
+    //                                                                           Job State
+    //                                                                           =========
+    @Override
+    public LocalDateTime getBeginTime() {
+        return beginTime;
     }
 
     // ===================================================================================

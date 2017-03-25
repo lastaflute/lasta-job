@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.dbflute.optional.OptionalThing;
-import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
@@ -30,7 +29,7 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class CronOption implements InitialCronOption, VaryingCronOption, JobSubAttr {
+public class CronOption implements InitialCronOption, VaryingCronOption, JobSubIdentityAttr {
 
     // ===================================================================================
     //                                                                           Attribute
@@ -86,7 +85,7 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubA
     }
 
     @Override
-    public CronOption triggeredBy(LaScheduledJob triggeringJob) {
+    public CronOption triggeredBy(RegisteredJob triggeringJob) {
         if (triggeringJob == null) {
             throw new IllegalArgumentException("The argument 'triggeringJob' should not be null or empty: " + triggeringJob);
         }

@@ -13,7 +13,7 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.subsidiary;
+package org.lastaflute.job.log;
 
 import java.util.ArrayList;
 import java.util.List;

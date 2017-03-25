@@ -22,6 +22,7 @@ import org.dbflute.utflute.core.cannonball.CannonballCar;
 import org.dbflute.utflute.core.cannonball.CannonballOption;
 import org.dbflute.utflute.core.cannonball.CannonballRun;
 import org.lastaflute.job.LaJobHistory;
+import org.lastaflute.job.log.SavedHistoryCache;
 import org.lastaflute.job.mock.MockJobHistory;
 
 /**

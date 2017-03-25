@@ -15,8 +15,6 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import org.lastaflute.job.LaScheduledJob;
-
 /**
  * @author jflute
  * @since 0.2.2 (2016/01/22 Friday at bay maihama)
@@ -48,5 +46,5 @@ public interface InitialCronOption extends VaryingCronOption { // also varying t
      * @param triggeringJob The job triggering me when success, means previous job (NotNull) 
      * @return this. (NotNull)
      */
-    InitialCronOption triggeredBy(LaScheduledJob triggeringJob);
+    InitialCronOption triggeredBy(RegisteredJob triggeringJob);
 }

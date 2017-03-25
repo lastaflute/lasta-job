@@ -16,18 +16,22 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaCron;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
-import org.lastaflute.job.LaScheduledJob;
+import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
-import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.InitialCronOpCall;
+import org.lastaflute.job.subsidiary.JobConcurrentExec;
+import org.lastaflute.job.subsidiary.RegisteredJob;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 
@@ -76,7 +80,7 @@ public class Cron4jCron implements LaCron {
     //                                                                            Register
     //                                                                            ========
     @Override
-    public LaScheduledJob register(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
+    public RegisteredJob register(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
             InitialCronOpCall opLambda) {
         assertArgumentNotNull("cronExp", cronExp);
         if (isNonCrom(cronExp)) {
@@ -93,14 +97,14 @@ public class Cron4jCron implements LaCron {
     }
 
     @Override
-    public LaScheduledJob registerNonCron(Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, InitialCronOpCall opLambda) {
+    public RegisteredJob registerNonCron(Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec, InitialCronOpCall opLambda) {
         assertArgumentNotNull("jobType", jobType);
         assertArgumentNotNull("concurrentExec", concurrentExec);
         assertArgumentNotNull("opLambda (cronOptionConsumer)", opLambda);
         return doRegister(NON_CRON, jobType, concurrentExec, opLambda);
     }
 
-    protected LaScheduledJob doRegister(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
+    protected RegisteredJob doRegister(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
             InitialCronOpCall opLambda) {
         final CronOption cronOption = createCronOption(opLambda);
         final Cron4jTask cron4jTask = createCron4jTask(cronExp, jobType, concurrentExec, cronOption);
@@ -156,6 +160,21 @@ public class Cron4jCron implements LaCron {
         return cron4jNow.saveJob(cron4jTask, cronOption, cronOption.getTriggeringJobKeyList(), OptionalThing.ofNullable(cron4jId, () -> {
             throw new IllegalStateException("Not found the cron4jId: " + cron4jTask);
         }));
+    }
+
+    // ===================================================================================
+    //                                                                 Neighbor Concurrent
+    //                                                                 ===================
+    @Override
+    public void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, RegisteredJob... jobs) {
+        assertArgumentNotNull("groupName", groupName);
+        if (groupName.trim().isEmpty()) {
+            throw new IllegalArgumentException("The argument 'groupName' should not be empty: [" + groupName + "]");
+        }
+        assertArgumentNotNull("concurrentExec", concurrentExec);
+        assertArgumentNotNull("jobs", jobs);
+        final Set<LaJobKey> jobKeySet = Stream.of(jobs).map(job -> job.getJobKey()).collect(Collectors.toSet());
+        cron4jNow.setupNeighborConcurrent(groupName, concurrentExec, jobKeySet);
     }
 
     // ===================================================================================

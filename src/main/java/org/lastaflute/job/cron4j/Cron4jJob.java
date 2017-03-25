@@ -15,12 +15,19 @@
  */
 package org.lastaflute.job.cron4j;
 
-import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.dbflute.optional.OptionalThing;
+import org.dbflute.optional.OptionalThingIfPresentAfter;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobHistory;
@@ -35,8 +42,9 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
-import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
+import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
+import org.lastaflute.job.subsidiary.SnapshotExecState;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -48,7 +56,7 @@ import it.sauronsoftware.cron4j.TaskExecutor;
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
-public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
+public class Cron4jJob implements LaScheduledJob {
 
     // ===================================================================================
     //                                                                          Definition
@@ -62,10 +70,11 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
-    protected final Cron4jTask cron4jTask;
-    protected final Cron4jNow cron4jNow;
+    protected final Cron4jTask cron4jTask; // 1:1
+    protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
-    protected List<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
+    protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
+    protected Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap; // null allowed if no neighbor
 
     // ===================================================================================
     //                                                                         Constructor
@@ -84,12 +93,30 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                       Executing Now
     //                                                                       =============
     @Override
-    public boolean isExecutingNow() {
-        return !findExecutorList().isEmpty();
+    public OptionalThingIfPresentAfter ifExecutingNow(Consumer<SnapshotExecState> oneArgLambda) {
+        return mapExecutingNow(execState -> {
+            oneArgLambda.accept(execState);
+            return (OptionalThingIfPresentAfter) (processor -> {});
+        }).orElseGet(() -> {
+            return processor -> processor.process();
+        });
     }
 
-    public List<TaskExecutor> findExecutorList() { // public for framework
-        return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
+    @Override
+    public boolean isExecutingNow() {
+        return cron4jTask.isRunningNow();
+    }
+
+    @Override
+    public <RESULT> OptionalThing<RESULT> mapExecutingNow(Function<SnapshotExecState, RESULT> oneArgLambda) {
+        final OptionalThing<LocalDateTime> beginTime = cron4jTask.syncRunningCall(runningState -> {
+            return runningState.getBeginTime().get(); // locked so can get() safely
+        });
+        return beginTime.flatMap(time -> {
+            return OptionalThing.ofNullable(oneArgLambda.apply(new SnapshotExecState(time)), () -> {
+                throw new IllegalStateException("Not found the result from your scope: job=" + toIdentityDisp() + "(" + time + ")");
+            });
+        });
     }
 
     // ===================================================================================
@@ -128,7 +155,7 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     //                                                                            ========
     @Override
     public synchronized void stopNow() { // can be called if unscheduled
-        final List<TaskExecutor> executorList = findExecutorList();
+        final List<TaskExecutor> executorList = findNativeExecutorList();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Stopping {} execution(s) now: {}", executorList.size(), toString());
         }
@@ -137,12 +164,18 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
         }
     }
 
+    protected List<TaskExecutor> findNativeExecutorList() {
+        return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
+    }
+
     // ===================================================================================
     //                                                                          Reschedule
     //                                                                          ==========
     @Override
     public synchronized void reschedule(String cronExp, VaryingCronOpCall opLambda) {
         verifyScheduledState();
+        assertArgumentNotNull("cronExp", cronExp);
+        assertArgumentNotNull("opLambda", opLambda);
         if (isNonCromExp(cronExp)) {
             throw new IllegalArgumentException("The cronExp for reschedule() should not be non-cron: " + toString());
         }
@@ -222,20 +255,21 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     // ===================================================================================
-    //                                                                             Trigger
-    //                                                                             =======
+    //                                                                        Next Trigger
+    //                                                                        ============
     @Override
     public synchronized void registerNext(LaJobKey triggeredJobKey) {
         verifyScheduledState();
-        if (triggeredJobKey == null) {
-            throw new IllegalArgumentException("The argument 'triggeredJobKey' should not be null.");
-        }
+        assertArgumentNotNull("triggeredJobKey", triggeredJobKey);
         // lazy check for initialization logic
         //if (!cron4jNow.findJobByKey(triggeredJobKey).isPresent()) {
         //    throw new IllegalArgumentException("Not found the job by the job key: " + triggeredJobKey);
         //}
+        if (triggeredJobKey.equals(jobKey)) { // myself
+            throw new IllegalArgumentException("Cannot register myself job as next trigger: " + toIdentityDisp());
+        }
         if (triggeredJobKeyList == null) {
-            triggeredJobKeyList = new ArrayList<LaJobKey>();
+            triggeredJobKeyList = new CopyOnWriteArraySet<LaJobKey>(); // just in case
         }
         triggeredJobKeyList.add(triggeredJobKey);
     }
@@ -277,11 +311,34 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     // ===================================================================================
+    //                                                                 Neighbor Concurrent
+    //                                                                 ===================
+    public synchronized void registerNeighborConcurrent(String groupName, NeighborConcurrentGroup neighborConcurrentGroup) {
+        verifyScheduledState();
+        if (neighborConcurrentGroupMap == null) {
+            neighborConcurrentGroupMap = new ConcurrentHashMap<String, NeighborConcurrentGroup>(); // just in case
+        }
+        neighborConcurrentGroupMap.put(groupName, neighborConcurrentGroup);
+    }
+
+    // ===================================================================================
     //                                                                             Display
     //                                                                             =======
     public String toIdentityDisp() {
         final Class<? extends LaJob> jobType = cron4jTask.getJobType();
         return jobType.getSimpleName() + ":{" + jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.value()) + "}";
+    }
+
+    // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    protected void assertArgumentNotNull(String variableName, Object value) {
+        if (variableName == null) {
+            throw new IllegalArgumentException("The variableName should not be null.");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
+        }
     }
 
     // ===================================================================================
@@ -347,7 +404,11 @@ public class Cron4jJob implements LaScheduledJob, JobIdentityAttr {
     }
 
     @Override
-    public synchronized List<LaJobKey> getTriggeredJobKeyList() { // synchronized for varying
-        return triggeredJobKeyList != null ? Collections.unmodifiableList(triggeredJobKeyList) : Collections.emptyList();
+    public synchronized Set<LaJobKey> getTriggeredJobKeySet() { // synchronized for varying
+        return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
+    }
+
+    public synchronized Map<String, NeighborConcurrentGroup> getNeighborConcurrentGroupMap() {
+        return neighborConcurrentGroupMap != null ? Collections.unmodifiableMap(neighborConcurrentGroupMap) : Collections.emptyMap();
     }
 }

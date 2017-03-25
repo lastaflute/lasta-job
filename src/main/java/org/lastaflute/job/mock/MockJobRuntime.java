@@ -16,6 +16,7 @@
 package org.lastaflute.job.mock;
 
 import java.lang.reflect.Method;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -61,8 +62,9 @@ public class MockJobRuntime implements LaJobRuntime {
             return supplier.supply();
         }).orElse(Collections.emptyMap());
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
+        final LocalDateTime beginTime = LocalDateTime.now(); // allowed in mock
         cron4jRuntime = new Cron4jRuntime(jobKey, cronOption.getJobNote(), cronOption.getJobUnique(), cronExp, jobType, parameterMap,
-                noticeLogLevel, cron4jContext);
+                noticeLogLevel, beginTime, cron4jContext);
     }
 
     // -----------------------------------------------------
@@ -156,6 +158,11 @@ public class MockJobRuntime implements LaJobRuntime {
     @Override
     public JobNoticeLogLevel getNoticeLogLevel() {
         return cron4jRuntime.getNoticeLogLevel();
+    }
+
+    @Override
+    public LocalDateTime getBeginTime() {
+        return cron4jRuntime.getBeginTime();
     }
 
     @Override
