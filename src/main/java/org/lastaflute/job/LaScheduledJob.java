@@ -17,7 +17,6 @@ package org.lastaflute.job;
 
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
-import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.ReadableJobAttr;
 import org.lastaflute.job.subsidiary.ReadableJobState;
@@ -87,15 +86,4 @@ public interface LaScheduledJob extends ReadableJobAttr, ReadableJobState, Regis
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void registerNext(LaJobKey triggeredJob);
-
-    // ===================================================================================
-    //                                                                 Neighbor Concurrent
-    //                                                                 ===================
-    /**
-     * Register triggered job for success.
-     * @param concurrentExec The execution type of concurrent. (NotNull)
-     * @param neighborJobKey The job key of neighbor job. (NotNull)
-     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
-     */
-    void registerNeighborConcurrent(JobConcurrentExec concurrentExec, LaJobKey neighborJobKey);
 }

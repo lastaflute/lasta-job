@@ -17,12 +17,12 @@ package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
-import org.dbflute.helper.HandyDate;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
@@ -41,6 +41,8 @@ import org.lastaflute.job.subsidiary.EndTitleRoll;
 import org.lastaflute.job.subsidiary.ExecResultType;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
+import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
+import org.lastaflute.job.subsidiary.NeighborConcurrentJobStopper;
 import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
@@ -67,10 +69,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected final Class<? extends LaJob> jobType;
     protected final JobConcurrentExec concurrentExec;
     protected final Supplier<String> threadNaming;
-    protected final LaJobRunner jobRunner;
+    protected final LaJobRunner jobRunner; // singleton
     protected final Cron4jNow cron4jNow;
     protected final Supplier<LocalDateTime> currentTime;
-    protected final Object executingLock = new Object();
+    protected final TaskRunningState runningState;
+    protected final Object preparingLock = new Object();
+    protected final Object runningLock = new Object();
     protected final Object varyingLock = new Object();
 
     // ===================================================================================
@@ -85,6 +89,31 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
         this.currentTime = currentTime;
+        this.runningState = new TaskRunningState(currentTime);
+    }
+
+    public static class TaskRunningState {
+
+        protected final Supplier<LocalDateTime> currentTime; // not null
+        protected volatile LocalDateTime beginTime; // null allowed when no executing, volatile just in case
+
+        public TaskRunningState(Supplier<LocalDateTime> currentTime) {
+            this.currentTime = currentTime;
+        }
+
+        public OptionalThing<LocalDateTime> getBeginTime() { // running if present
+            return OptionalThing.ofNullable(beginTime, () -> {
+                throw new IllegalStateException("Not found the beginTime.");
+            });
+        }
+
+        public void begin() {
+            this.beginTime = currentTime.get();
+        }
+
+        public void end() {
+            this.beginTime = null;
+        }
     }
 
     // ===================================================================================
@@ -139,59 +168,107 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final String cronExp;
         final VaryingCronOption cronOption;
         synchronized (varyingLock) {
-            final List<TaskExecutor> executorList = job.findNativeExecutorList();
-            if (executorList.size() >= 2) { // contains myself
-                final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job, executorList);
-                if (concurrentResult.isPresent()) {
-                    return concurrentResult.get();
-                }
-                // will wait by executing synchronization as default
-            }
-            final OptionalThing<RunnerResult> neighborConcurrentResult = stopNeighborConcurrentJobIfNeeds(job, executorList);
-            if (neighborConcurrentResult.isPresent()) {
-                return neighborConcurrentResult.get();
-                // waiting for neighbor job is unsupported #for_now (how do I wait?) 
-            }
             cronExp = varyingCron.getCronExp();
             cronOption = varyingCron.getCronOption();
         }
-        synchronized (executingLock) { // avoid duplicate execution, waiting for previous ending
-            final RunnerResult runnerResult = actuallyExecute(job, cronExp, cronOption, context);
-            if (canTriggerNext(job, runnerResult)) {
-                job.triggerNext();
+        // ...may be hard to read, it's synchronized hell
+        final List<NeighborConcurrentGroup> groupList = job.getNeighborConcurrentGroupList();
+        synchronized (preparingLock) {
+            final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job);
+            if (concurrentResult.isPresent()) {
+                return concurrentResult.get();
             }
-            return runnerResult;
+            final OptionalThing<RunnerResult> neighborConcurrentResult = synchronizedNeighborPreparingDo(groupList.iterator(), () -> {
+                final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job);
+                if (!result.isPresent()) { // no neighbor concurrent
+                    synchronized (runningLock) {
+                        synchronized (runningState) {
+                            runningState.begin();
+                        }
+                    }
+                }
+                return result;
+            });
+            if (neighborConcurrentResult.isPresent()) {
+                return neighborConcurrentResult.get();
+            }
+        }
+        synchronized (runningLock) { // avoid duplicate execution, waiting for previous ending
+            try {
+                return synchronizedNeighborRunningDo(groupList.iterator(), () -> {
+                    final RunnerResult runnerResult = actuallyExecute(job, cronExp, cronOption, context);
+                    if (canTriggerNext(job, runnerResult)) {
+                        job.triggerNext();
+                    }
+                    return runnerResult;
+                });
+            } finally {
+                synchronized (runningState) {
+                    runningState.end();
+                }
+            }
         }
     }
 
     // -----------------------------------------------------
-    //                                            Concurrent
-    //                                            ----------
-    protected OptionalThing<RunnerResult> stopConcurrentJobIfNeeds(Cron4jJob job, List<TaskExecutor> executorList) {
-        return createConcurrentJobStopper().stopIfNeeds(job, () -> {
-            return executorList.stream().map(meta -> convertToBeginTime(meta)).collect(Collectors.toList()).toString();
-        });
-    }
-
-    protected OptionalThing<RunnerResult> stopNeighborConcurrentJobIfNeeds(Cron4jJob job, List<TaskExecutor> executorList) {
-        return createConcurrentJobStopper().stopIfNeighborNeeds(job, jobKey -> {
-            return cron4jNow.findJobByKey(jobKey);
-        }, () -> {
-            return buildConcurrentSupplementDisp(executorList);
-        });
+    //                                   (Myself) Concurrent
+    //                                   -------------------
+    protected OptionalThing<RunnerResult> stopConcurrentJobIfNeeds(Cron4jJob job) { // in preparing lock
+        synchronized (runningState) {
+            if (isRunningNow()) {
+                final OptionalThing<RunnerResult> concurrentResult = createConcurrentJobStopper().stopIfNeeds(job, () -> {
+                    return runningState.getBeginTime().get().toString(); // locked so can get safely
+                });
+                if (concurrentResult.isPresent()) {
+                    return concurrentResult;
+                }
+                // will wait for previous job by synchronization later
+            }
+        }
+        return OptionalThing.empty();
     }
 
     protected ConcurrentJobStopper createConcurrentJobStopper() {
         return new ConcurrentJobStopper();
     }
 
-    protected String buildConcurrentSupplementDisp(List<TaskExecutor> executorList) {
-        return executorList.stream().map(meta -> convertToBeginTime(meta)).collect(Collectors.toList()).toString();
+    // -----------------------------------------------------
+    //                                   Neighbor Concurrent
+    //                                   -------------------
+    protected OptionalThing<RunnerResult> synchronizedNeighborPreparingDo(Iterator<NeighborConcurrentGroup> groupIte,
+            Supplier<OptionalThing<RunnerResult>> runner) { // in preparing lock
+        if (groupIte.hasNext()) {
+            final NeighborConcurrentGroup group = groupIte.next();
+            synchronized (group.getGroupPreparingLock()) {
+                return synchronizedNeighborPreparingDo(groupIte, runner);
+            }
+        } else {
+            return runner.get();
+        }
     }
 
-    protected LocalDateTime convertToBeginTime(TaskExecutor meta) {
-        // #thinking timeZone? by jflute (2017/03/20)
-        return new HandyDate(new java.util.Date(meta.getStartTime())).getLocalDateTime();
+    protected RunnerResult synchronizedNeighborRunningDo(Iterator<NeighborConcurrentGroup> groupIte, Supplier<RunnerResult> runner) { // in running lock
+        if (groupIte.hasNext()) {
+            final NeighborConcurrentGroup group = groupIte.next();
+            synchronized (group.getGroupRunningLock()) {
+                return synchronizedNeighborRunningDo(groupIte, runner);
+            }
+        } else {
+            return runner.get();
+        }
+    }
+
+    protected OptionalThing<RunnerResult> stopNeighborConcurrentJobIfNeeds(Cron4jJob job) { // in neighbor preparing lock
+        return createNeighborConcurrentJobStopper().stopIfNeeds(job, jobState -> {
+            return jobState.mapExecutingNow(execState -> execState.getBeginTime().toString()).orElseGet(() -> {
+                return "*the job have just ended now"; // may be ended while message building
+            });
+        });
+        // will wait for previous job by synchronization later
+    }
+
+    protected NeighborConcurrentJobStopper createNeighborConcurrentJobStopper() {
+        return new NeighborConcurrentJobStopper(jobKey -> cron4jNow.findJobByKey(jobKey));
     }
 
     // -----------------------------------------------------
@@ -339,6 +416,23 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     // ===================================================================================
+    //                                                                             Running
+    //                                                                             =======
+    public <RESULT> OptionalThing<RESULT> syncRunningCall(Function<TaskRunningState, RESULT> oneArgLambda) {
+        synchronized (runningState) {
+            if (runningState.getBeginTime().isPresent()) {
+                return OptionalThing.ofNullable(oneArgLambda.apply(runningState), () -> {
+                    throw new IllegalStateException("Not found the result from your scope: " + jobType);
+                });
+            } else {
+                return OptionalThing.ofNullable(null, () -> {
+                    throw new IllegalStateException("Not running now: " + jobType);
+                });
+            }
+        }
+    }
+
+    // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
     @Override
@@ -368,11 +462,25 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return concurrentExec;
     }
 
-    public Object getExecutingLock() {
-        return executingLock;
+    public Object getPreparingLock() {
+        return preparingLock;
+    }
+
+    public Object getRunningLock() {
+        return runningLock;
     }
 
     public Object getVaryingLock() {
         return varyingLock;
+    }
+
+    public boolean isRunningNow() {
+        synchronized (runningState) {
+            return runningState.getBeginTime().isPresent();
+        }
+    }
+
+    public TaskRunningState getRunningState() {
+        return runningState;
     }
 }

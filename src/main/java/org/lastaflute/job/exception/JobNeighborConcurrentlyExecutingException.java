@@ -21,11 +21,11 @@ import org.lastaflute.job.exception.base.LaJobOperationException;
  * @author jflute
  * @since 0.4.1 (2017/03/24 Friday)
  */
-public class JobConcurrentlyNeighborExecutingException extends LaJobOperationException {
+public class JobNeighborConcurrentlyExecutingException extends LaJobOperationException {
 
     private static final long serialVersionUID = 1L;
 
-    public JobConcurrentlyNeighborExecutingException(String msg) {
+    public JobNeighborConcurrentlyExecutingException(String msg) {
         super(msg);
     }
 }

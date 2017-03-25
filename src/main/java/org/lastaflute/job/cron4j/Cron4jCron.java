@@ -17,13 +17,16 @@ package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaCron;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
-import org.lastaflute.job.LaScheduledJob;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
@@ -170,18 +173,17 @@ public class Cron4jCron implements LaCron {
         if (jobs.length <= 1) {
             throw new IllegalArgumentException("The specified jobs should be two or more: " + Arrays.asList(jobs));
         }
+        final Set<LaJobKey> neighborJobKeySet = Stream.of(jobs).map(job -> job.getJobKey()).collect(Collectors.toSet());
+        final Object groupPreparingLock = new Object();
+        final Object groupRunningLock = new Object();
         for (RegisteredJob job : jobs) {
-            if (!(job instanceof LaScheduledJob)) {
-                throw new IllegalArgumentException("The registered job should be instance of scheduled job: " + job);
+            if (!(job instanceof Cron4jJob)) {
+                throw new IllegalArgumentException("The registered job should be instance of cron4j job: " + job);
             }
-            final LaScheduledJob me = (LaScheduledJob) job;
-            for (RegisteredJob neighborJob : jobs) {
-                final LaJobKey neighborKey = neighborJob.getJobKey();
-                if (me.getJobKey().equals(neighborKey)) { // myself
-                    continue;
-                }
-                me.registerNeighborConcurrent(concurrentExec, neighborKey);
-            }
+            final Cron4jJob me = (Cron4jJob) job;
+            final Set<LaJobKey> filteredSet = new LinkedHashSet<LaJobKey>(neighborJobKeySet);
+            filteredSet.remove(me.getJobKey());
+            me.registerNeighborConcurrent(concurrentExec, filteredSet, groupPreparingLock, groupRunningLock);
         }
     }
 

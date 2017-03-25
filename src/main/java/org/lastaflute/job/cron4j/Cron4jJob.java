@@ -15,15 +15,18 @@
  */
 package org.lastaflute.job.cron4j;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.dbflute.optional.OptionalThing;
+import org.dbflute.optional.OptionalThingIfPresentAfter;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobHistory;
@@ -39,6 +42,8 @@ import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
+import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
+import org.lastaflute.job.subsidiary.SnapshotExecState;
 import org.lastaflute.job.subsidiary.VaryingCronOpCall;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 import org.slf4j.Logger;
@@ -64,11 +69,11 @@ public class Cron4jJob implements LaScheduledJob {
     protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
-    protected final Cron4jTask cron4jTask;
-    protected final Cron4jNow cron4jNow;
+    protected final Cron4jTask cron4jTask; // 1:1
+    protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
     protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
-    protected Map<JobConcurrentExec, Set<LaJobKey>> neighborConcurrentMap; // null allowed if no neighbor
+    protected List<NeighborConcurrentGroup> neighborConcurrentGroupList; // null allowed if no neighbor
 
     // ===================================================================================
     //                                                                         Constructor
@@ -87,12 +92,30 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                       Executing Now
     //                                                                       =============
     @Override
-    public boolean isExecutingNow() {
-        return !findNativeExecutorList().isEmpty();
+    public OptionalThingIfPresentAfter ifExecutingNow(Consumer<SnapshotExecState> oneArgLambda) {
+        return mapExecutingNow(execState -> {
+            oneArgLambda.accept(execState);
+            return (OptionalThingIfPresentAfter) (processor -> {});
+        }).orElseGet(() -> {
+            return processor -> processor.process();
+        });
     }
 
-    public List<TaskExecutor> findNativeExecutorList() { // public for framework
-        return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
+    @Override
+    public boolean isExecutingNow() {
+        return cron4jTask.isRunningNow();
+    }
+
+    @Override
+    public <RESULT> OptionalThing<RESULT> mapExecutingNow(Function<SnapshotExecState, RESULT> oneArgLambda) {
+        final OptionalThing<LocalDateTime> beginTime = cron4jTask.syncRunningCall(runningState -> {
+            return runningState.getBeginTime().get(); // locked so can get() safely
+        });
+        return beginTime.flatMap(time -> {
+            return OptionalThing.ofNullable(oneArgLambda.apply(new SnapshotExecState(time)), () -> {
+                throw new IllegalStateException("Not found the result from your scope: job=" + toIdentityDisp() + "(" + time + ")");
+            });
+        });
     }
 
     // ===================================================================================
@@ -138,6 +161,10 @@ public class Cron4jJob implements LaScheduledJob {
         if (!executorList.isEmpty()) {
             executorList.forEach(executor -> executor.stop());
         }
+    }
+
+    protected List<TaskExecutor> findNativeExecutorList() {
+        return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
     }
 
     // ===================================================================================
@@ -285,26 +312,28 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                 Neighbor Concurrent
     //                                                                 ===================
-    @Override
-    public synchronized void registerNeighborConcurrent(JobConcurrentExec concurrentExec, LaJobKey neighborJobKey) {
+    public synchronized void registerNeighborConcurrent(JobConcurrentExec concurrentExec, Set<LaJobKey> neighborJobKeySet,
+            Object groupPreparingLock, Object groupRunningLock) {
         verifyScheduledState();
         assertArgumentNotNull("concurrentExec", concurrentExec);
-        assertArgumentNotNull("neighborJobKey", neighborJobKey);
-        if (neighborJobKey.equals(jobKey)) { // myself
-            throw new IllegalArgumentException("Cannot register myself job as next trigger: " + toIdentityDisp());
+        assertArgumentNotNull("neighborJobKeySet", neighborJobKeySet);
+        assertArgumentNotNull("groupPreparingLock", groupPreparingLock);
+        assertArgumentNotNull("groupRunningLock", groupRunningLock);
+        for (LaJobKey neighborJobKey : neighborJobKeySet) {
+            if (neighborJobKey.equals(jobKey)) { // myself
+                throw new IllegalArgumentException("Cannot register myself job as neighbor concurrent: " + toIdentityDisp());
+            }
         }
-        if (JobConcurrentExec.WAIT.equals(concurrentExec)) {
-            throw new IllegalArgumentException("Concurrent execution type WAIT is still unsupported: neighbor=" + neighborJobKey);
+        if (neighborConcurrentGroupList == null) {
+            neighborConcurrentGroupList = new CopyOnWriteArrayList<NeighborConcurrentGroup>(); // just in case
         }
-        if (neighborConcurrentMap == null) {
-            neighborConcurrentMap = new ConcurrentHashMap<JobConcurrentExec, Set<LaJobKey>>(); // just in case
-        }
-        Set<LaJobKey> jobKeySet = neighborConcurrentMap.get(concurrentExec);
-        if (jobKeySet == null) {
-            jobKeySet = new CopyOnWriteArraySet<LaJobKey>(); // just in case
-            neighborConcurrentMap.put(concurrentExec, jobKeySet);
-        }
-        jobKeySet.add(neighborJobKey);
+        final CopyOnWriteArraySet<LaJobKey> safeSet = new CopyOnWriteArraySet<>(neighborJobKeySet); // just in case
+        neighborConcurrentGroupList.add(newNeighborConcurrentGroup(concurrentExec, safeSet, groupPreparingLock, groupRunningLock));
+    }
+
+    protected NeighborConcurrentGroup newNeighborConcurrentGroup(JobConcurrentExec concurrentExec, Set<LaJobKey> neighborJobKeySet,
+            Object groupPreparingLock, Object groupRunningLock) {
+        return new NeighborConcurrentGroup(concurrentExec, neighborJobKeySet, groupPreparingLock, groupRunningLock);
     }
 
     // ===================================================================================
@@ -394,8 +423,7 @@ public class Cron4jJob implements LaScheduledJob {
         return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
     }
 
-    @Override
-    public synchronized Map<JobConcurrentExec, Set<LaJobKey>> getNeighborConcurrentMap() {
-        return neighborConcurrentMap != null ? Collections.unmodifiableMap(neighborConcurrentMap) : Collections.emptyMap();
+    public List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() {
+        return Collections.unmodifiableList(neighborConcurrentGroupList);
     }
 }
