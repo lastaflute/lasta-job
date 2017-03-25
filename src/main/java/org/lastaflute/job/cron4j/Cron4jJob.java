@@ -423,7 +423,7 @@ public class Cron4jJob implements LaScheduledJob {
         return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
     }
 
-    public List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() {
-        return Collections.unmodifiableList(neighborConcurrentGroupList);
+    public synchronized List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() {
+        return neighborConcurrentGroupList != null ? Collections.unmodifiableList(neighborConcurrentGroupList) : Collections.emptyList();
     }
 }

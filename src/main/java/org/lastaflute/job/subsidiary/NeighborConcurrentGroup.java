@@ -26,11 +26,17 @@ import org.lastaflute.job.key.LaJobKey;
  */
 public class NeighborConcurrentGroup {
 
+    // ===================================================================================
+    //                                                                           Attribute
+    //                                                                           =========
     protected final JobConcurrentExec concurrentExec; // not null
     protected final Set<LaJobKey> neighborJobKeySet; // not null
     protected final Object groupPreparingLock; // not null
     protected final Object groupRunningLock; // not null
 
+    // ===================================================================================
+    //                                                                         Constructor
+    //                                                                         ===========
     public NeighborConcurrentGroup(JobConcurrentExec concurrentExec, Set<LaJobKey> neighborJobKeySet, Object groupPreparingLock,
             Object groupRunningLock) {
         if (concurrentExec == null) {
@@ -51,6 +57,17 @@ public class NeighborConcurrentGroup {
         this.groupRunningLock = groupRunningLock;
     }
 
+    // ===================================================================================
+    //                                                                      Basic Override
+    //                                                                      ==============
+    @Override
+    public String toString() {
+        return "group:{" + concurrentExec + ", " + neighborJobKeySet + "}";
+    }
+
+    // ===================================================================================
+    //                                                                            Accessor
+    //                                                                            ========
     public JobConcurrentExec getConcurrentExec() {
         return concurrentExec;
     }

@@ -44,6 +44,7 @@ import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
 import org.lastaflute.job.subsidiary.NeighborConcurrentJobStopper;
 import org.lastaflute.job.subsidiary.RunnerResult;
+import org.lastaflute.job.subsidiary.TaskRunningState;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 
@@ -90,30 +91,6 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         this.cron4jNow = cron4jNow;
         this.currentTime = currentTime;
         this.runningState = new TaskRunningState(currentTime);
-    }
-
-    public static class TaskRunningState {
-
-        protected final Supplier<LocalDateTime> currentTime; // not null
-        protected volatile LocalDateTime beginTime; // null allowed when no executing, volatile just in case
-
-        public TaskRunningState(Supplier<LocalDateTime> currentTime) {
-            this.currentTime = currentTime;
-        }
-
-        public OptionalThing<LocalDateTime> getBeginTime() { // running if present
-            return OptionalThing.ofNullable(beginTime, () -> {
-                throw new IllegalStateException("Not found the beginTime.");
-            });
-        }
-
-        public void begin() {
-            this.beginTime = currentTime.get();
-        }
-
-        public void end() {
-            this.beginTime = null;
-        }
     }
 
     // ===================================================================================
