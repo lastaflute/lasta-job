@@ -16,9 +16,9 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -144,31 +144,31 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             cronExp = varyingCron.getCronExp();
             cronOption = varyingCron.getCronOption();
         }
-        final Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap = job.getNeighborConcurrentGroupMap();
-        final Collection<NeighborConcurrentGroup> groupList = neighborConcurrentGroupMap.values();
+        final List<NeighborConcurrentGroup> neighborConcurrentGroupList = job.getNeighborConcurrentGroupList();
         synchronized (preparingLock) { // to avoid duplicate concurrent check, waiting for previous ready 
             final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job);
             if (concurrentResult.isPresent()) {
                 return concurrentResult.get();
             }
-            final OptionalThing<RunnerResult> neighborConcurrentResult = synchronizedNeighborPreparing(groupList.iterator(), () -> {
-                final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job, neighborConcurrentGroupMap);
-                if (!result.isPresent()) { // no neighbor concurrent
-                    synchronized (runningLock) { // allowed job wait here to get running state
-                        synchronized (runningState) { // to protect running state, begin() and end()
-                            runningState.begin(); // needs to get it in preparing lock, to suppress duplicate begin()
+            final OptionalThing<RunnerResult> neighborConcurrentResult =
+                    synchronizedNeighborPreparing(neighborConcurrentGroupList.iterator(), () -> {
+                        final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job, neighborConcurrentGroupList);
+                        if (!result.isPresent()) { // no neighbor concurrent
+                            synchronized (runningLock) { // allowed job wait here to get running state
+                                synchronized (runningState) { // to protect running state, begin() and end()
+                                    runningState.begin(); // needs to get it in preparing lock, to suppress duplicate begin()
+                                }
+                            }
                         }
-                    }
-                }
-                return result;
-            });
+                        return result;
+                    });
             if (neighborConcurrentResult.isPresent()) {
                 return neighborConcurrentResult.get();
             }
         }
         synchronized (runningLock) { // to avoid duplicate execution, waiting for previous ending
             try {
-                return synchronizedNeighborRunning(groupList.iterator(), () -> {
+                return synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> {
                     final OptionalThing<CrossVMState> crossVMState = jobRunner.getCrossVMHook().map(hook -> {
                         return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
                     });
@@ -244,8 +244,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected OptionalThing<RunnerResult> stopNeighborConcurrentJobIfNeeds(Cron4jJob job,
-            Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap) { // in neighbor preparing lock
-        return createNeighborConcurrentJobStopper(neighborConcurrentGroupMap).stopIfNeeds(job, jobState -> {
+            List<NeighborConcurrentGroup> neighborConcurrentGroupList) { // in neighbor preparing lock
+        return createNeighborConcurrentJobStopper(neighborConcurrentGroupList).stopIfNeeds(job, jobState -> {
             return jobState.mapExecutingNow(execState -> execState.getBeginTime().toString()).orElseGet(() -> {
                 return "*the job have just ended now"; // may be ended while message building
             });
@@ -253,9 +253,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         // will wait for previous job by synchronization later
     }
 
-    protected NeighborConcurrentJobStopper createNeighborConcurrentJobStopper(
-            Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap) {
-        return new NeighborConcurrentJobStopper(jobKey -> cron4jNow.findJobByKey(jobKey), neighborConcurrentGroupMap);
+    protected NeighborConcurrentJobStopper createNeighborConcurrentJobStopper(List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
+        return new NeighborConcurrentJobStopper(jobKey -> cron4jNow.findJobByKey(jobKey), neighborConcurrentGroupList);
     }
 
     // ===================================================================================

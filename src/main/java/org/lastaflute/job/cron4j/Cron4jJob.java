@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -74,7 +75,10 @@ public class Cron4jJob implements LaScheduledJob {
     protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
     protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
+
+    // these are same life-cycle (list to keep order for machine-gun synchronization)
     protected Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap; // null allowed if no neighbor
+    protected List<NeighborConcurrentGroup> neighborConcurrentGroupList; // null allowed if no neighbor
 
     // ===================================================================================
     //                                                                         Constructor
@@ -317,8 +321,10 @@ public class Cron4jJob implements LaScheduledJob {
         verifyScheduledState();
         if (neighborConcurrentGroupMap == null) {
             neighborConcurrentGroupMap = new ConcurrentHashMap<String, NeighborConcurrentGroup>(); // just in case
+            neighborConcurrentGroupList = new CopyOnWriteArrayList<NeighborConcurrentGroup>(); // just in case
         }
         neighborConcurrentGroupMap.put(groupName, neighborConcurrentGroup);
+        neighborConcurrentGroupList.add(neighborConcurrentGroup);
     }
 
     // ===================================================================================
@@ -408,7 +414,18 @@ public class Cron4jJob implements LaScheduledJob {
         return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
     }
 
+    @Override
     public synchronized Map<String, NeighborConcurrentGroup> getNeighborConcurrentGroupMap() {
         return neighborConcurrentGroupMap != null ? Collections.unmodifiableMap(neighborConcurrentGroupMap) : Collections.emptyMap();
+    }
+
+    public synchronized List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() { // unmodifiable and snapshot, for framework
+        if (neighborConcurrentGroupList == null) {
+            return Collections.emptyList();
+        }
+        // wrap wrap just in case, for machine-gun synchronization (that needs ordered groups)
+        final CopyOnWriteArrayList<NeighborConcurrentGroup> snapshotList =
+                new CopyOnWriteArrayList<NeighborConcurrentGroup>(neighborConcurrentGroupList);
+        return Collections.unmodifiableList(snapshotList);
     }
 }

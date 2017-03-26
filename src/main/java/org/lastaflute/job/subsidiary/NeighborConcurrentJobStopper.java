@@ -15,8 +15,7 @@
  */
 package org.lastaflute.job.subsidiary;
 
-import java.util.Collection;
-import java.util.Map;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -36,32 +35,31 @@ public class NeighborConcurrentJobStopper {
     //                                                                           Attribute
     //                                                                           =========
     protected final Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder;
-    protected final Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap; // inherit outer map for synchronization
+    protected final List<NeighborConcurrentGroup> neighborConcurrentGroupList; // inherit outer list for synchronization
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
     public NeighborConcurrentJobStopper(Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder,
-            Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap) {
+            List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
         this.jobFinder = jobFinder;
-        this.neighborConcurrentGroupMap = neighborConcurrentGroupMap;
+        this.neighborConcurrentGroupList = neighborConcurrentGroupList;
     }
 
     // ===================================================================================
     //                                                                               Stop
     //                                                                              ======
     public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobState me, Function<ReadableJobState, String> stateDisp) {
-        final Collection<NeighborConcurrentGroup> groupList = neighborConcurrentGroupMap.values();
-        doStopIfNeeds(me, groupList, JobConcurrentExec.QUIT, (neighbor, group) -> {
+        doStopIfNeeds(me, neighborConcurrentGroupList, JobConcurrentExec.QUIT, (neighbor, group) -> {
             noticeSilentlyQuit(me, neighbor, stateDisp, group);
         });
-        doStopIfNeeds(me, groupList, JobConcurrentExec.ERROR, (neighbor, group) -> {
+        doStopIfNeeds(me, neighborConcurrentGroupList, JobConcurrentExec.ERROR, (neighbor, group) -> {
             throwJobNeighborConcurrentlyExecutingException(me, neighbor, stateDisp, group);
         });
         return OptionalThing.empty();
     }
 
-    protected void doStopIfNeeds(ReadableJobAttr me, Collection<NeighborConcurrentGroup> groupList, JobConcurrentExec concurrentExec,
+    protected void doStopIfNeeds(ReadableJobAttr me, List<NeighborConcurrentGroup> groupList, JobConcurrentExec concurrentExec,
             BiConsumer<ReadableJobState, NeighborConcurrentGroup> action) {
         groupList.stream().filter(group -> concurrentExec.equals(group.getConcurrentExec())).forEach(group -> {
             group.getNeighborJobKeySet().forEach(neighborJobKey -> {
