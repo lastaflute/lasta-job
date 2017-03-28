@@ -46,7 +46,7 @@ public class SimpleJobManager implements JobManager {
     // -----------------------------------------------------
     //                                              Stateful
     //                                              --------
-    protected static boolean bowgunEmptyInit; // used when initialization
+    protected static boolean bowgunEmptyScheduling; // used when initialization
     protected static boolean locked = true;
 
     // ===================================================================================
@@ -67,9 +67,6 @@ public class SimpleJobManager implements JobManager {
      */
     @PostConstruct
     public synchronized void initialize() {
-        if (bowgunEmptyInit) { // for e.g. UnitTest
-            return;
-        }
         BowgunCurtainBefore.unlock();
         BowgunCurtainBefore.shootBowgunCurtainBefore(assistantDirector -> {
             startSchedule();
@@ -78,6 +75,13 @@ public class SimpleJobManager implements JobManager {
     }
 
     protected void startSchedule() {
+        if (bowgunEmptyScheduling) { // for e.g. UnitTest
+            return;
+        }
+        doStartSchedule();
+    }
+
+    protected void doStartSchedule() {
         schedulingNow = createStarter().start();
         schedulingDone = true;
     }
@@ -235,14 +239,14 @@ public class SimpleJobManager implements JobManager {
     }
 
     // ===================================================================================
-    //                                                                    Bowgun EmptyInit
-    //                                                                    ================
-    public static void shootBowgunEmptyInit() { // called by e.g. UTFlute
+    //                                                              Bowgun EmptyScheduling
+    //                                                              ======================
+    public static void shootBowgunEmptyScheduling() { // called by e.g. UTFlute
         assertUnlocked();
         if (logger.isInfoEnabled()) {
-            logger.info("...Shooting bowgun empty init: true");
+            logger.info("...Shooting bowgun empty scheduling: true");
         }
-        bowgunEmptyInit = true;
+        bowgunEmptyScheduling = true;
         lock(); // auto-lock here, because of deep world
     }
 
