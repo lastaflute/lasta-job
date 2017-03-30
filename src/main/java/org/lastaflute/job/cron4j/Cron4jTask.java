@@ -145,30 +145,41 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             cronOption = varyingCron.getCronOption();
         }
         final List<NeighborConcurrentGroup> neighborConcurrentGroupList = job.getNeighborConcurrentGroupList();
-        synchronized (preparingLock) { // to avoid duplicate concurrent check, waiting for previous ready 
+        synchronized (preparingLock) { // waiting for previous preparing end
             final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job);
-            if (concurrentResult.isPresent()) {
+            if (concurrentResult.isPresent()) { // e.g. quit, error
                 return concurrentResult.get();
             }
+            // no duplicate or duplicate as waiting, here
             final OptionalThing<RunnerResult> neighborConcurrentResult =
                     synchronizedNeighborPreparing(neighborConcurrentGroupList.iterator(), () -> {
                         final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job, neighborConcurrentGroupList);
-                        if (!result.isPresent()) { // no neighbor concurrent
-                            synchronized (runningLock) { // allowed job wait here to get running state
-                                synchronized (runningState) { // to protect running state, begin() and end()
-                                    runningState.begin(); // needs to get it in preparing lock, to suppress duplicate begin()
-                                }
+                        if (!result.isPresent()) { // no duplicate neighbor or duplicate as waiting
+                            sleepForLockableLife(); // not to get running lock before previous thread in crevasse point
+                            synchronized (runningLock) { // waiting for previous running end
+                                synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> { // also neighbor's running
+                                    synchronized (runningState) { // to protect running state, begin() and end()
+                                        // may be override by crevasse headache, but recover it later
+                                        runningState.begin(); // needs to get in preparing lock, to suppress duplicate begin()
+                                    }
+                                    return null; // unused
+                                });
                             }
                         }
                         return result;
                     });
-            if (neighborConcurrentResult.isPresent()) {
+            if (neighborConcurrentResult.isPresent()) { // e.g. quit, error
                 return neighborConcurrentResult.get();
             }
         }
-        synchronized (runningLock) { // to avoid duplicate execution, waiting for previous ending
-            try {
+        // *here is first crevasse point
+        // (really want to get running lock before returning preparing lock)
+        synchronized (runningLock) { // to make next thread wait for me (or waiting by crevasse headache)
+            try { // *here is second crevasse point
                 return synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> {
+                    if (!runningState.getBeginTime().isPresent()) { // almost no way, but may be crevasse headache
+                        runningState.begin(); // just in case
+                    }
                     final OptionalThing<CrossVMState> crossVMState = jobRunner.getCrossVMHook().map(hook -> {
                         return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
                     });
@@ -188,11 +199,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     return runnerResult;
                 });
             } finally {
-                synchronized (runningState) {
-                    runningState.end();
+                synchronized (runningState) { // running state is only my job so outside neighbor synchronization
+                    if (runningState.getBeginTime().isPresent()) {
+                        runningState.end(); // for controller dead
+                    }
                 }
             }
         }
+    }
+
+    protected void sleepForLockableLife() {
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException ignored) {}
     }
 
     // -----------------------------------------------------
