@@ -423,7 +423,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                             Error Log
     //                                             ---------
     protected void error(OptionalThing<ReadableJobAttr> jobAttr, String msg, Throwable cause) {
-        final String bigMsg = msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause);
+        final String bigMsg = (msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause)).trim();
         jobRunner.getErrorLogHook().ifPresent(hook -> {
             hook.hookError(new JobErrorResource(jobAttr, OptionalThing.empty(), bigMsg, cause));
         });
