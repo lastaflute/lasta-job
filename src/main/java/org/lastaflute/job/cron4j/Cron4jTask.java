@@ -226,7 +226,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     protected void sleepForLockableLife() {
         try {
-            Thread.sleep(500);
+            Thread.sleep(200);
         } catch (InterruptedException ignored) {}
     }
 
