@@ -32,6 +32,7 @@ import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobErrorLog;
+import org.lastaflute.job.log.JobErrorResource;
 import org.lastaflute.job.log.JobErrorStackTracer;
 import org.lastaflute.job.log.JobHistoryResource;
 import org.lastaflute.job.log.JobNoticeLogLevel;
@@ -43,6 +44,7 @@ import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
 import org.lastaflute.job.subsidiary.NeighborConcurrentJobStopper;
+import org.lastaflute.job.subsidiary.ReadableJobAttr;
 import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.TaskRunningState;
 import org.lastaflute.job.subsidiary.VaryingCron;
@@ -110,16 +112,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     job.triggerNext(); // should be after current job ending
                 }
             } catch (JobConcurrentlyExecutingException e) {
-                error("Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName(), e);
+                final String msg = "Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName();
+                error(OptionalThing.of(job), msg, e);
                 controllerCause = e;
             } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
-                error("Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName(), cause);
+                final String msg = "Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName();
+                error(OptionalThing.of(job), msg, cause);
                 controllerCause = cause;
             }
             final OptionalThing<LocalDateTime> endTime = deriveEndTime(runnerResult);
             recordJobHistory(context, job, jobThread, activationTime, runnerResult, endTime, controllerCause);
         } catch (Throwable coreCause) { // controller dead
-            error("Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName(), coreCause);
+            final String msg = "Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName();
+            error(OptionalThing.empty(), msg, coreCause);
         }
     }
 
@@ -392,12 +397,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                             Error Log
     //                                             ---------
-    protected void error(String msg, Throwable cause) {
-        final String unifiedMsg = msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause);
+    protected void error(OptionalThing<ReadableJobAttr> jobAttr, String msg, Throwable cause) {
+        final String bigMsg = msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause);
         jobRunner.getErrorLogHook().ifPresent(hook -> {
-            hook.hookError(unifiedMsg);
+            hook.hookError(new JobErrorResource(jobAttr, OptionalThing.empty(), bigMsg, cause));
         });
-        JobErrorLog.log(unifiedMsg);
+        JobErrorLog.log(bigMsg);
     }
 
     // ===================================================================================
