@@ -50,6 +50,7 @@ import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.log.JobErrorLog;
 import org.lastaflute.job.log.JobErrorLogHook;
+import org.lastaflute.job.log.JobErrorResource;
 import org.lastaflute.job.log.JobErrorStackTracer;
 import org.lastaflute.job.log.JobHistoryHook;
 import org.lastaflute.job.log.JobNoticeLog;
@@ -532,11 +533,12 @@ public class LaJobRunner {
     // -----------------------------------------------------
     //                                     Exception Logging
     //                                     -----------------
-    protected void logJobException(LaJobRuntime runtime, String msg, Throwable cause) { // msg contains stack-trace
+    protected void logJobException(LaJobRuntime runtime, String bigMsg, Throwable cause) { // bigMsg contains stack-trace
         if (errorLogHook != null) {
-            errorLogHook.hookError(msg);
+            final OptionalThing<LaScheduledJob> job = jobManager.findJobByKey(runtime.getJobKey());
+            errorLogHook.hookError(new JobErrorResource(job, OptionalThing.of(runtime), bigMsg, cause));
         }
-        JobErrorLog.log(msg); // not use second argument here, same reason as logging filter
+        JobErrorLog.log(bigMsg); // not use second argument here, same reason as logging filter
     }
 
     // ===================================================================================

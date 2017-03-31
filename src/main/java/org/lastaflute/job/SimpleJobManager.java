@@ -43,6 +43,12 @@ public class SimpleJobManager implements JobManager {
     //                                                                          ==========
     private static final Logger logger = LoggerFactory.getLogger(SimpleJobManager.class);
 
+    // -----------------------------------------------------
+    //                                              Stateful
+    //                                              --------
+    protected static boolean bowgunEmptyScheduling; // used when initialization
+    protected static boolean locked = true;
+
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
@@ -69,6 +75,13 @@ public class SimpleJobManager implements JobManager {
     }
 
     protected void startSchedule() {
+        if (bowgunEmptyScheduling) { // for e.g. UnitTest
+            return;
+        }
+        doStartSchedule();
+    }
+
+    protected void doStartSchedule() {
         schedulingNow = createStarter().start();
         schedulingDone = true;
     }
@@ -223,5 +236,46 @@ public class SimpleJobManager implements JobManager {
         if (value == null) {
             throw new IllegalArgumentException("The argument '" + variableName + "' should not be null.");
         }
+    }
+
+    // ===================================================================================
+    //                                                              Bowgun EmptyScheduling
+    //                                                              ======================
+    public static void shootBowgunEmptyScheduling() { // called by e.g. UTFlute
+        assertUnlocked();
+        if (logger.isInfoEnabled()) {
+            logger.info("...Shooting bowgun empty scheduling: true");
+        }
+        bowgunEmptyScheduling = true;
+        lock(); // auto-lock here, because of deep world
+    }
+
+    // ===================================================================================
+    //                                                                         Config Lock
+    //                                                                         ===========
+    // also no info logging here because mainly used by UnitTest
+    public static boolean isLocked() {
+        return locked;
+    }
+
+    public static void lock() {
+        if (locked) {
+            return;
+        }
+        locked = true;
+    }
+
+    public static void unlock() {
+        if (!locked) {
+            return;
+        }
+        locked = false;
+    }
+
+    protected static void assertUnlocked() {
+        if (!isLocked()) {
+            return;
+        }
+        throw new IllegalStateException("The job manager is locked.");
     }
 }

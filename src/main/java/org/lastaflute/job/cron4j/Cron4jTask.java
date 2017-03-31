@@ -32,6 +32,7 @@ import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobErrorLog;
+import org.lastaflute.job.log.JobErrorResource;
 import org.lastaflute.job.log.JobErrorStackTracer;
 import org.lastaflute.job.log.JobHistoryResource;
 import org.lastaflute.job.log.JobNoticeLogLevel;
@@ -43,6 +44,7 @@ import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
 import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
 import org.lastaflute.job.subsidiary.NeighborConcurrentJobStopper;
+import org.lastaflute.job.subsidiary.ReadableJobAttr;
 import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.TaskRunningState;
 import org.lastaflute.job.subsidiary.VaryingCron;
@@ -67,16 +69,16 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                           Attribute
     //                                                                           =========
     protected VaryingCron varyingCron; // not null, can be switched
-    protected final Class<? extends LaJob> jobType;
-    protected final JobConcurrentExec concurrentExec;
-    protected final Supplier<String> threadNaming;
-    protected final LaJobRunner jobRunner; // singleton
-    protected final Cron4jNow cron4jNow;
-    protected final Supplier<LocalDateTime> currentTime;
-    protected final TaskRunningState runningState;
-    protected final Object preparingLock = new Object();
-    protected final Object runningLock = new Object();
-    protected final Object varyingLock = new Object();
+    protected final Class<? extends LaJob> jobType; // not null
+    protected final JobConcurrentExec concurrentExec; // not null
+    protected final Supplier<String> threadNaming; // not null
+    protected final LaJobRunner jobRunner; // not null, singleton
+    protected final Cron4jNow cron4jNow; // not null
+    protected final Supplier<LocalDateTime> currentTime; // not null
+    protected final TaskRunningState runningState; // not null
+    protected final Object preparingLock = new Object(); // not null
+    protected final Object runningLock = new Object(); // not null
+    protected final Object varyingLock = new Object(); // not null
 
     // ===================================================================================
     //                                                                         Constructor
@@ -109,17 +111,21 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 if (canTriggerNext(job, runnerResult)) {
                     job.triggerNext(); // should be after current job ending
                 }
-            } catch (JobConcurrentlyExecutingException e) {
-                error("Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName(), e);
+            } catch (JobConcurrentlyExecutingException e) { // these catch statements are related to deriveRunnerExecResultType()
+                final String msg = "Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName();
+                error(OptionalThing.of(job), msg, e);
                 controllerCause = e;
             } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
-                error("Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName(), cause);
+                final String msg = "Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName();
+                error(OptionalThing.of(job), msg, cause);
                 controllerCause = cause;
             }
-            final OptionalThing<LocalDateTime> endTime = deriveEndTime(runnerResult);
-            recordJobHistory(context, job, jobThread, activationTime, runnerResult, endTime, controllerCause);
+            final OptionalThing<RunnerResult> optRunnerResult = optRunnerResult(runnerResult); // empty when error 
+            final OptionalThing<LocalDateTime> endTime = deriveEndTime(optRunnerResult);
+            recordJobHistory(context, job, jobThread, activationTime, optRunnerResult, endTime, optControllerCause(controllerCause));
         } catch (Throwable coreCause) { // controller dead
-            error("Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName(), coreCause);
+            final String msg = "Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName();
+            error(OptionalThing.empty(), msg, coreCause);
         }
     }
 
@@ -127,9 +133,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return cron4jNow.findJobByTask(this).get();
     }
 
-    protected OptionalThing<LocalDateTime> deriveEndTime(RunnerResult runnerResult) {
-        return OptionalThing.ofNullable(runnerResult.getBeginTime().isPresent() ? currentTime.get() : null, () -> {
-            throw new IllegalStateException("Not found the end-time: " + jobType);
+    protected OptionalThing<LocalDateTime> deriveEndTime(OptionalThing<RunnerResult> runnerResult) {
+        return runnerResult.filter(res -> res.getBeginTime().isPresent()).map(res -> currentTime.get());
+    }
+
+    protected OptionalThing<RunnerResult> optRunnerResult(RunnerResult runnerResult) {
+        return OptionalThing.ofNullable(runnerResult, () -> {
+            throw new IllegalStateException("Not found the runner result.");
+        });
+    }
+
+    protected OptionalThing<Throwable> optControllerCause(Throwable controllerCause) {
+        return OptionalThing.ofNullable(controllerCause, () -> {
+            throw new IllegalStateException("Not found the controller cause.");
         });
     }
 
@@ -145,30 +161,41 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             cronOption = varyingCron.getCronOption();
         }
         final List<NeighborConcurrentGroup> neighborConcurrentGroupList = job.getNeighborConcurrentGroupList();
-        synchronized (preparingLock) { // to avoid duplicate concurrent check, waiting for previous ready 
+        synchronized (preparingLock) { // waiting for previous preparing end
             final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job);
-            if (concurrentResult.isPresent()) {
+            if (concurrentResult.isPresent()) { // e.g. quit, error
                 return concurrentResult.get();
             }
+            // no duplicate or duplicate as waiting, here
             final OptionalThing<RunnerResult> neighborConcurrentResult =
                     synchronizedNeighborPreparing(neighborConcurrentGroupList.iterator(), () -> {
                         final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job, neighborConcurrentGroupList);
-                        if (!result.isPresent()) { // no neighbor concurrent
-                            synchronized (runningLock) { // allowed job wait here to get running state
-                                synchronized (runningState) { // to protect running state, begin() and end()
-                                    runningState.begin(); // needs to get it in preparing lock, to suppress duplicate begin()
-                                }
+                        if (!result.isPresent()) { // no duplicate neighbor or duplicate as waiting
+                            sleepForLockableLife(); // not to get running lock before previous thread in crevasse point
+                            synchronized (runningLock) { // waiting for previous running end
+                                synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> { // also neighbor's running
+                                    synchronized (runningState) { // to protect running state, begin() and end()
+                                        // may be override by crevasse headache, but recover it later
+                                        runningState.begin(); // needs to get in preparing lock, to suppress duplicate begin()
+                                    }
+                                    return null; // unused
+                                });
                             }
                         }
                         return result;
                     });
-            if (neighborConcurrentResult.isPresent()) {
+            if (neighborConcurrentResult.isPresent()) { // e.g. quit, error
                 return neighborConcurrentResult.get();
             }
         }
-        synchronized (runningLock) { // to avoid duplicate execution, waiting for previous ending
-            try {
+        // *here is first crevasse point
+        // (really want to get running lock before returning preparing lock)
+        synchronized (runningLock) { // to make next thread wait for me (or waiting by crevasse headache)
+            try { // *here is second crevasse point
                 return synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> {
+                    if (!runningState.getBeginTime().isPresent()) { // almost no way, but may be crevasse headache
+                        runningState.begin(); // just in case
+                    }
                     final OptionalThing<CrossVMState> crossVMState = jobRunner.getCrossVMHook().map(hook -> {
                         return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
                     });
@@ -188,11 +215,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     return runnerResult;
                 });
             } finally {
-                synchronized (runningState) {
-                    runningState.end();
+                synchronized (runningState) { // running state is only my job so outside neighbor synchronization
+                    if (runningState.getBeginTime().isPresent()) {
+                        runningState.end(); // for controller dead
+                    }
                 }
             }
         }
+    }
+
+    protected void sleepForLockableLife() {
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException ignored) {}
     }
 
     // -----------------------------------------------------
@@ -312,7 +347,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                           Job History
     //                                           -----------
     protected void recordJobHistory(TaskExecutionContext context, Cron4jJob job, Thread jobThread, LocalDateTime activationTime,
-            RunnerResult runnerResult, OptionalThing<LocalDateTime> endTime, Throwable controllerCause) {
+            OptionalThing<RunnerResult> runnerResult, OptionalThing<LocalDateTime> endTime, OptionalThing<Throwable> controllerCause) {
         final TaskExecutor taskExecutor = context.getTaskExecutor();
         final Cron4jJobHistory jobHistory = prepareJobHistory(job, activationTime, runnerResult, endTime, controllerCause);
         final int historyLimit = getHistoryLimit();
@@ -322,32 +357,46 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         Cron4jJobHistory.record(taskExecutor, jobHistory, historyLimit);
     }
 
-    protected Cron4jJobHistory prepareJobHistory(Cron4jJob job, LocalDateTime activationTime, RunnerResult runnerResult,
-            OptionalThing<LocalDateTime> endTime, Throwable controllerCause) {
-        final OptionalThing<LocalDateTime> beginTime = runnerResult.getBeginTime();
+    protected Cron4jJobHistory prepareJobHistory(Cron4jJob job, LocalDateTime activationTime, OptionalThing<RunnerResult> runnerResult,
+            OptionalThing<LocalDateTime> endTime, OptionalThing<Throwable> controllerCause) {
+        final OptionalThing<LocalDateTime> beginTime = runnerResult.flatMap(res -> res.getBeginTime());
         final Cron4jJobHistory jobHistory;
         if (controllerCause == null) { // mainly here, and runnerResult is not null here
             jobHistory = createJobHistory(job, activationTime, beginTime, endTime, () -> {
-                return deriveRunnerExecResultType(runnerResult);
-            }, runnerResult.getEndTitleRoll(), runnerResult.getCause());
+                return deriveRunnerExecResultType(runnerResult, controllerCause);
+            }, runnerResult.flatMap(res -> res.getEndTitleRoll()), runnerResult.flatMap(res -> res.getCause()));
         } else if (controllerCause instanceof JobConcurrentlyExecutingException) {
             jobHistory = createJobHistory(job, activationTime, beginTime, endTime, () -> ExecResultType.ERROR_BY_CONCURRENT,
-                    OptionalThing.empty(), OptionalThing.of(controllerCause));
+                    OptionalThing.empty(), controllerCause);
         } else { // may be framework exception
             jobHistory = createJobHistory(job, activationTime, beginTime, endTime, () -> ExecResultType.CAUSED_BY_FRAMEWORK,
-                    OptionalThing.empty(), OptionalThing.of(controllerCause));
+                    OptionalThing.empty(), controllerCause);
         }
         return jobHistory;
     }
 
-    protected ExecResultType deriveRunnerExecResultType(RunnerResult runnerResult) {
-        if (runnerResult.getCause().isPresent()) {
-            return ExecResultType.CAUSED_BY_APPLICATION;
-        } else if (runnerResult.isQuitByConcurrent()) {
-            return ExecResultType.QUIT_BY_CONCURRENT;
-        } else {
-            return ExecResultType.SUCCESS;
-        }
+    protected ExecResultType deriveRunnerExecResultType(OptionalThing<RunnerResult> runnerResult,
+            OptionalThing<Throwable> controllerCause) {
+        return runnerResult.map(res -> {
+            if (res.getCause().isPresent()) {
+                return ExecResultType.CAUSED_BY_APPLICATION;
+            } else if (res.isQuitByConcurrent()) {
+                return ExecResultType.QUIT_BY_CONCURRENT;
+            } else {
+                return ExecResultType.SUCCESS;
+            }
+        }).orElseGet(() -> {
+            return controllerCause.map(cause -> {
+                // these logic are related to execute()'s catch
+                if (cause instanceof JobConcurrentlyExecutingException) {
+                    return ExecResultType.ERROR_BY_CONCURRENT;
+                } else {
+                    return ExecResultType.CAUSED_BY_FRAMEWORK;
+                }
+            }).orElseGet(() -> { // no way, either runnerResult or controllerCause always exists
+                return ExecResultType.SUCCESS;
+            });
+        });
     }
 
     protected Cron4jJobHistory createJobHistory(Cron4jJob job, LocalDateTime activationTime, OptionalThing<LocalDateTime> beginTime,
@@ -373,12 +422,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                             Error Log
     //                                             ---------
-    protected void error(String msg, Throwable cause) {
-        final String unifiedMsg = msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause);
+    protected void error(OptionalThing<ReadableJobAttr> jobAttr, String msg, Throwable cause) {
+        final String bigMsg = (msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause)).trim();
         jobRunner.getErrorLogHook().ifPresent(hook -> {
-            hook.hookError(unifiedMsg);
+            hook.hookError(new JobErrorResource(jobAttr, OptionalThing.empty(), bigMsg, cause));
         });
-        JobErrorLog.log(unifiedMsg);
+        JobErrorLog.log(bigMsg);
     }
 
     // ===================================================================================

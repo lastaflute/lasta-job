@@ -21,5 +21,8 @@ package org.lastaflute.job.log;
  */
 public interface JobErrorLogHook {
 
-    void hookError(String msg);
+    /**
+     * @param resource The resource of job error, which has job and exception information. (NotNull)
+     */
+    void hookError(JobErrorResource resource);
 }
