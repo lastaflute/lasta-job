@@ -361,11 +361,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             OptionalThing<LocalDateTime> endTime, OptionalThing<Throwable> controllerCause) {
         final OptionalThing<LocalDateTime> beginTime = runnerResult.flatMap(res -> res.getBeginTime());
         final Cron4jJobHistory jobHistory;
-        if (controllerCause == null) { // mainly here, and runnerResult is not null here
+        if (!controllerCause.isPresent()) { // mainly here, and runnerResult is not null here
             jobHistory = createJobHistory(job, activationTime, beginTime, endTime, () -> {
                 return deriveRunnerExecResultType(runnerResult, controllerCause);
             }, runnerResult.flatMap(res -> res.getEndTitleRoll()), runnerResult.flatMap(res -> res.getCause()));
-        } else if (controllerCause instanceof JobConcurrentlyExecutingException) {
+        } else if (controllerCause.get() instanceof JobConcurrentlyExecutingException) {
             jobHistory = createJobHistory(job, activationTime, beginTime, endTime, () -> ExecResultType.ERROR_BY_CONCURRENT,
                     OptionalThing.empty(), controllerCause);
         } else { // may be framework exception
