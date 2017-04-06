@@ -361,11 +361,11 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             OptionalThing<LocalDateTime> endTime, OptionalThing<Throwable> controllerCause) {
         final OptionalThing<LocalDateTime> beginTime = runnerResult.flatMap(res -> res.getBeginTime());
         final Cron4jJobHistory jobHistory;
-        if (controllerCause == null) { // mainly here, and runnerResult is not null here
+        if (!controllerCause.isPresent()) { // mainly here, and runnerResult is not null here
             jobHistory = createJobHistory(job, activationTime, beginTime, endTime, () -> {
-                return deriveRunnerExecResultType(runnerResult, controllerCause);
+                return deriveRunnerExecResultType(runnerResult);
             }, runnerResult.flatMap(res -> res.getEndTitleRoll()), runnerResult.flatMap(res -> res.getCause()));
-        } else if (controllerCause instanceof JobConcurrentlyExecutingException) {
+        } else if (controllerCause.get() instanceof JobConcurrentlyExecutingException) {
             jobHistory = createJobHistory(job, activationTime, beginTime, endTime, () -> ExecResultType.ERROR_BY_CONCURRENT,
                     OptionalThing.empty(), controllerCause);
         } else { // may be framework exception
@@ -375,9 +375,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return jobHistory;
     }
 
-    protected ExecResultType deriveRunnerExecResultType(OptionalThing<RunnerResult> runnerResult,
-            OptionalThing<Throwable> controllerCause) {
-        return runnerResult.map(res -> {
+    protected ExecResultType deriveRunnerExecResultType(OptionalThing<RunnerResult> runnerResult) {
+        return runnerResult.map(res -> { // basically exists
             if (res.getCause().isPresent()) {
                 return ExecResultType.CAUSED_BY_APPLICATION;
             } else if (res.isQuitByConcurrent()) {
@@ -385,17 +384,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             } else {
                 return ExecResultType.SUCCESS;
             }
-        }).orElseGet(() -> {
-            return controllerCause.map(cause -> {
-                // these logic are related to execute()'s catch
-                if (cause instanceof JobConcurrentlyExecutingException) {
-                    return ExecResultType.ERROR_BY_CONCURRENT;
-                } else {
-                    return ExecResultType.CAUSED_BY_FRAMEWORK;
-                }
-            }).orElseGet(() -> { // no way, either runnerResult or controllerCause always exists
-                return ExecResultType.SUCCESS;
-            });
+        }).orElseGet(() -> { // no way, either runnerResult or controllerCause always exists, but just in case
+            return ExecResultType.SUCCESS;
         });
     }
 
