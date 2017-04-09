@@ -69,7 +69,7 @@ public class SimpleJobManager implements JobManager {
     public synchronized void initialize() {
         BowgunCurtainBefore.unlock();
         BowgunCurtainBefore.shootBowgunCurtainBefore(assistantDirector -> {
-            if (bowgunEmptyScheduling) { // for e.g. UnitTest
+            if (!bowgunEmptyScheduling) { // for e.g. UnitTest
                 startSchedule();
             }
             showBootLogging();
