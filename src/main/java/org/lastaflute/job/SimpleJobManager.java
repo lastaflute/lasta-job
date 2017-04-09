@@ -130,7 +130,7 @@ public class SimpleJobManager implements JobManager {
     @PreDestroy
     @Override
     public synchronized void destroy() {
-        schedulingNow.destroy();
+        schedulingNow.destroy(); // asynchronous
         schedulingNow = createEmptyNow();
         schedulingDone = false;
     }
@@ -176,19 +176,22 @@ public class SimpleJobManager implements JobManager {
 
         @Override
         public OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey) {
-            throwJobManagerNotInitializedYetException();
+            // air shot for job ending after destroy()
+            //throwJobManagerNotInitializedYetException();
             return OptionalThing.empty(); // unreachable
         }
 
         @Override
         public OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique) {
-            throwJobManagerNotInitializedYetException();
+            // air shot for job ending after destroy()
+            //throwJobManagerNotInitializedYetException();
             return OptionalThing.empty(); // unreachable
         }
 
         @Override
         public List<LaScheduledJob> getJobList() {
-            throwJobManagerNotInitializedYetException();
+            // air shot for job ending after destroy()
+            //throwJobManagerNotInitializedYetException();
             return Collections.emptyList(); // unreachable
         }
 
@@ -199,7 +202,8 @@ public class SimpleJobManager implements JobManager {
 
         @Override
         public List<LaJobHistory> searchJobHistoryList() {
-            throwJobManagerNotInitializedYetException();
+            // air shot for job ending after destroy()
+            //throwJobManagerNotInitializedYetException();
             return Collections.emptyList(); // unreachable
         }
 
@@ -212,6 +216,11 @@ public class SimpleJobManager implements JobManager {
         public void destroy() {
             // air shot for unit test (can call reboot)
             //throwJobManagerNotInitializedYetException();
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + ":{*no scheduling}";
         }
     }
 

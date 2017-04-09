@@ -41,12 +41,19 @@ import org.lastaflute.job.subsidiary.CronConsumer;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobSubIdentityAttr;
 import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author jflute
  * @since 0.2.0 (2016/01/11 Monday)
  */
 public class Cron4jNow implements LaSchedulingNow {
+
+    // ===================================================================================
+    //                                                                          Definition
+    //                                                                          ==========
+    private static final Logger logger = LoggerFactory.getLogger(Cron4jNow.class);
 
     // ===================================================================================
     //                                                                           Attribute
@@ -287,7 +294,19 @@ public class Cron4jNow implements LaSchedulingNow {
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Destroying scheduler completely: jobs={} scheduler={}", jobKeyJobMap.size(), cron4jScheduler);
         }
-        cron4jScheduler.stop();
+        // not use AsyncManager here, because not frequent call, keep no dependency to core
+        new Thread(() -> { // to release synchronized lock to avoid deadlock
+            try {
+                cron4jScheduler.stop();
+            } catch (RuntimeException e) {
+                final String msg = "#job Failed to stop jobs: jobs={} scheduler={}";
+                if (JobChangeLog.isEnabled()) {
+                    JobChangeLog.log(msg, jobKeyJobMap.size(), cron4jScheduler, e);
+                } else { // just in case
+                    logger.info(msg, jobKeyJobMap.size(), cron4jScheduler, e);
+                }
+            }
+        }).start();
     }
 
     // ===================================================================================
