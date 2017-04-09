@@ -69,19 +69,14 @@ public class SimpleJobManager implements JobManager {
     public synchronized void initialize() {
         BowgunCurtainBefore.unlock();
         BowgunCurtainBefore.shootBowgunCurtainBefore(assistantDirector -> {
-            startSchedule();
+            if (bowgunEmptyScheduling) { // for e.g. UnitTest
+                startSchedule();
+            }
             showBootLogging();
         });
     }
 
-    protected void startSchedule() {
-        if (bowgunEmptyScheduling) { // for e.g. UnitTest
-            return;
-        }
-        doStartSchedule();
-    }
-
-    protected void doStartSchedule() {
+    protected void startSchedule() { // also called by destroy()
         schedulingNow = createStarter().start();
         schedulingDone = true;
     }
@@ -144,9 +139,10 @@ public class SimpleJobManager implements JobManager {
     //                                                                              Reboot
     //                                                                              ======
     @Override
-    public synchronized void reboot() {
+    public synchronized void reboot() { // also called by unit test
         destroy();
         startSchedule();
+        showBootLogging();
     }
 
     // ===================================================================================
@@ -173,47 +169,50 @@ public class SimpleJobManager implements JobManager {
     }
 
     protected LaSchedulingNow createEmptyNow() {
-        return new LaSchedulingNow() {
+        return new EmptySchedulingNow();
+    }
 
-            @Override
-            public OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey) {
-                throwJobManagerNotInitializedYetException();
-                return OptionalThing.empty(); // unreachable
-            }
+    protected class EmptySchedulingNow implements LaSchedulingNow {
 
-            @Override
-            public OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique) {
-                throwJobManagerNotInitializedYetException();
-                return OptionalThing.empty(); // unreachable
-            }
+        @Override
+        public OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey) {
+            throwJobManagerNotInitializedYetException();
+            return OptionalThing.empty(); // unreachable
+        }
 
-            @Override
-            public List<LaScheduledJob> getJobList() {
-                throwJobManagerNotInitializedYetException();
-                return Collections.emptyList(); // unreachable
-            }
+        @Override
+        public OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique) {
+            throwJobManagerNotInitializedYetException();
+            return OptionalThing.empty(); // unreachable
+        }
 
-            @Override
-            public void schedule(CronConsumer oneArgLambda) {
-                throwJobManagerNotInitializedYetException();
-            }
+        @Override
+        public List<LaScheduledJob> getJobList() {
+            throwJobManagerNotInitializedYetException();
+            return Collections.emptyList(); // unreachable
+        }
 
-            @Override
-            public List<LaJobHistory> searchJobHistoryList() {
-                throwJobManagerNotInitializedYetException();
-                return Collections.emptyList(); // unreachable
-            }
+        @Override
+        public void schedule(CronConsumer oneArgLambda) {
+            throwJobManagerNotInitializedYetException();
+        }
 
-            @Override
-            public void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, Set<LaJobKey> jobKeySet) {
-                throwJobManagerNotInitializedYetException();
-            }
+        @Override
+        public List<LaJobHistory> searchJobHistoryList() {
+            throwJobManagerNotInitializedYetException();
+            return Collections.emptyList(); // unreachable
+        }
 
-            @Override
-            public void destroy() {
-                throwJobManagerNotInitializedYetException();
-            }
-        };
+        @Override
+        public void setupNeighborConcurrent(String groupName, JobConcurrentExec concurrentExec, Set<LaJobKey> jobKeySet) {
+            throwJobManagerNotInitializedYetException();
+        }
+
+        @Override
+        public void destroy() {
+            // air shot for unit test (can call reboot)
+            //throwJobManagerNotInitializedYetException();
+        }
     }
 
     protected void throwJobManagerNotInitializedYetException() {
@@ -241,12 +240,15 @@ public class SimpleJobManager implements JobManager {
     // ===================================================================================
     //                                                              Bowgun EmptyScheduling
     //                                                              ======================
-    public static void shootBowgunEmptyScheduling() { // called by e.g. UTFlute
+    public static synchronized void shootBowgunEmptyScheduling() { // called by e.g. UTFlute
         assertUnlocked();
+        if (bowgunEmptyScheduling) { // already empty
+            return;
+        }
         if (logger.isInfoEnabled()) {
             logger.info("...Shooting bowgun empty scheduling: true");
         }
-        bowgunEmptyScheduling = true;
+        bowgunEmptyScheduling = true; // should be before container initialization
         lock(); // auto-lock here, because of deep world
     }
 
