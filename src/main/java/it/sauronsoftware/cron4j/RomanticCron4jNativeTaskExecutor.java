@@ -144,7 +144,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (notifyExecutionTerminatedMethod == null) {
             synchronized (reflectionPartyLock) {
                 if (notifyExecutionTerminatedMethod == null) {
-                    final String methodName = "notifyExecutionTerminatedMethod";
+                    final String methodName = "notifyExecutionTerminated";
                     final Class<?>[] argTypes = new Class<?>[] { Throwable.class };
                     notifyExecutionTerminatedMethod = DfReflectionUtil.getWholeMethod(getClass(), methodName, argTypes);
                     notifyExecutionTerminatedMethod.setAccessible(true);
@@ -161,7 +161,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (linkedLock == null) {
             synchronized (attributeLinkLock) {
                 if (linkedLock == null) {
-                    linkedLock = DfReflectionUtil.getValue(lockField, this);
+                    linkedLock = getFieldValue(lockField);
                 }
             }
         }
@@ -171,8 +171,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (lockField == null) {
             synchronized (reflectionPartyLock) {
                 if (lockField == null) {
-                    lockField = DfReflectionUtil.getWholeField(getClass(), "lock");
-                    lockField.setAccessible(true);
+                    lockField = getAccessibleField("lock");
                 }
             }
         }
@@ -183,8 +182,8 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     //                                            ----------
     protected void registerStartTimeCurrentTime() {
         readyStartTimeFieldIfNeeds();
-        final long millis = System.currentTimeMillis();
-        DfReflectionUtil.setValue(startTimeField, this, millis); // #thinking should be from time-manager?
+        final long millis = System.currentTimeMillis(); // #thinking should be from time-manager? (but basically unused...)
+        setFieldValue(startTimeField, millis);
         linkedStartTime = millis;
     }
 
@@ -192,8 +191,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (startTimeField == null) {
             synchronized (reflectionPartyLock) {
                 if (startTimeField == null) {
-                    startTimeField = DfReflectionUtil.getWholeField(getClass(), "startTime");
-                    startTimeField.setAccessible(true);
+                    startTimeField = getAccessibleField("startTime");
                 }
             }
         }
@@ -207,7 +205,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (linkedGuid == null) {
             synchronized (attributeLinkLock) {
                 if (linkedGuid == null) {
-                    linkedGuid = (String) DfReflectionUtil.getValue(guidField, this);
+                    linkedGuid = getFieldValue(guidField);
                 }
             }
         }
@@ -217,8 +215,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (guidField == null) {
             synchronized (reflectionPartyLock) {
                 if (guidField == null) {
-                    guidField = DfReflectionUtil.getWholeField(getClass(), "guid");
-                    guidField.setAccessible(true);
+                    guidField = getAccessibleField("guid");
                 }
             }
         }
@@ -230,7 +227,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     protected void registerThreadNewCreated() {
         readyThreadFieldIfNeeds();
         final Thread thread = new Thread(new RomanticRunner());
-        DfReflectionUtil.setValue(threadField, this, thread);
+        setFieldValue(threadField, thread);
         linkedThread = thread;
     }
 
@@ -238,8 +235,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (threadField == null) {
             synchronized (reflectionPartyLock) {
                 if (threadField == null) {
-                    threadField = DfReflectionUtil.getWholeField(getClass(), "thread");
-                    threadField.setAccessible(true);
+                    threadField = getAccessibleField("thread");
                 }
             }
         }
@@ -253,7 +249,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (linkedContext == null) {
             synchronized (attributeLinkLock) {
                 if (linkedContext == null) {
-                    linkedContext = (TaskExecutionContext) DfReflectionUtil.getValue(contextField, this);
+                    linkedContext = getFieldValue(contextField);
                 }
             }
         }
@@ -263,10 +259,27 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
         if (contextField == null) {
             synchronized (reflectionPartyLock) {
                 if (contextField == null) {
-                    contextField = DfReflectionUtil.getWholeField(getClass(), "context");
-                    contextField.setAccessible(true);
+                    contextField = getAccessibleField("context");
                 }
             }
         }
+    }
+
+    // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    @SuppressWarnings("unchecked")
+    protected <RESULT> RESULT getFieldValue(Field field) {
+        return (RESULT) DfReflectionUtil.getValue(field, this);
+    }
+
+    protected void setFieldValue(Field field, Object value) {
+        DfReflectionUtil.setValue(field, this, value);
+    }
+
+    protected Field getAccessibleField(String fieldName) {
+        final Field field = DfReflectionUtil.getWholeField(getClass(), fieldName);
+        field.setAccessible(true);
+        return field;
     }
 }

@@ -356,8 +356,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected Map<String, Object> mergeParameterMap(Map<String, Object> byCronMap, LaunchNowOption nowOption) {
         final Map<String, Object> byLaunchMap = nowOption.getParameterMap();
         if (!nowOption.isPriorParams()) {
-            byLaunchMap.keySet().forEach(key -> {
-                if (byCronMap.containsKey(key)) {
+            byCronMap.keySet().forEach(key -> {
+                if (byLaunchMap.containsKey(key)) {
                     throwJobLaunchParameterConflictException(byCronMap, byLaunchMap);
                 }
             });
@@ -368,15 +368,15 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return Collections.unmodifiableMap(parameterMap);
     }
 
-    protected void throwJobLaunchParameterConflictException(Map<String, Object> byOptionMap, Map<String, Object> byLaunchMap) {
+    protected void throwJobLaunchParameterConflictException(Map<String, Object> byCronMap, Map<String, Object> byLaunchMap) {
         final ExceptionMessageBuilder br = new ExceptionMessageBuilder();
-        br.addNotice("The same key parameter exists in both launch and option paramter.");
+        br.addNotice("Conflicted the key of launch parameter.");
         br.addItem("Advice");
-        br.addElement("You cannot use launch parameter key.");
-        br.addElement("same as option paramter key.");
+        br.addElement("You cannot use the launch parameter key");
+        br.addElement("that is same as cron paramter key.");
         br.addElement("Or you can override by launch parameter option.");
-        br.addItem("Option Parameter");
-        br.addElement(byOptionMap.keySet());
+        br.addItem("Cron Parameter");
+        br.addElement(byCronMap.keySet());
         br.addItem("Launch Parameter");
         br.addElement(byLaunchMap.keySet());
         final String msg = br.buildExceptionMessage();

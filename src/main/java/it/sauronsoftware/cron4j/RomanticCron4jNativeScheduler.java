@@ -91,13 +91,12 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
     // -----------------------------------------------------
     //                                             Executors
     //                                             ---------
-    @SuppressWarnings("unchecked")
     protected void setupLinkedExecutorsIfNeeds() {
         readyExecutorsFieldIfNeeds();
         if (linkedExecutors == null) {
             synchronized (attributeLinkLock) {
                 if (linkedExecutors == null) {
-                    linkedExecutors = (List<TaskExecutor>) DfReflectionUtil.getValue(executorsField, this);
+                    linkedExecutors = getFieldValue(executorsField);
                 }
             }
         }
@@ -107,8 +106,7 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
         if (executorsField == null) {
             synchronized (reflectionPartyLock) {
                 if (executorsField == null) {
-                    executorsField = DfReflectionUtil.getWholeField(getClass(), "executors");
-                    executorsField.setAccessible(true);
+                    executorsField = getAccessibleField("executors");
                 }
             }
         }
@@ -122,7 +120,7 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
         if (linkedLock == null) {
             synchronized (attributeLinkLock) {
                 if (linkedLock == null) {
-                    linkedLock = DfReflectionUtil.getValue(lockField, this);
+                    linkedLock = getFieldValue(lockField);
                 }
             }
         }
@@ -132,10 +130,23 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
         if (lockField == null) {
             synchronized (reflectionPartyLock) {
                 if (lockField == null) {
-                    lockField = DfReflectionUtil.getWholeField(getClass(), "lock");
-                    lockField.setAccessible(true);
+                    lockField = getAccessibleField("lock");
                 }
             }
         }
+    }
+
+    // ===================================================================================
+    //                                                                        Small Helper
+    //                                                                        ============
+    @SuppressWarnings("unchecked")
+    protected <RESULT> RESULT getFieldValue(Field field) {
+        return (RESULT) DfReflectionUtil.getValue(field, this);
+    }
+
+    protected Field getAccessibleField(String fieldName) {
+        final Field field = DfReflectionUtil.getWholeField(getClass(), fieldName);
+        field.setAccessible(true);
+        return field;
     }
 }
