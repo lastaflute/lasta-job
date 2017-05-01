@@ -17,6 +17,7 @@ package org.lastaflute.job;
 
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
+import org.lastaflute.job.subsidiary.LaunchNowOpCall;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.ReadableJobAttr;
 import org.lastaflute.job.subsidiary.ReadableJobState;
@@ -40,6 +41,17 @@ public interface LaScheduledJob extends ReadableJobAttr, ReadableJobState, Regis
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     LaunchedProcess launchNow();
+
+    /**
+     * Actually launch the job now (at other thread), no-related to cron time. <br>
+     * If executing job exists, the launched job is waiting for <br>
+     * finishing the executing job. (you can change the behavior by option) <br>
+     * And you can set parameter by option, which launched job can directly use by runtime.
+     * @param opLambda The callback for option of launch-now, e.g. parameter. (NotNull)
+     * @return The launched process of the job. (NotNull)
+     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
+     */
+    LaunchedProcess launchNow(LaunchNowOpCall opLambda);
 
     /**
      * Stop the executing job by Thread.interrupt() and runtime.stopIfNeeds(). <br>

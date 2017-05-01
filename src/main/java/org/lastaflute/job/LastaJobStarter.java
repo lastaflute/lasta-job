@@ -33,7 +33,7 @@ import org.lastaflute.job.exception.JobSchedulerNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import it.sauronsoftware.cron4j.Scheduler;
+import it.sauronsoftware.cron4j.RomanticCron4jNativeScheduler;
 
 /**
  * @author jflute
@@ -155,8 +155,8 @@ public class LastaJobStarter {
         return new Cron4jScheduler(newNativeScheduler());
     }
 
-    protected Scheduler newNativeScheduler() {
-        return new Scheduler();
+    protected RomanticCron4jNativeScheduler newNativeScheduler() {
+        return new RomanticCron4jNativeScheduler();
     }
 
     protected Cron4jNow createCron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner) {

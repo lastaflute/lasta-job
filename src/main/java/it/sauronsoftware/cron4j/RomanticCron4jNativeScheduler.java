@@ -18,7 +18,10 @@ package it.sauronsoftware.cron4j;
 import java.lang.reflect.Field;
 import java.util.List;
 
+import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfReflectionUtil;
+import org.lastaflute.job.cron4j.Cron4jTask;
+import org.lastaflute.job.subsidiary.LaunchNowOption;
 
 /**
  * @author jflute
@@ -26,13 +29,51 @@ import org.dbflute.util.DfReflectionUtil;
  */
 public class RomanticCron4jNativeScheduler extends Scheduler {
 
+    // ===================================================================================
+    //                                                                           Attribute
+    //                                                                           =========
+    // -----------------------------------------------------
+    //                                            Reflection
+    //                                            ----------
+    protected final Object attributeLinkLock = this; // per instance
+    protected final Object reflectionPartyLock = RomanticCron4jNativeScheduler.class; // as static
+
     protected static Field executorsField; // cached
     protected List<TaskExecutor> linkedExecutors;
 
+    protected static Field lockField; // cached
+    protected Object linkedLock;
+
+    // ===================================================================================
+    //                                                                          Launch Now
+    //                                                                          ==========
+    public TaskExecutor launchNow(Cron4jTask cron4jTask, LaunchNowOption nowOption) {
+        setupLinkedLockIfNeeds();
+        synchronized (linkedLock) {
+            if (!isStarted()) {
+                throw new IllegalStateException("Scheduler not started");
+            }
+            return spawnExecutor(cron4jTask, OptionalThing.of(nowOption));
+        }
+    }
+
+    // ===================================================================================
+    //                                                                      Spawn Executor
+    //                                                                      ==============
     @Override
-    public TaskExecutor spawnExecutor(Task task) { // called by run() and launch()
+    protected TaskExecutor spawnExecutor(Task task) { // called by run() and launch()
+        return doSpawnExecutor(task, OptionalThing.ofNullable(null, () -> {
+            throw new IllegalStateException("Not found the launch-now option because of not launch-now.");
+        }));
+    }
+
+    protected TaskExecutor spawnExecutor(Task task, OptionalThing<LaunchNowOption> nowOption) {
+        return doSpawnExecutor(task, nowOption);
+    }
+
+    protected TaskExecutor doSpawnExecutor(Task task, OptionalThing<LaunchNowOption> nowOption) {
         setupLinkedExecutorsIfNeeds();
-        final RomanticCron4jNativeTaskExecutor executor = new RomanticCron4jNativeTaskExecutor(this, task);
+        final TaskExecutor executor = createTaskExecutor(task, nowOption);
         synchronized (linkedExecutors) {
             linkedExecutors.add(executor);
         }
@@ -40,11 +81,21 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
         return executor;
     }
 
+    protected TaskExecutor createTaskExecutor(Task task, OptionalThing<LaunchNowOption> nowOption) {
+        return new RomanticCron4jNativeTaskExecutor(this, task, nowOption);
+    }
+
+    // ===================================================================================
+    //                                                                 Reflection Festival
+    //                                                                 ===================
+    // -----------------------------------------------------
+    //                                             Executors
+    //                                             ---------
     @SuppressWarnings("unchecked")
     protected void setupLinkedExecutorsIfNeeds() {
         readyExecutorsFieldIfNeeds();
         if (linkedExecutors == null) {
-            synchronized (this) {
+            synchronized (attributeLinkLock) {
                 if (linkedExecutors == null) {
                     linkedExecutors = (List<TaskExecutor>) DfReflectionUtil.getValue(executorsField, this);
                 }
@@ -54,10 +105,35 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
 
     protected void readyExecutorsFieldIfNeeds() {
         if (executorsField == null) {
-            synchronized (RomanticCron4jNativeScheduler.class) {
+            synchronized (reflectionPartyLock) {
                 if (executorsField == null) {
                     executorsField = DfReflectionUtil.getWholeField(getClass(), "executors");
                     executorsField.setAccessible(true);
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------
+    //                                                 Lock
+    //                                                ------
+    protected void setupLinkedLockIfNeeds() {
+        readyLockFieldIfNeeds();
+        if (linkedLock == null) {
+            synchronized (attributeLinkLock) {
+                if (linkedLock == null) {
+                    linkedLock = DfReflectionUtil.getValue(lockField, this);
+                }
+            }
+        }
+    }
+
+    protected void readyLockFieldIfNeeds() {
+        if (lockField == null) {
+            synchronized (reflectionPartyLock) {
+                if (lockField == null) {
+                    lockField = DfReflectionUtil.getWholeField(getClass(), "lock");
+                    lockField.setAccessible(true);
                 }
             }
         }

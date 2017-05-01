@@ -18,16 +18,19 @@ package org.lastaflute.job.cron4j;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobConcurrentlyExecutingException;
+import org.lastaflute.job.exception.JobLaunchParameterConflictException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
 import org.lastaflute.job.key.LaJobUnique;
@@ -42,6 +45,7 @@ import org.lastaflute.job.subsidiary.EndTitleRoll;
 import org.lastaflute.job.subsidiary.ExecResultType;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.job.subsidiary.JobIdentityAttr;
+import org.lastaflute.job.subsidiary.LaunchNowOption;
 import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
 import org.lastaflute.job.subsidiary.NeighborConcurrentJobStopper;
 import org.lastaflute.job.subsidiary.ReadableJobAttr;
@@ -50,6 +54,7 @@ import org.lastaflute.job.subsidiary.TaskRunningState;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
 
+import it.sauronsoftware.cron4j.RomanticCron4jTaskExecutionContext;
 import it.sauronsoftware.cron4j.Task;
 import it.sauronsoftware.cron4j.TaskExecutionContext;
 import it.sauronsoftware.cron4j.TaskExecutor;
@@ -100,6 +105,16 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                  ==================
     @Override
     public void execute(TaskExecutionContext context) { // e.g. error handling
+        final TaskExecutionContext nativeContext;
+        final OptionalThing<LaunchNowOption> nowOption;
+        if (context instanceof RomanticCron4jTaskExecutionContext) {
+            final RomanticCron4jTaskExecutionContext romantic = (RomanticCron4jTaskExecutionContext) context;
+            nativeContext = romantic.getNativeContext();
+            nowOption = romantic.getLaunchNowOption();
+        } else {
+            nativeContext = context;
+            nowOption = OptionalThing.empty();
+        }
         try {
             final LocalDateTime activationTime = currentTime.get();
             final Cron4jJob job = findJob();
@@ -107,7 +122,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             RunnerResult runnerResult = null;
             Throwable controllerCause = null;
             try {
-                runnerResult = doExecute(job, context); // not null
+                runnerResult = doExecute(job, nativeContext, nowOption); // not null
                 if (canTriggerNext(job, runnerResult)) {
                     job.triggerNext(); // should be after current job ending
                 }
@@ -122,7 +137,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             }
             final OptionalThing<RunnerResult> optRunnerResult = optRunnerResult(runnerResult); // empty when error 
             final OptionalThing<LocalDateTime> endTime = deriveEndTime(optRunnerResult);
-            recordJobHistory(context, job, jobThread, activationTime, optRunnerResult, endTime, optControllerCause(controllerCause));
+            recordJobHistory(nativeContext, job, jobThread, activationTime, optRunnerResult, endTime, optControllerCause(controllerCause));
         } catch (Throwable coreCause) { // controller dead
             final String msg = "Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName();
             error(OptionalThing.empty(), msg, coreCause);
@@ -152,7 +167,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // ===================================================================================
     //                                                        Execute - Concurrent Control
     //                                                        ============================
-    protected RunnerResult doExecute(Cron4jJob job, TaskExecutionContext context) { // e.g. concurrent control, cross vm
+    protected RunnerResult doExecute(Cron4jJob job, TaskExecutionContext context, OptionalThing<LaunchNowOption> nowOption) { // e.g. concurrent control, cross vm
         // ...may be hard to read, synchronized hell
         final String cronExp;
         final VaryingCronOption cronOption;
@@ -202,7 +217,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     final RunnerResult runnerResult;
                     final LocalDateTime endTime;
                     try {
-                        runnerResult = actuallyExecute(job, cronExp, cronOption, context);
+                        runnerResult = actuallyExecute(job, cronExp, cronOption, context, nowOption);
                     } finally {
                         endTime = currentTime.get();
                         if (crossVMState.isPresent()) { // hook exists
@@ -297,9 +312,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                          ==========================
     // in execution lock, cannot use varingCron here
     protected RunnerResult actuallyExecute(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
-            TaskExecutionContext context) { // in synchronized world
+            TaskExecutionContext context, OptionalThing<LaunchNowOption> nowOption) { // in synchronized world
         adjustThreadNameIfNeeds(cronOption);
-        return runJob(identityProvider, cronExp, cronOption, context);
+        return runJob(identityProvider, cronExp, cronOption, context, nowOption);
     }
 
     protected void adjustThreadNameIfNeeds(VaryingCronOption cronOption) { // because of too long name of cron4j
@@ -312,25 +327,60 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected RunnerResult runJob(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
-            TaskExecutionContext cron4jContext) {
+            TaskExecutionContext cron4jContext, OptionalThing<LaunchNowOption> nowOption) {
         final LocalDateTime beginTime = runningState.getBeginTime().get(); // already begun here
         return jobRunner.run(jobType, () -> {
-            return createCron4jRuntime(identityProvider, cronExp, cronOption, beginTime, cron4jContext);
+            return createCron4jRuntime(identityProvider, cronExp, cronOption, beginTime, cron4jContext, nowOption);
         }).acceptEndTime(currentTime.get());
     }
 
     protected Cron4jRuntime createCron4jRuntime(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
-            LocalDateTime beginTime, TaskExecutionContext cron4jContext) {
+            LocalDateTime beginTime, TaskExecutionContext cron4jContext, OptionalThing<LaunchNowOption> nowOption) {
         final LaJobKey jobKey = identityProvider.getJobKey();
         final OptionalThing<LaJobNote> jobNote = identityProvider.getJobNote();
         final OptionalThing<LaJobUnique> jobUnique = identityProvider.getJobUnique();
-        final Map<String, Object> parameterMap = extractParameterMap(cronOption);
+        final Map<String, Object> parameterMap = prepareParameterMap(cronOption, nowOption);
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
         return new Cron4jRuntime(jobKey, jobNote, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel, beginTime, cron4jContext);
     }
 
+    protected Map<String, Object> prepareParameterMap(VaryingCronOption cronOption, OptionalThing<LaunchNowOption> nowOption) {
+        final Map<String, Object> byCronMap = extractParameterMap(cronOption);
+        return nowOption.isPresent() ? mergeParameterMap(byCronMap, nowOption.get()) : byCronMap;
+    }
+
     protected Map<String, Object> extractParameterMap(VaryingCronOption cronOption) {
         return cronOption.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
+    }
+
+    protected Map<String, Object> mergeParameterMap(Map<String, Object> byCronMap, LaunchNowOption nowOption) {
+        final Map<String, Object> byLaunchMap = nowOption.getParameterMap();
+        if (!nowOption.isPriorParams()) {
+            byLaunchMap.keySet().forEach(key -> {
+                if (byCronMap.containsKey(key)) {
+                    throwJobLaunchParameterConflictException(byCronMap, byLaunchMap);
+                }
+            });
+        }
+        final Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();
+        parameterMap.putAll(byCronMap);
+        parameterMap.putAll(byLaunchMap); // may override same-key value
+        return Collections.unmodifiableMap(parameterMap);
+    }
+
+    protected void throwJobLaunchParameterConflictException(Map<String, Object> byOptionMap, Map<String, Object> byLaunchMap) {
+        final ExceptionMessageBuilder br = new ExceptionMessageBuilder();
+        br.addNotice("The same key parameter exists in both launch and option paramter.");
+        br.addItem("Advice");
+        br.addElement("You cannot use launch parameter key.");
+        br.addElement("same as option paramter key.");
+        br.addElement("Or you can override by launch parameter option.");
+        br.addItem("Option Parameter");
+        br.addElement(byOptionMap.keySet());
+        br.addItem("Launch Parameter");
+        br.addElement(byLaunchMap.keySet());
+        final String msg = br.buildExceptionMessage();
+        throw new JobLaunchParameterConflictException(msg);
     }
 
     // ===================================================================================

@@ -15,18 +15,27 @@
  */
 package it.sauronsoftware.cron4j;
 
+import org.dbflute.optional.OptionalThing;
+import org.lastaflute.job.subsidiary.LaunchNowOption;
+
 /**
  * @author jflute
  * @since 0.4.6 (2017/05/01 Monday at rainbow bird rendezvous)
  */
 public class RomanticCron4jTaskExecutionContext implements TaskExecutionContext {
 
-    protected final TaskExecutionContext nativeContext;
-    protected final Object parameter;
+    // ===================================================================================
+    //                                                                           Attribute
+    //                                                                           =========
+    protected final TaskExecutionContext nativeContext; // not null
+    protected final OptionalThing<LaunchNowOption> nowOption; // not null
 
-    public RomanticCron4jTaskExecutionContext(TaskExecutionContext nativeContext, Object parameter) {
+    // ===================================================================================
+    //                                                                         Constructor
+    //                                                                         ===========
+    public RomanticCron4jTaskExecutionContext(TaskExecutionContext nativeContext, OptionalThing<LaunchNowOption> nowOption) {
         this.nativeContext = nativeContext;
-        this.parameter = parameter;
+        this.nowOption = nowOption;
     }
 
     // ===================================================================================
@@ -69,7 +78,7 @@ public class RomanticCron4jTaskExecutionContext implements TaskExecutionContext 
         return nativeContext;
     }
 
-    public Object getParameter() {
-        return parameter;
+    public OptionalThing<LaunchNowOption> getLaunchNowOption() {
+        return nowOption;
     }
 }

@@ -18,7 +18,9 @@ package it.sauronsoftware.cron4j;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
+import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfReflectionUtil;
+import org.lastaflute.job.subsidiary.LaunchNowOption;
 
 /**
  * @author jflute
@@ -34,6 +36,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     //                                                 -----
     protected final Scheduler linkedScheduler; // not null
     protected final Task linkedTask; // not null
+    protected final OptionalThing<LaunchNowOption> nowOption; // not null
 
     // -----------------------------------------------------
     //                                            Reflection
@@ -61,10 +64,11 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public RomanticCron4jNativeTaskExecutor(Scheduler scheduler, Task task) {
+    public RomanticCron4jNativeTaskExecutor(Scheduler scheduler, Task task, OptionalThing<LaunchNowOption> nowOption) {
         super(scheduler, task);
         this.linkedScheduler = scheduler;
         this.linkedTask = task;
+        this.nowOption = nowOption;
     }
 
     // ===================================================================================
@@ -84,7 +88,7 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     }
 
     protected String buildThreadName(Object schedulerGuid, String executorGuid) {
-        return "cron4j::scheduler[" + schedulerGuid + "]::executor[" + executorGuid + "]";
+        return "cron4j::scheduler[" + schedulerGuid + "]::executor[" + executorGuid + "]"; // same as native
     }
 
     protected void prepareThread(boolean daemon, String threadName) {
@@ -97,19 +101,19 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     }
 
     // ===================================================================================
-    //                                                                              Runner
-    //                                                                              ======
+    //                                                                     Romantic Runner
+    //                                                                     ===============
     protected class RomanticRunner implements Runnable {
 
         @Override
         public void run() {
             final TaskExecutor myself = RomanticCron4jNativeTaskExecutor.this;
-            registerStartTimeCurrentTime(); // #thiking duplicate?
+            registerStartTimeCurrentTime(); // #thiking duplicate? (also in native code) by jflute
             Throwable cause = null;
             try {
                 linkedScheduler.notifyTaskLaunching(myself);
                 setupLinkedContextIfNeeds();
-                linkedTask.execute(linkedContext);
+                linkedTask.execute(createRomanticContext());
                 linkedScheduler.notifyTaskSucceeded(myself);
             } catch (Throwable e) {
                 cause = e;
@@ -119,6 +123,10 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
                 linkedScheduler.notifyExecutorCompleted(myself);
             }
         }
+    }
+
+    protected RomanticCron4jTaskExecutionContext createRomanticContext() {
+        return new RomanticCron4jTaskExecutionContext(linkedContext, nowOption);
     }
 
     // ===================================================================================

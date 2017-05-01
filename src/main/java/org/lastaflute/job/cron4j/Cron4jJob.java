@@ -43,6 +43,8 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
+import org.lastaflute.job.subsidiary.LaunchNowOpCall;
+import org.lastaflute.job.subsidiary.LaunchNowOption;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
 import org.lastaflute.job.subsidiary.NeighborConcurrentGroup;
 import org.lastaflute.job.subsidiary.SnapshotExecState;
@@ -128,13 +130,29 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized LaunchedProcess launchNow() {
+        return doLaunchNow(op -> {});
+    }
+
+    @Override
+    public LaunchedProcess launchNow(LaunchNowOpCall opLambda) {
+        return doLaunchNow(opLambda);
+    }
+
+    protected LaunchedProcess doLaunchNow(LaunchNowOpCall opLambda) {
         verifyScheduledState();
+        final LaunchNowOption option = createLaunchNowOption(opLambda);
         if (JobChangeLog.isEnabled()) {
-            JobChangeLog.log("#job ...Launching now: {}", toString());
+            JobChangeLog.log("#job ...Launching now: {}, {}", option, this);
         }
         // if executed by cron here, duplicate execution occurs but task level synchronization exists
-        final TaskExecutor taskExecutor = cron4jNow.getCron4jScheduler().launch(cron4jTask);
+        final TaskExecutor taskExecutor = cron4jNow.getCron4jScheduler().launchNow(cron4jTask, option);
         return createLaunchedProcess(taskExecutor);
+    }
+
+    protected LaunchNowOption createLaunchNowOption(LaunchNowOpCall opLambda) {
+        final LaunchNowOption op = new LaunchNowOption();
+        opLambda.callback(op);
+        return op;
     }
 
     protected LaunchedProcess createLaunchedProcess(TaskExecutor taskExecutor) {
