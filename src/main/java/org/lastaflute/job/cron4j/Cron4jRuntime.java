@@ -143,11 +143,9 @@ public class Cron4jRuntime implements LaJobRuntime {
     @Override
     public void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda) {
         assertArgumentNotNull("dataLambda", dataLambda);
-        if (endTitleRollData != null) {
-            String msg = "Already existing end-title roll data: " + endTitleRollData + " runtime=" + toString();
-            throw new IllegalStateException(msg);
+        if (endTitleRollData == null) { // you can call this several times in your job
+            endTitleRollData = newEndTitleRoll();
         }
-        endTitleRollData = newEndTitleRoll();
         dataLambda.accept(endTitleRollData);
     }
 

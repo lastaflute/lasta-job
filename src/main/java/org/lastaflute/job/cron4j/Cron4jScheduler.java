@@ -19,6 +19,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.lastaflute.job.subsidiary.LaunchNowOption;
+
+import it.sauronsoftware.cron4j.RomanticCron4jNativeScheduler;
 import it.sauronsoftware.cron4j.Scheduler;
 import it.sauronsoftware.cron4j.TaskExecutor;
 
@@ -31,12 +34,12 @@ public class Cron4jScheduler {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Scheduler nativeScheduler;
+    protected final RomanticCron4jNativeScheduler nativeScheduler;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jScheduler(Scheduler cron4jScheduler) {
+    public Cron4jScheduler(RomanticCron4jNativeScheduler cron4jScheduler) {
         this.nativeScheduler = cron4jScheduler;
     }
 
@@ -69,8 +72,13 @@ public class Cron4jScheduler {
         return Stream.of(nativeScheduler.getExecutingTasks()).collect(Collectors.toList());
     }
 
-    public TaskExecutor launch(Cron4jTask cron4jTask) {
-        return nativeScheduler.launch(cron4jTask);
+    // unused because of launch-now option
+    //public TaskExecutor launch(Cron4jTask cron4jTask) {
+    //    return nativeScheduler.launch(cron4jTask);
+    //}
+
+    public TaskExecutor launchNow(Cron4jTask cron4jTask, LaunchNowOption option) {
+        return nativeScheduler.launchNow(cron4jTask, option);
     }
 
     public void stop() {

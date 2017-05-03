@@ -201,7 +201,7 @@ public class LaJobRunner {
     }
 
     protected RunnerResult doRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
-        // simplar to async manager's process
+        // similar to async manager's process
         arrangeThreadCacheContext(runtime);
         arrangePreparedAccessContext(runtime);
         arrangeCallbackContext(runtime);

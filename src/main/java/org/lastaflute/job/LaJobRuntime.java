@@ -48,7 +48,11 @@ public interface LaJobRuntime {
 
     Method getRunMethod(); // not null
 
-    Map<String, Object> getParameterMap(); // not null, read-only
+    /**
+     * Get parameter map for the job, from both cron option and launch-now option.
+     * @return The read-only map of your parameter. (NotNull)
+     */
+    Map<String, Object> getParameterMap(); // not null, read-only, business method
 
     JobNoticeLogLevel getNoticeLogLevel(); // not null
 
@@ -65,17 +69,17 @@ public interface LaJobRuntime {
     /**
      * @param dataLambda The callback of end-title roll data for registration. (NotNull)
      */
-    void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda);
+    void showEndTitleRoll(Consumer<EndTitleRoll> dataLambda); // business method
 
     // ===================================================================================
     //                                                                            Stop Job
     //                                                                            ========
-    void stopIfNeeds(); // exception if stopped
+    void stopIfNeeds(); // exception if stopped, business method
 
     // ===================================================================================
     //                                                                    Business Failure
     //                                                                    ================
-    void suppressNextTrigger();
+    void suppressNextTrigger(); // business method
 
     boolean isNextTriggerSuppressed();
 
