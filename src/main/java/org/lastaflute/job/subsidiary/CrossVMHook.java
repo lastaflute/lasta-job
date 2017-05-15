@@ -29,7 +29,7 @@ public interface CrossVMHook {
     //     OptionalThing<JobExecControl> jobExecControl = jobExecControlBhv.selectByUniqueOf(job.getJobUnique().get());
     //     if (jobExecControl.isPresent()) { // concurrent
     //         ConcurrentJobStopper stopper = new ConcurrentJobStopper();
-    //         return stopper.stopIfNeeds(...).map(result -> { // quit (or exception)
+    //         return stopper.stopIfNeeds(jobAttr, ...).map(result -> { // quit (or exception)
     //             return asQuitState();
     //         }).orElseGet(() -> { // wait
     //             waitForEndingBySomething();

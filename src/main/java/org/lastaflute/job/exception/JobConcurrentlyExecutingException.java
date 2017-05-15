@@ -28,4 +28,8 @@ public class JobConcurrentlyExecutingException extends LaJobOperationException {
     public JobConcurrentlyExecutingException(String msg) {
         super(msg);
     }
+
+    public JobConcurrentlyExecutingException(String msg, Throwable cause) {
+        super(msg, cause);
+    }
 }
