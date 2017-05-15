@@ -26,34 +26,7 @@ import org.lastaflute.job.exception.JobNeighborConcurrentlyExecutingException;
  */
 public interface CrossVMHook {
 
-    // e.g.
-    // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-    // public CrossVMState hookBeginning(ReadableJobState jobState, LocalDateTime activationTime) {
-    //     ConcurrentJobStopper stopper = createConcurrentJobStopper();
-    //     return stopper.stopIfNeeds(jobState, ...).map(result -> { // quit (or exception)
-    //         return asQuitState();
-    //     }).orElseGet(() -> {
-    //         return asNormalState();
-    //     });
-    // }
-    // private ConcurrentJobStopper createConcurrentJobStopper() {
-    //     return new ConcurrentJobStopper(jobState -> {
-    //         return jobExecControlBhv.selectCount(cb -> {
-    //             cb.query().setJobUnique(job.getJobUnique().get());
-    //         }) > 0;
-    //     }).waitress(jobState -> waitForEndingBySomething(jobState));
-    // });
-    // private CrossVMState asQuitState() {
-    //     return new CrossVMState().asQuit();
-    // }
-    // private CrossVMState asNormalState() {
-    //     JobExecControl jobExecControl = new JobExecControl();
-    //     ...
-    //     jobExecControlBhv.insert(jobExecControl);
-    //     return new CrossVMState().withAttribute("jobExecControlId", jobExecControl.getJobExecControlId());
-    // }
-    // _/_/_/_/_/_/_/_/_/_/
-    // not jobState because jobAttr is enough to hook for self job
+    // sea ConcurrentCrossVMHook for the implementation example
     /**
      * Hook beginning for cross VM handling.
      * @param jobState The object that can provide attributes and states of job. (NotNull)
@@ -64,13 +37,6 @@ public interface CrossVMHook {
      */
     CrossVMState hookBeginning(ReadableJobState jobState, LocalDateTime activationTime);
 
-    // e.g.
-    // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-    // public void hookEnding(ReadableJobState jobState, CrossVMState crossVMState, LocalDateTime endTime) {
-    //     Long jobExecControlId = crossVMState.getAttribute("jobExecControlId", Long.class).get();
-    //     jobExecControlBhv.delete(...);
-    // }
-    // _/_/_/_/_/_/_/_/_/_/
     /**
      * Hook ending for cross VM handling. <br>
      * Cannot be called if quit and error for concurrent. <br>
