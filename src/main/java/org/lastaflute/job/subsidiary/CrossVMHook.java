@@ -17,6 +17,9 @@ package org.lastaflute.job.subsidiary;
 
 import java.time.LocalDateTime;
 
+import org.lastaflute.job.exception.JobConcurrentlyExecutingException;
+import org.lastaflute.job.exception.JobNeighborConcurrentlyExecutingException;
+
 /**
  * @author jflute
  * @since 0.4.1 (2017/03/20 Monday)
@@ -52,9 +55,12 @@ public interface CrossVMHook {
     // _/_/_/_/_/_/_/_/_/_/
     // not jobState because jobAttr is enough to hook for self job
     /**
+     * Hook beginning for cross VM handling.
      * @param jobState The object that can provide attributes and states of job. (NotNull)
      * @param activationTime The date-time of job activation. (NotNull)
      * @return The state object of hook runtime, can be used at ending hook. (NotNull)
+     * @throws JobConcurrentlyExecutingException When the job is duplicate boot.
+     * @throws JobNeighborConcurrentlyExecutingException When the neightbor job is boot.
      */
     CrossVMState hookBeginning(ReadableJobState jobState, LocalDateTime activationTime);
 
@@ -66,6 +72,9 @@ public interface CrossVMHook {
     // }
     // _/_/_/_/_/_/_/_/_/_/
     /**
+     * Hook ending for cross VM handling. <br>
+     * Cannot be called if quit and error for concurrent. <br>
+     * While, can be called if exception from job execution.
      * @param jobState The object that can provide attributes and states of job. (NotNull)
      * @param crossVMState The state object of hook runtime, can be used at ending hook. (NotNull)
      * @param endTime The date-time of job ending. (NotNull)

@@ -214,6 +214,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     final OptionalThing<CrossVMState> crossVMState = jobRunner.getCrossVMHook().map(hook -> {
                         return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
                     });
+                    if (crossVMState.isPresent() && crossVMState.get().isQuit()) {
+                        return RunnerResult.asQuitByConcurrent(); // quit by cross VM handling
+                    }
                     final RunnerResult runnerResult;
                     final LocalDateTime endTime;
                     try {
