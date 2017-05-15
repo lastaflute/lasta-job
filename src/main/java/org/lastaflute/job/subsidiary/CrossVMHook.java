@@ -25,47 +25,50 @@ public interface CrossVMHook {
 
     // e.g.
     // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-    // public CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime activationTime) {
-    //     OptionalThing<JobExecControl> jobExecControl = jobExecControlBhv.selectByUniqueOf(job.getJobUnique().get());
-    //     if (jobExecControl.isPresent()) { // concurrent
-    //         ConcurrentJobStopper stopper = new ConcurrentJobStopper();
-    //         return stopper.stopIfNeeds(jobAttr, ...).map(result -> { // quit (or exception)
-    //             return asQuitState();
-    //         }).orElseGet(() -> { // wait
-    //             waitForEndingBySomething();
-    //             return asNormalState();
-    //         });
-    //     } else {
-    //         return asNormalExecution();
-    //     }
+    // public CrossVMState hookBeginning(ReadableJobState jobState, LocalDateTime activationTime) {
+    //     ConcurrentJobStopper stopper = createConcurrentJobStopper();
+    //     return stopper.stopIfNeeds(jobState, ...).map(result -> { // quit (or exception)
+    //         return asQuitState();
+    //     }).orElseGet(() -> {
+    //         return asNormalState();
+    //     });
     // }
+    // private ConcurrentJobStopper createConcurrentJobStopper() {
+    //     return new ConcurrentJobStopper(jobState -> {
+    //         return jobExecControlBhv.selectCount(cb -> {
+    //             cb.query().setJobUnique(job.getJobUnique().get());
+    //         }) > 0;
+    //     }).waitress(jobState -> waitForEndingBySomething(jobState));
+    // });
     // private CrossVMState asQuitState() {
     //     return new CrossVMState().asQuit();
     // }
     // private CrossVMState asNormalState() {
-    //     JobExecControl jobExecControl = jobExecControlBhv.insert(...);
+    //     JobExecControl jobExecControl = new JobExecControl();
+    //     ...
+    //     jobExecControlBhv.insert(jobExecControl);
     //     return new CrossVMState().withAttribute("jobExecControlId", jobExecControl.getJobExecControlId());
     // }
     // _/_/_/_/_/_/_/_/_/_/
     // not jobState because jobAttr is enough to hook for self job
     /**
-     * @param jobAttr The object that can provide attributes of job. (NotNull)
+     * @param jobState The object that can provide attributes and states of job. (NotNull)
      * @param activationTime The date-time of job activation. (NotNull)
      * @return The state object of hook runtime, can be used at ending hook. (NotNull)
      */
-    CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime activationTime);
+    CrossVMState hookBeginning(ReadableJobState jobState, LocalDateTime activationTime);
 
     // e.g.
     // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-    // public void hookEnding(ReadableJobAttr jobAttr, CrossVMState state) {
-    //     Long jobExecControlId = state.getAttribute("jobExecControlId", Long.class).get();
+    // public void hookEnding(ReadableJobState jobState, CrossVMState crossVMState, LocalDateTime endTime) {
+    //     Long jobExecControlId = crossVMState.getAttribute("jobExecControlId", Long.class).get();
     //     jobExecControlBhv.delete(...);
     // }
     // _/_/_/_/_/_/_/_/_/_/
     /**
-     * @param jobAttr The object that can provide attributes of job. (NotNull)
-     * @param state The state object of hook runtime, can be used at ending hook. (NotNull)
+     * @param jobState The object that can provide attributes and states of job. (NotNull)
+     * @param crossVMState The state object of hook runtime, can be used at ending hook. (NotNull)
      * @param endTime The date-time of job ending. (NotNull)
      */
-    void hookEnding(ReadableJobAttr jobAttr, CrossVMState state, LocalDateTime endTime);
+    void hookEnding(ReadableJobState jobState, CrossVMState crossVMState, LocalDateTime endTime);
 }

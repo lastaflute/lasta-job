@@ -250,21 +250,21 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                   -------------------
     protected OptionalThing<RunnerResult> stopConcurrentJobIfNeeds(Cron4jJob job) { // in preparing lock
         synchronized (runningState) {
-            if (isRunningNow()) {
-                final OptionalThing<RunnerResult> concurrentResult = createConcurrentJobStopper().stopIfNeeds(job, () -> {
-                    return runningState.getBeginTime().get().toString(); // locked so can get safely
-                });
-                if (concurrentResult.isPresent()) {
-                    return concurrentResult;
-                }
-                // will wait for previous job by synchronization later
+            final OptionalThing<RunnerResult> concurrentResult = createConcurrentJobStopper().stopIfNeeds(job, () -> {
+                return runningState.getBeginTime().get().toString(); // locked so can get safely
+            });
+            if (concurrentResult.isPresent()) {
+                return concurrentResult;
             }
+            // will wait for previous job by synchronization later
         }
         return OptionalThing.empty();
     }
 
     protected ConcurrentJobStopper createConcurrentJobStopper() {
-        return new ConcurrentJobStopper();
+        // direct call to avoid instance worry about runningState handling so jobState is unused
+        return new ConcurrentJobStopper(unused -> isRunningNow());
+
     }
 
     // -----------------------------------------------------
@@ -304,9 +304,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected NeighborConcurrentJobStopper createNeighborConcurrentJobStopper(List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
-        return new NeighborConcurrentJobStopper(jobKey -> {
-            return cron4jNow.findJobByKey(jobKey);
-        }, jobState -> jobState.isExecutingNow(), neighborConcurrentGroupList);
+        return new NeighborConcurrentJobStopper(jobState -> jobState.isExecutingNow() // jobExecutingDeterminer
+                , jobKey -> cron4jNow.findJobByKey(jobKey) // jobFinder
+                , neighborConcurrentGroupList);
     }
 
     // ===================================================================================

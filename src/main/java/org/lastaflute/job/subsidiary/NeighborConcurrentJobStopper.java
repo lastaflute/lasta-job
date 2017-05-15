@@ -16,9 +16,12 @@
 package org.lastaflute.job.subsidiary;
 
 import java.util.List;
-import java.util.function.BiConsumer;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.exception.JobNeighborConcurrentlyExecutingException;
@@ -35,47 +38,87 @@ public class NeighborConcurrentJobStopper {
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder;
-    protected final Predicate<ReadableJobState> jobExecutingDeterminer;
+    protected final Predicate<ReadableJobState> jobExecutingDeterminer; // for neighbor job
+    protected final Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder; // for neighbor job
     protected final List<NeighborConcurrentGroup> neighborConcurrentGroupList; // inherit outer list for synchronization
+    protected Consumer<ReadableJobState> waitress; // basically for cross VM
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public NeighborConcurrentJobStopper(Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder,
-            Predicate<ReadableJobState> jobExecutingDeterminer, List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
-        this.jobFinder = jobFinder;
+    public NeighborConcurrentJobStopper(Predicate<ReadableJobState> jobExecutingDeterminer,
+            Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder,
+            List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
         this.jobExecutingDeterminer = jobExecutingDeterminer;
+        this.jobFinder = jobFinder;
         this.neighborConcurrentGroupList = neighborConcurrentGroupList;
     }
 
+    // -----------------------------------------------------
+    //                                                Option
+    //                                                ------
+    public NeighborConcurrentJobStopper waitress(Consumer<ReadableJobState> waitress) {
+        if (waitress == null) {
+            throw new IllegalArgumentException("The argument 'waitress' should not be null.");
+        }
+        this.waitress = waitress;
+        return this;
+    }
+
     // ===================================================================================
-    //                                                                               Stop
-    //                                                                              ======
+    //                                                                       Stop if needs
+    //                                                                       =============
     public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobAttr me, Function<ReadableJobState, String> stateDisp) {
-        doStopIfNeeds(me, neighborConcurrentGroupList, JobConcurrentExec.QUIT, (neighbor, group) -> {
+        final OptionalThing<RunnerResult> quitResult = doStopIfNeeds(me, JobConcurrentExec.QUIT, (neighbor, group) -> {
             noticeSilentlyQuit(me, neighbor, stateDisp, group);
+            return RunnerResult.asQuitByConcurrent();
         });
-        doStopIfNeeds(me, neighborConcurrentGroupList, JobConcurrentExec.ERROR, (neighbor, group) -> {
+        if (quitResult.isPresent()) {
+            return quitResult;
+        }
+        final OptionalThing<RunnerResult> errorResult = doStopIfNeeds(me, JobConcurrentExec.ERROR, (neighbor, group) -> {
             throwJobNeighborConcurrentlyExecutingException(me, neighbor, stateDisp, group);
+            return null; // unreachable
         });
+        if (quitResult.isPresent()) {
+            return errorResult;
+        }
+        if (waitress != null) {
+            // this is not perfect concurrent control, because of no lock
+            // so basically used only for cross VM concurrent control
+            doStopIfNeeds(me, JobConcurrentExec.WAIT, (neighbor, group) -> {
+                waitress.accept(neighbor);
+                return null; // as empty (converted to empty later)
+            });
+        }
+        // will wait for previous job naturally by synchronization later if waitress is unused
         return OptionalThing.empty();
     }
 
-    protected void doStopIfNeeds(ReadableJobAttr me, List<NeighborConcurrentGroup> groupList, JobConcurrentExec concurrentExec,
-            BiConsumer<ReadableJobState, NeighborConcurrentGroup> action) {
-        groupList.stream().filter(group -> concurrentExec.equals(group.getConcurrentExec())).forEach(group -> {
-            group.getNeighborJobKeySet().forEach(neighborJobKey -> {
+    protected OptionalThing<RunnerResult> doStopIfNeeds(ReadableJobAttr me, JobConcurrentExec concurrentExec,
+            BiFunction<ReadableJobState, NeighborConcurrentGroup, RunnerResult> action) {
+        final List<NeighborConcurrentGroup> filteredGroupList = neighborConcurrentGroupList.stream().filter(group -> {
+            return concurrentExec.equals(group.getConcurrentExec());
+        }).collect(Collectors.toList());
+        for (NeighborConcurrentGroup group : filteredGroupList) {
+            final Set<LaJobKey> neighborJobKeySet = group.getNeighborJobKeySet();
+            for (LaJobKey neighborJobKey : neighborJobKeySet) {
                 if (me.getJobKey().equals(neighborJobKey)) { // myself
-                    return; // skip
+                    continue; // skip
                 }
-                jobFinder.apply(neighborJobKey).ifPresent(neighbor -> { // ignoring unscheduled job, no problem
-                    if (jobExecutingDeterminer.test(neighbor)) { // no lock here (for cross VM hook)
-                        action.accept(neighbor, group); // so may be ended while message building
-                    }
-                });
-            });
-        });
+                final OptionalThing<? extends ReadableJobState> optJobState = jobFinder.apply(neighborJobKey);
+                if (!optJobState.isPresent()) { // ignoring unscheduled job, no problem
+                    return OptionalThing.empty();
+                }
+                final ReadableJobState neighbor = optJobState.get();
+                if (jobExecutingDeterminer.test(neighbor)) { // no lock here (for cross VM hook)
+                    return OptionalThing.ofNullable(action.apply(neighbor, group), () -> { // so may be ended while message building
+                        throw new IllegalStateException("Not found the neighbor concurrent runner result: " + neighbor);
+                    });
+                }
+            }
+        }
+        return OptionalThing.empty();
     }
 
     // -----------------------------------------------------
