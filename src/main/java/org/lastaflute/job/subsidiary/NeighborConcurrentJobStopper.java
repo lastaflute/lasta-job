@@ -18,6 +18,7 @@ package org.lastaflute.job.subsidiary;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.exception.JobNeighborConcurrentlyExecutingException;
@@ -35,21 +36,23 @@ public class NeighborConcurrentJobStopper {
     //                                                                           Attribute
     //                                                                           =========
     protected final Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder;
+    protected final Predicate<ReadableJobState> jobExecutingDeterminer;
     protected final List<NeighborConcurrentGroup> neighborConcurrentGroupList; // inherit outer list for synchronization
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
     public NeighborConcurrentJobStopper(Function<LaJobKey, OptionalThing<? extends ReadableJobState>> jobFinder,
-            List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
+            Predicate<ReadableJobState> jobExecutingDeterminer, List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
         this.jobFinder = jobFinder;
+        this.jobExecutingDeterminer = jobExecutingDeterminer;
         this.neighborConcurrentGroupList = neighborConcurrentGroupList;
     }
 
     // ===================================================================================
     //                                                                               Stop
     //                                                                              ======
-    public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobState me, Function<ReadableJobState, String> stateDisp) {
+    public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobAttr me, Function<ReadableJobState, String> stateDisp) {
         doStopIfNeeds(me, neighborConcurrentGroupList, JobConcurrentExec.QUIT, (neighbor, group) -> {
             noticeSilentlyQuit(me, neighbor, stateDisp, group);
         });
@@ -67,7 +70,7 @@ public class NeighborConcurrentJobStopper {
                     return; // skip
                 }
                 jobFinder.apply(neighborJobKey).ifPresent(neighbor -> { // ignoring unscheduled job, no problem
-                    if (neighbor.isExecutingNow()) { // no lock here (for cross VM hook)
+                    if (jobExecutingDeterminer.test(neighbor)) { // no lock here (for cross VM hook)
                         action.accept(neighbor, group); // so may be ended while message building
                     }
                 });
@@ -78,7 +81,7 @@ public class NeighborConcurrentJobStopper {
     // -----------------------------------------------------
     //                                                Notice
     //                                                ------
-    protected void noticeSilentlyQuit(ReadableJobState me, ReadableJobState neighbor, Function<ReadableJobState, String> stateDisp,
+    protected void noticeSilentlyQuit(ReadableJobAttr me, ReadableJobState neighbor, Function<ReadableJobState, String> stateDisp,
             NeighborConcurrentGroup group) { // in varying lock
         final JobNoticeLogLevel noticeLogLevel = me.getNoticeLogLevel(); // in varying lock so exclusive
         JobNoticeLog.log(noticeLogLevel, () -> {
@@ -89,12 +92,12 @@ public class NeighborConcurrentJobStopper {
     // -----------------------------------------------------
     //                                             Exception
     //                                             ---------
-    protected void throwJobNeighborConcurrentlyExecutingException(ReadableJobState me, ReadableJobState neighbor,
+    protected void throwJobNeighborConcurrentlyExecutingException(ReadableJobAttr me, ReadableJobState neighbor,
             Function<ReadableJobState, String> stateDisp, NeighborConcurrentGroup group) {
         throw new JobNeighborConcurrentlyExecutingException(buildConcurrentMessage(me, neighbor, stateDisp, group));
     }
 
-    protected String buildConcurrentMessage(ReadableJobState me, ReadableJobState neighbor, Function<ReadableJobState, String> stateDisp,
+    protected String buildConcurrentMessage(ReadableJobAttr me, ReadableJobState neighbor, Function<ReadableJobState, String> stateDisp,
             NeighborConcurrentGroup group) {
         return "Already executing the neighbor job: " + buildMeAndNeighbor(me, neighbor, stateDisp, group);
     }
@@ -102,7 +105,7 @@ public class NeighborConcurrentJobStopper {
     // -----------------------------------------------------
     //                                               Display
     //                                               -------
-    protected String buildMeAndNeighbor(ReadableJobState me, ReadableJobState neighbor, Function<ReadableJobState, String> stateDisp,
+    protected String buildMeAndNeighbor(ReadableJobAttr me, ReadableJobState neighbor, Function<ReadableJobState, String> stateDisp,
             NeighborConcurrentGroup group) {
         final StringBuilder sb = new StringBuilder();
         sb.append("me=").append(me.toIdentityDisp());

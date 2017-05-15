@@ -28,31 +28,31 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
  */
 public class ConcurrentJobStopper {
 
-    public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobState jobState, Supplier<String> stateDisp) {
-        final JobConcurrentExec concurrentExec = jobState.getConcurrentExec();
+    public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobAttr jobAttr, Supplier<String> stateDisp) {
+        final JobConcurrentExec concurrentExec = jobAttr.getConcurrentExec();
         if (concurrentExec.equals(JobConcurrentExec.QUIT)) {
-            noticeSilentlyQuit(jobState, stateDisp);
+            noticeSilentlyQuit(jobAttr, stateDisp);
             return OptionalThing.of(RunnerResult.asQuitByConcurrent());
         } else if (concurrentExec.equals(JobConcurrentExec.ERROR)) {
-            throwJobConcurrentlyExecutingException(jobState, stateDisp);
+            throwJobConcurrentlyExecutingException(jobAttr, stateDisp);
         }
         return OptionalThing.empty();
     }
 
-    protected void noticeSilentlyQuit(ReadableJobState jobState, Supplier<String> stateDisp) {
-        final JobNoticeLogLevel noticeLogLevel = jobState.getNoticeLogLevel(); // in varying lock so exclusive
+    protected void noticeSilentlyQuit(ReadableJobAttr jobAttr, Supplier<String> stateDisp) {
+        final JobNoticeLogLevel noticeLogLevel = jobAttr.getNoticeLogLevel(); // in varying lock so exclusive
         JobNoticeLog.log(noticeLogLevel, () -> {
-            final String identityDisp = jobState.toIdentityDisp();
+            final String identityDisp = jobAttr.toIdentityDisp();
             return "...Quitting the job for already executing job: " + identityDisp + "(" + stateDisp.get() + ")";
         });
     }
 
-    protected void throwJobConcurrentlyExecutingException(ReadableJobState jobState, Supplier<String> stateDisp) {
-        throw new JobConcurrentlyExecutingException(buildConcurrentMessage(jobState, stateDisp));
+    protected void throwJobConcurrentlyExecutingException(ReadableJobAttr jobAttr, Supplier<String> stateDisp) {
+        throw new JobConcurrentlyExecutingException(buildConcurrentMessage(jobAttr, stateDisp));
     }
 
-    protected String buildConcurrentMessage(ReadableJobState jobState, Supplier<String> stateDisp) {
-        final String identityDisp = jobState.toIdentityDisp();
+    protected String buildConcurrentMessage(ReadableJobAttr jobAttr, Supplier<String> stateDisp) {
+        final String identityDisp = jobAttr.toIdentityDisp();
         return "Already executing the job: " + identityDisp + "(" + stateDisp.get() + ")";
     }
 }

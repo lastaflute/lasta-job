@@ -304,7 +304,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected NeighborConcurrentJobStopper createNeighborConcurrentJobStopper(List<NeighborConcurrentGroup> neighborConcurrentGroupList) {
-        return new NeighborConcurrentJobStopper(jobKey -> cron4jNow.findJobByKey(jobKey), neighborConcurrentGroupList);
+        return new NeighborConcurrentJobStopper(jobKey -> {
+            return cron4jNow.findJobByKey(jobKey);
+        }, jobState -> jobState.isExecutingNow(), neighborConcurrentGroupList);
     }
 
     // ===================================================================================

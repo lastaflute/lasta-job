@@ -47,6 +47,7 @@ public interface CrossVMHook {
     //     return new CrossVMState().withAttribute("jobExecControlId", jobExecControl.getJobExecControlId());
     // }
     // _/_/_/_/_/_/_/_/_/_/
+    // not jobState because jobAttr is enough to hook for self job
     /**
      * @param jobAttr The object that can provide attributes of job. (NotNull)
      * @param activationTime The date-time of job activation. (NotNull)
