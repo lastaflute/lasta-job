@@ -44,6 +44,7 @@ import org.lastaflute.job.log.JobErrorLog;
 import org.lastaflute.job.log.JobErrorResource;
 import org.lastaflute.job.log.JobErrorStackTracer;
 import org.lastaflute.job.log.JobHistoryResource;
+import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentJobStopper;
 import org.lastaflute.job.subsidiary.CrossVMHook;
@@ -322,6 +323,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 arrangeCrossVMPreparedAccessContext(arranger, hook, "hookBeginning", job);
             });
             try {
+                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp());
                 return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
             } finally {
                 clearCrossVMPreparedAccessContext();
@@ -330,18 +332,20 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     protected void crossVMEnding(Cron4jJob job, OptionalThing<CrossVMState> crossVMState, LocalDateTime endTime) {
-        if (crossVMState.isPresent()) { // hook exists
-            jobRunner.getCrossVMHook().alwaysPresent(hook -> { // so always present
-                jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                    arrangeCrossVMPreparedAccessContext(arranger, hook, "hookEnding", job);
-                });
-                try {
-                    hook.hookEnding(job, crossVMState.get(), endTime);
-                } finally {
-                    clearCrossVMPreparedAccessContext();
-                }
-            });
+        if (!crossVMState.isPresent()) {
+            return;
         }
+        jobRunner.getCrossVMHook().alwaysPresent(hook -> {
+            jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
+                arrangeCrossVMPreparedAccessContext(arranger, hook, "hookEnding", job);
+            });
+            try {
+                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp());
+                hook.hookEnding(job, crossVMState.get(), endTime);
+            } finally {
+                clearCrossVMPreparedAccessContext();
+            }
+        });
     }
 
     protected void arrangeCrossVMPreparedAccessContext(AccessContextArranger arranger, CrossVMHook hook, String methodName, Cron4jJob job) {
