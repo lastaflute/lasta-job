@@ -585,6 +585,12 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    public OptionalThing<AccessContextArranger> getAccessContextArranger() {
+        return OptionalThing.ofNullable(accessContextArranger, () -> {
+            throw new IllegalStateException("Not found the accessContextArranger.");
+        });
+    }
+
     public OptionalThing<CrossVMHook> getCrossVMHook() {
         return OptionalThing.ofNullable(crossVMHook, () -> {
             throw new IllegalStateException("Not found the crossVMHook.");
