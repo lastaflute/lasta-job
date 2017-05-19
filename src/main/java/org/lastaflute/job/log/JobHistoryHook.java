@@ -36,5 +36,7 @@ public interface JobHistoryHook {
      * @param nativeSearcher The searcher of LastaJob native histories. (NotNull)
      * @return The list of history, native histories or application histories. (NotNull)
      */
-    List<LaJobHistory> hookList(Supplier<List<LaJobHistory>> nativeSearcher);
+    default List<LaJobHistory> hookList(Supplier<List<LaJobHistory>> nativeSearcher) {
+        return nativeSearcher.get(); // as default
+    }
 }
