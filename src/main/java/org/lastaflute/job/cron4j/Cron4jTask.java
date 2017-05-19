@@ -47,7 +47,6 @@ import org.lastaflute.job.log.JobHistoryResource;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentJobStopper;
-import org.lastaflute.job.subsidiary.CrossVMHook;
 import org.lastaflute.job.subsidiary.CrossVMState;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
 import org.lastaflute.job.subsidiary.ExecResultType;
@@ -314,60 +313,6 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 , neighborConcurrentGroupList);
     }
 
-    // -----------------------------------------------------
-    //                                               CrossVM
-    //                                               -------
-    protected OptionalThing<CrossVMState> crossVMBeginning(Cron4jJob job) {
-        return jobRunner.getCrossVMHook().map(hook -> {
-            jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeCrossVMPreparedAccessContext(arranger, hook, "hookBeginning", job);
-            });
-            try {
-                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp());
-                return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
-            } finally {
-                clearCrossVMPreparedAccessContext();
-            }
-        });
-    }
-
-    protected void crossVMEnding(Cron4jJob job, OptionalThing<CrossVMState> crossVMState, LocalDateTime endTime) {
-        if (!crossVMState.isPresent()) {
-            return;
-        }
-        jobRunner.getCrossVMHook().alwaysPresent(hook -> {
-            jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeCrossVMPreparedAccessContext(arranger, hook, "hookEnding", job);
-            });
-            try {
-                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp());
-                hook.hookEnding(job, crossVMState.get(), endTime);
-            } finally {
-                clearCrossVMPreparedAccessContext();
-            }
-        });
-    }
-
-    protected void arrangeCrossVMPreparedAccessContext(AccessContextArranger arranger, CrossVMHook hook, String methodName, Cron4jJob job) {
-        final Method hookMethod = Stream.of(hook.getClass().getMethods())
-                .filter(method -> method.getName().equals(methodName))
-                .findFirst()
-                .orElseThrow(() -> { // no way
-                    return new IllegalStateException("Not found the method in hook: " + methodName + ", " + hook);
-                });
-        final String moduleName = DfTypeUtil.toClassTitle(hook.getClass());
-        final AccessContext context = arranger.arrangePreparedAccessContext(new AccessContextResource(moduleName, hookMethod));
-        if (context == null) {
-            String msg = "Cannot return null from access context arranger: " + arranger + " job=" + job.toIdentityDisp();
-            throw new IllegalStateException(msg);
-        }
-        PreparedAccessContext.setAccessContextOnThread(context);
-    }
-
-    protected void clearCrossVMPreparedAccessContext() {
-        PreparedAccessContext.clearAccessContextOnThread();
-    }
-
     // ===================================================================================
     //                                                          Execute - Really Executing
     //                                                          ==========================
@@ -445,13 +390,47 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     // ===================================================================================
-    //                                                                  Execute - Suppoter
-    //                                                                  ==================
+    //                                                                 Execute - Supporter
+    //                                                                 ===================
     // -----------------------------------------------------
     //                                          Next Trigger
     //                                          ------------
     protected boolean canTriggerNext(Cron4jJob job, RunnerResult runnerResult) {
         return !runnerResult.getCause().isPresent() && !runnerResult.isNextTriggerSuppressed();
+    }
+
+    // -----------------------------------------------------
+    //                                               CrossVM
+    //                                               -------
+    protected OptionalThing<CrossVMState> crossVMBeginning(Cron4jJob job) {
+        return jobRunner.getCrossVMHook().map(hook -> {
+            jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
+                arrangeHookPreparedAccessContext(arranger, hook, "hookBeginning", job);
+            });
+            try {
+                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp());
+                return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
+            } finally {
+                clearHookPreparedAccessContext();
+            }
+        });
+    }
+
+    protected void crossVMEnding(Cron4jJob job, OptionalThing<CrossVMState> crossVMState, LocalDateTime endTime) {
+        if (!crossVMState.isPresent()) {
+            return;
+        }
+        jobRunner.getCrossVMHook().alwaysPresent(hook -> {
+            jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
+                arrangeHookPreparedAccessContext(arranger, hook, "hookEnding", job);
+            });
+            try {
+                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp());
+                hook.hookEnding(job, crossVMState.get(), endTime);
+            } finally {
+                clearHookPreparedAccessContext();
+            }
+        });
     }
 
     // -----------------------------------------------------
@@ -463,7 +442,14 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final Cron4jJobHistory jobHistory = prepareJobHistory(job, activationTime, runnerResult, endTime, controllerCause);
         final int historyLimit = getHistoryLimit();
         jobRunner.getHistoryHook().ifPresent(hook -> {
-            hook.hookRecord(jobHistory, new JobHistoryResource(historyLimit));
+            jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
+                arrangeHookPreparedAccessContext(arranger, hook, "hookRecord", job);
+            });
+            try {
+                hook.hookRecord(jobHistory, new JobHistoryResource(historyLimit));
+            } finally {
+                clearHookPreparedAccessContext();
+            }
         });
         Cron4jJobHistory.record(taskExecutor, jobHistory, historyLimit);
     }
@@ -518,6 +504,29 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
 
     protected int getHistoryLimit() {
         return 300;
+    }
+
+    // -----------------------------------------------------
+    //                                         AccessContext
+    //                                         -------------
+    protected void arrangeHookPreparedAccessContext(AccessContextArranger arranger, Object hook, String methodName, Cron4jJob job) {
+        final Method hookMethod = Stream.of(hook.getClass().getMethods())
+                .filter(method -> method.getName().equals(methodName))
+                .findFirst()
+                .orElseThrow(() -> { // no way
+                    return new IllegalStateException("Not found the method in hook: " + methodName + ", " + hook);
+                });
+        final String moduleName = DfTypeUtil.toClassTitle(hook.getClass());
+        final AccessContext context = arranger.arrangePreparedAccessContext(new AccessContextResource(moduleName, hookMethod));
+        if (context == null) {
+            String msg = "Cannot return null from access context arranger: " + arranger + " job=" + job.toIdentityDisp();
+            throw new IllegalStateException(msg);
+        }
+        PreparedAccessContext.setAccessContextOnThread(context);
+    }
+
+    protected void clearHookPreparedAccessContext() {
+        PreparedAccessContext.clearAccessContextOnThread();
     }
 
     // -----------------------------------------------------
