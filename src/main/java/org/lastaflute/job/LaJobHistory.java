@@ -33,28 +33,61 @@ public interface LaJobHistory {
     // ===================================================================================
     //                                                                       Job Attribute
     //                                                                       =============
+    /**
+     * @return The key of job, managed by framework. (NotNull)
+     */
     LaJobKey getJobKey();
 
+    /**
+     * @return The optional note of job, e.g. title, description. (NotNull, EmptyAllowed: not required)
+     */
     OptionalThing<LaJobNote> getJobNote();
 
+    /**
+     * @return The optional unique code of job, specified by application. (NotNull, EmptyAllowed: not required)
+     */
     OptionalThing<LaJobUnique> getJobUnique();
 
+    /**
+     * @return The optional cron expression of job. (NotNull, EmptyAllowed: if non-cron)
+     */
     OptionalThing<String> getCronExp(); // varying so this is snapshot
 
+    /**
+     * @return The full qualified class name of job type. (NotNull)
+     */
     String getJobTypeFqcn();
 
     // ===================================================================================
     //                                                                    Execution Result
     //                                                                    ================
+    /**
+     * @return The local date-time of job activation. (NotNull: exists even if not begun)
+     */
     LocalDateTime getActivationTime();
 
+    /**
+     * @return The optional local date-time of job beginning. (NotNull, EmptyAllowed: e.g. quit by duplicate)
+     */
     OptionalThing<LocalDateTime> getBeginTime();
 
+    /**
+     * @return The optional local date-time of job ending. (NotNull, EmptyAllowed: e.g. quit by duplicate)
+     */
     OptionalThing<LocalDateTime> getEndTime();
 
+    /**
+     * @return The type of execution result, e.g. SUCCESS, QUIT_BY_CONCURRENT (NotNull)
+     */
     ExecResultType getExecResultType();
 
+    /**
+     * @return The read-only and snapshot map of end-title-roll. (NotNull, EmptyAllowed)
+     */
     Map<String, String> getEndTitleRollSnapshotMap(); // not to keep application instance
 
+    /**
+     * @return The optional exception of failure cause. (NotNull, EmptyAllowed: if success)
+     */
     OptionalThing<Throwable> getCause();
 }
