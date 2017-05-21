@@ -28,4 +28,8 @@ public class JobNeighborConcurrentlyExecutingException extends LaJobOperationExc
     public JobNeighborConcurrentlyExecutingException(String msg) {
         super(msg);
     }
+
+    public JobNeighborConcurrentlyExecutingException(String msg, Throwable cause) {
+        super(msg, cause);
+    }
 }

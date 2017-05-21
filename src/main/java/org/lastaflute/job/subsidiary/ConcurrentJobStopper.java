@@ -15,6 +15,8 @@
  */
 package org.lastaflute.job.subsidiary;
 
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.dbflute.optional.OptionalThing;
@@ -28,31 +30,67 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
  */
 public class ConcurrentJobStopper {
 
-    public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobState jobState, Supplier<String> stateDisp) {
-        final JobConcurrentExec concurrentExec = jobState.getConcurrentExec();
-        if (concurrentExec.equals(JobConcurrentExec.QUIT)) {
-            noticeSilentlyQuit(jobState, stateDisp);
-            return OptionalThing.of(RunnerResult.asQuitByConcurrent());
-        } else if (concurrentExec.equals(JobConcurrentExec.ERROR)) {
-            throwJobConcurrentlyExecutingException(jobState, stateDisp);
+    // ===================================================================================
+    //                                                                           Attribute
+    //                                                                           =========
+    protected final Predicate<ReadableJobState> jobExecutingDeterminer;
+    protected Consumer<ReadableJobState> waitress; // option, basically for cross VM
+
+    // ===================================================================================
+    //                                                                         Constructor
+    //                                                                         ===========
+    public ConcurrentJobStopper(Predicate<ReadableJobState> jobExecutingDeterminer) {
+        this.jobExecutingDeterminer = jobExecutingDeterminer;
+    }
+
+    // -----------------------------------------------------
+    //                                                Option
+    //                                                ------
+    public ConcurrentJobStopper waitress(Consumer<ReadableJobState> waitress) {
+        if (waitress == null) {
+            throw new IllegalArgumentException("The argument 'waitress' should not be null.");
         }
+        this.waitress = waitress;
+        return this;
+    }
+
+    // ===================================================================================
+    //                                                                       Stop if needs
+    //                                                                       =============
+    public OptionalThing<RunnerResult> stopIfNeeds(ReadableJobState jobState, Supplier<String> stateDisp) {
+        if (jobExecutingDeterminer.test(jobState)) {
+            final JobConcurrentExec concurrentExec = jobState.getConcurrentExec();
+            if (concurrentExec.equals(JobConcurrentExec.QUIT)) {
+                noticeSilentlyQuit(jobState, stateDisp);
+                return OptionalThing.of(RunnerResult.asQuitByConcurrent());
+            } else if (concurrentExec.equals(JobConcurrentExec.ERROR)) {
+                throwJobConcurrentlyExecutingException(jobState, stateDisp);
+            } else if (concurrentExec.equals(JobConcurrentExec.WAIT)) {
+                if (waitress != null) {
+                    // this is not perfect concurrent control, because of no lock
+                    // so basically used only for cross VM concurrent control
+                    waitress.accept(jobState);
+                }
+            }
+        }
+        // will wait for previous job naturally by synchronization later if waitress is unused
         return OptionalThing.empty();
     }
 
-    protected void noticeSilentlyQuit(ReadableJobState jobState, Supplier<String> stateDisp) {
-        final JobNoticeLogLevel noticeLogLevel = jobState.getNoticeLogLevel(); // in varying lock so exclusive
+    protected void noticeSilentlyQuit(ReadableJobAttr jobAttr, Supplier<String> stateDisp) {
+        final JobNoticeLogLevel noticeLogLevel = jobAttr.getNoticeLogLevel(); // in varying lock so exclusive
         JobNoticeLog.log(noticeLogLevel, () -> {
-            final String identityDisp = jobState.toIdentityDisp();
+            final String identityDisp = jobAttr.toIdentityDisp();
             return "...Quitting the job for already executing job: " + identityDisp + "(" + stateDisp.get() + ")";
         });
     }
 
-    protected void throwJobConcurrentlyExecutingException(ReadableJobState jobState, Supplier<String> stateDisp) {
-        throw new JobConcurrentlyExecutingException(buildConcurrentMessage(jobState, stateDisp));
+    protected void throwJobConcurrentlyExecutingException(ReadableJobAttr jobAttr, Supplier<String> stateDisp) {
+        throw new JobConcurrentlyExecutingException(buildConcurrentMessage(jobAttr, stateDisp));
     }
 
-    protected String buildConcurrentMessage(ReadableJobState jobState, Supplier<String> stateDisp) {
-        final String identityDisp = jobState.toIdentityDisp();
+    protected String buildConcurrentMessage(ReadableJobAttr jobAttr, Supplier<String> stateDisp) {
+        final String identityDisp = jobAttr.toIdentityDisp();
         return "Already executing the job: " + identityDisp + "(" + stateDisp.get() + ")";
     }
 }

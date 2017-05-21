@@ -26,7 +26,17 @@ import org.lastaflute.job.LaJobHistory;
  */
 public interface JobHistoryHook {
 
+    /**
+     * @param jobHistory The job history provided by LastaJob. (NotNull)
+     * @param resource the resource of history, e.g. nativeHistoryLimit (NotNull)
+     */
     void hookRecord(LaJobHistory jobHistory, JobHistoryResource resource);
 
-    List<LaJobHistory> hookList(Supplier<List<LaJobHistory>> nativeSearcher);
+    /**
+     * @param nativeSearcher The searcher of LastaJob native histories. (NotNull)
+     * @return The list of history, native histories or application histories. (NotNull)
+     */
+    default List<LaJobHistory> hookList(Supplier<List<LaJobHistory>> nativeSearcher) {
+        return nativeSearcher.get(); // as default
+    }
 }

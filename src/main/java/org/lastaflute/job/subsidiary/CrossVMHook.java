@@ -17,54 +17,33 @@ package org.lastaflute.job.subsidiary;
 
 import java.time.LocalDateTime;
 
+import org.lastaflute.job.exception.JobConcurrentlyExecutingException;
+import org.lastaflute.job.exception.JobNeighborConcurrentlyExecutingException;
+
 /**
  * @author jflute
  * @since 0.4.1 (2017/03/20 Monday)
  */
 public interface CrossVMHook {
 
-    // e.g.
-    // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-    // public CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime activationTime) {
-    //     OptionalThing<JobExecControl> jobExecControl = jobExecControlBhv.selectByUniqueOf(job.getJobUnique().get());
-    //     if (jobExecControl.isPresent()) { // concurrent
-    //         ConcurrentJobStopper stopper = new ConcurrentJobStopper();
-    //         return stopper.stopIfNeeds(...).map(result -> { // quit (or exception)
-    //             return asQuitState();
-    //         }).orElseGet(() -> { // wait
-    //             waitForEndingBySomething();
-    //             return asNormalState();
-    //         });
-    //     } else {
-    //         return asNormalExecution();
-    //     }
-    // }
-    // private CrossVMState asQuitState() {
-    //     return new CrossVMState().asQuit();
-    // }
-    // private CrossVMState asNormalState() {
-    //     JobExecControl jobExecControl = jobExecControlBhv.insert(...);
-    //     return new CrossVMState().withAttribute("jobExecControlId", jobExecControl.getJobExecControlId());
-    // }
-    // _/_/_/_/_/_/_/_/_/_/
+    // sea ConcurrentCrossVMHook for the implementation example
     /**
-     * @param jobAttr The object that can provide attributes of job. (NotNull)
+     * Hook beginning for cross VM handling.
+     * @param jobState The object that can provide attributes and states of job. (NotNull)
      * @param activationTime The date-time of job activation. (NotNull)
      * @return The state object of hook runtime, can be used at ending hook. (NotNull)
+     * @throws JobConcurrentlyExecutingException When the job is duplicate boot.
+     * @throws JobNeighborConcurrentlyExecutingException When the neightbor job is boot.
      */
-    CrossVMState hookBeginning(ReadableJobAttr jobAttr, LocalDateTime activationTime);
+    CrossVMState hookBeginning(ReadableJobState jobState, LocalDateTime activationTime);
 
-    // e.g.
-    // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-    // public void hookEnding(ReadableJobAttr jobAttr, CrossVMState state) {
-    //     Long jobExecControlId = state.getAttribute("jobExecControlId", Long.class).get();
-    //     jobExecControlBhv.delete(...);
-    // }
-    // _/_/_/_/_/_/_/_/_/_/
     /**
-     * @param jobAttr The object that can provide attributes of job. (NotNull)
-     * @param state The state object of hook runtime, can be used at ending hook. (NotNull)
+     * Hook ending for cross VM handling. <br>
+     * Cannot be called if quit and error for concurrent. <br>
+     * While, can be called if exception from job execution.
+     * @param jobState The object that can provide attributes and states of job. (NotNull)
+     * @param crossVMState The state object of hook runtime, can be used at ending hook. (NotNull)
      * @param endTime The date-time of job ending. (NotNull)
      */
-    void hookEnding(ReadableJobAttr jobAttr, CrossVMState state, LocalDateTime endTime);
+    void hookEnding(ReadableJobState jobState, CrossVMState crossVMState, LocalDateTime endTime);
 }

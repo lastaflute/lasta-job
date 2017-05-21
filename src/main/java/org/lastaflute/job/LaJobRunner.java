@@ -259,14 +259,16 @@ public class LaJobRunner {
     //                                                                            Show Job
     //                                                                            ========
     protected long showRunning(LaJobRuntime runtime) {
-        // no use enabled determination to be simple
-        final String msg = "#flow #job ...Running job: " + runtime.toCronMethodDisp();
-        JobNoticeLog.log(runtime.getNoticeLogLevel(), () -> msg);
+        JobNoticeLog.log(runtime.getNoticeLogLevel(), () -> buildRunningJobLogMessage(runtime));
         if (noticeLogHook != null) {
-            noticeLogHook.hookRunning(runtime, msg);
+            noticeLogHook.hookRunning(runtime, buildRunningJobLogMessage(runtime));
         }
         return System.currentTimeMillis();
 
+    }
+
+    protected String buildRunningJobLogMessage(LaJobRuntime runtime) {
+        return "#flow #job ...Running job: " + runtime.toCronMethodDisp();
     }
 
     protected void showFinishing(LaJobRuntime runtime, long before, Throwable cause) {
@@ -585,6 +587,12 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    public OptionalThing<AccessContextArranger> getAccessContextArranger() {
+        return OptionalThing.ofNullable(accessContextArranger, () -> {
+            throw new IllegalStateException("Not found the accessContextArranger.");
+        });
+    }
+
     public OptionalThing<CrossVMHook> getCrossVMHook() {
         return OptionalThing.ofNullable(crossVMHook, () -> {
             throw new IllegalStateException("Not found the crossVMHook.");

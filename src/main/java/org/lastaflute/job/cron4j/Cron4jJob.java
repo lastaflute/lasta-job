@@ -433,17 +433,17 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public synchronized Map<String, NeighborConcurrentGroup> getNeighborConcurrentGroupMap() {
-        return neighborConcurrentGroupMap != null ? Collections.unmodifiableMap(neighborConcurrentGroupMap) : Collections.emptyMap();
-    }
-
-    public synchronized List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() { // unmodifiable and snapshot, for framework
+    public synchronized List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() {
         if (neighborConcurrentGroupList == null) {
             return Collections.emptyList();
         }
+        // unmodifiable and snapshot list for concurrent process,
         // wrap wrap just in case, for machine-gun synchronization (that needs ordered groups)
-        final CopyOnWriteArrayList<NeighborConcurrentGroup> snapshotList =
-                new CopyOnWriteArrayList<NeighborConcurrentGroup>(neighborConcurrentGroupList);
-        return Collections.unmodifiableList(snapshotList);
+        return Collections.unmodifiableList(new CopyOnWriteArrayList<NeighborConcurrentGroup>(neighborConcurrentGroupList));
+    }
+
+    @Override
+    public synchronized Map<String, NeighborConcurrentGroup> getNeighborConcurrentGroupMap() {
+        return neighborConcurrentGroupMap != null ? Collections.unmodifiableMap(neighborConcurrentGroupMap) : Collections.emptyMap();
     }
 }

@@ -46,8 +46,12 @@ public class CrossVMState {
     }
 
     // ===================================================================================
-    //                                                                            
+    //                                                                            Accessor
     //                                                                            ========
+    public boolean isQuit() {
+        return quit;
+    }
+
     public <ATTRIBUTE> OptionalThing<ATTRIBUTE> getAttribute(String key, Class<ATTRIBUTE> attrType) {
         final Object obj = attributeMap.get(key);
         return OptionalThing.ofNullable(obj != null ? attrType.cast(obj) : null, () -> {
