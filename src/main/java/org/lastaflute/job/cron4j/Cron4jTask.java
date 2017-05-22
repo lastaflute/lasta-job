@@ -30,6 +30,7 @@ import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.hook.AccessContext;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
+import org.lastaflute.core.magic.ThreadCacheContext;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextArranger;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextResource;
 import org.lastaflute.db.dbflute.accesscontext.PreparedAccessContext;
@@ -404,6 +405,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                               -------
     protected OptionalThing<CrossVMState> crossVMBeginning(Cron4jJob job) {
         return jobRunner.getCrossVMHook().map(hook -> {
+            ThreadCacheContext.initialize();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
                 arrangeHookPreparedAccessContext(arranger, hook, "hookBeginning", job);
             });
@@ -412,6 +414,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
             } finally {
                 clearHookPreparedAccessContext();
+                ThreadCacheContext.clear();
             }
         });
     }
@@ -421,6 +424,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             return;
         }
         jobRunner.getCrossVMHook().alwaysPresent(hook -> {
+            ThreadCacheContext.initialize();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
                 arrangeHookPreparedAccessContext(arranger, hook, "hookEnding", job);
             });
@@ -429,6 +433,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 hook.hookEnding(job, crossVMState.get(), endTime);
             } finally {
                 clearHookPreparedAccessContext();
+                ThreadCacheContext.clear();
             }
         });
     }
@@ -442,6 +447,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final Cron4jJobHistory jobHistory = prepareJobHistory(job, activationTime, runnerResult, endTime, controllerCause);
         final int historyLimit = getHistoryLimit();
         jobRunner.getHistoryHook().ifPresent(hook -> {
+            ThreadCacheContext.initialize();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
                 arrangeHookPreparedAccessContext(arranger, hook, "hookRecord", job);
             });
@@ -449,6 +455,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 hook.hookRecord(jobHistory, new JobHistoryResource(historyLimit));
             } finally {
                 clearHookPreparedAccessContext();
+                ThreadCacheContext.clear();
             }
         });
         Cron4jJobHistory.record(taskExecutor, jobHistory, historyLimit);
