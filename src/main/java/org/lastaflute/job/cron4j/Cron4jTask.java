@@ -26,14 +26,22 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import org.dbflute.bhv.proposal.callback.TraceableSqlAdditionalInfoProvider;
 import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.hook.AccessContext;
+import org.dbflute.hook.CallbackContext;
+import org.dbflute.hook.SqlFireHook;
+import org.dbflute.hook.SqlResultHandler;
+import org.dbflute.hook.SqlStringFilter;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.core.magic.ThreadCacheContext;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextArranger;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextResource;
 import org.lastaflute.db.dbflute.accesscontext.PreparedAccessContext;
+import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlFireHook;
+import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlResultHandler;
+import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlStringFilter;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobConcurrentlyExecutingException;
@@ -405,16 +413,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                               -------
     protected OptionalThing<CrossVMState> crossVMBeginning(Cron4jJob job) {
         return jobRunner.getCrossVMHook().map(hook -> {
-            ThreadCacheContext.initialize();
+            final Method hookMethod = findHookMethod(hook, "hookBeginning");
+            arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, "hookBeginning", job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
+            arrangeHookCallbackContext(hookMethod, job);
             try {
                 JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp());
                 return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
             } finally {
+                clearHookCallbackContext();
                 clearHookPreparedAccessContext();
-                ThreadCacheContext.clear();
+                clearHookThreadCacheContext();
             }
         });
     }
@@ -424,16 +435,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             return;
         }
         jobRunner.getCrossVMHook().alwaysPresent(hook -> {
-            ThreadCacheContext.initialize();
+            final Method hookMethod = findHookMethod(hook, "hookEnding");
+            arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, "hookEnding", job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
+            arrangeHookCallbackContext(hookMethod, job);
             try {
                 JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp());
                 hook.hookEnding(job, crossVMState.get(), endTime);
             } finally {
+                clearHookCallbackContext();
                 clearHookPreparedAccessContext();
-                ThreadCacheContext.clear();
+                clearHookThreadCacheContext();
             }
         });
     }
@@ -447,15 +461,18 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final Cron4jJobHistory jobHistory = prepareJobHistory(job, activationTime, runnerResult, endTime, controllerCause);
         final int historyLimit = getHistoryLimit();
         jobRunner.getHistoryHook().ifPresent(hook -> {
-            ThreadCacheContext.initialize();
+            final Method hookMethod = findHookMethod(hook, "hookRecord");
+            arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, "hookRecord", job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
+            arrangeHookCallbackContext(hookMethod, job);
             try {
                 hook.hookRecord(jobHistory, new JobHistoryResource(historyLimit));
             } finally {
+                clearHookCallbackContext();
                 clearHookPreparedAccessContext();
-                ThreadCacheContext.clear();
+                clearHookThreadCacheContext();
             }
         });
         Cron4jJobHistory.record(taskExecutor, jobHistory, historyLimit);
@@ -514,15 +531,34 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     // -----------------------------------------------------
+    //                                             Error Log
+    //                                             ---------
+    protected void error(OptionalThing<ReadableJobAttr> jobAttr, String msg, Throwable cause) {
+        final String bigMsg = (msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause)).trim();
+        jobRunner.getErrorLogHook().ifPresent(hook -> {
+            hook.hookError(new JobErrorResource(jobAttr, OptionalThing.empty(), bigMsg, cause));
+        });
+        JobErrorLog.log(bigMsg);
+    }
+
+    // ===================================================================================
+    //                                                                        Hook Context
+    //                                                                        ============
+    // -----------------------------------------------------
+    //                                           ThreadCache
+    //                                           -----------
+    protected void arrangeHookThreadCacheContext() {
+        ThreadCacheContext.initialize();
+    }
+
+    protected void clearHookThreadCacheContext() {
+        ThreadCacheContext.clear();
+    }
+
+    // -----------------------------------------------------
     //                                         AccessContext
     //                                         -------------
-    protected void arrangeHookPreparedAccessContext(AccessContextArranger arranger, Object hook, String methodName, Cron4jJob job) {
-        final Method hookMethod = Stream.of(hook.getClass().getMethods())
-                .filter(method -> method.getName().equals(methodName))
-                .findFirst()
-                .orElseThrow(() -> { // no way
-                    return new IllegalStateException("Not found the method in hook: " + methodName + ", " + hook);
-                });
+    protected void arrangeHookPreparedAccessContext(AccessContextArranger arranger, Object hook, Method hookMethod, Cron4jJob job) {
         final String moduleName = DfTypeUtil.toClassTitle(hook.getClass());
         final AccessContext context = arranger.arrangePreparedAccessContext(new AccessContextResource(moduleName, hookMethod));
         if (context == null) {
@@ -537,14 +573,60 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     // -----------------------------------------------------
-    //                                             Error Log
-    //                                             ---------
-    protected void error(OptionalThing<ReadableJobAttr> jobAttr, String msg, Throwable cause) {
-        final String bigMsg = (msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause)).trim();
-        jobRunner.getErrorLogHook().ifPresent(hook -> {
-            hook.hookError(new JobErrorResource(jobAttr, OptionalThing.empty(), bigMsg, cause));
-        });
-        JobErrorLog.log(bigMsg);
+    //                                       CallbackContext
+    //                                       ---------------
+    protected void arrangeHookCallbackContext(Method hookMethod, Cron4jJob job) {
+        CallbackContext.setSqlFireHookOnThread(createHookSqlFireHook());
+        CallbackContext.setSqlStringFilterOnThread(createHookSqlStringFilter(hookMethod, job));
+        CallbackContext.setSqlResultHandlerOnThread(createHookSqlResultHandler());
+    }
+
+    protected SqlFireHook createHookSqlFireHook() {
+        return newHookRomanticTraceableSqlFireHook();
+    }
+
+    protected RomanticTraceableSqlFireHook newHookRomanticTraceableSqlFireHook() {
+        return new RomanticTraceableSqlFireHook();
+    }
+
+    protected SqlStringFilter createHookSqlStringFilter(Method hookMethod, Cron4jJob job) {
+        return newHookRomanticTraceableSqlStringFilter(hookMethod, () -> buildHookSqlMarkingAdditionalInfo(job));
+    }
+
+    protected String buildHookSqlMarkingAdditionalInfo(Cron4jJob job) {
+        return job.getClass().getSimpleName();
+    }
+
+    protected RomanticTraceableSqlStringFilter newHookRomanticTraceableSqlStringFilter(Method actionMethod,
+            TraceableSqlAdditionalInfoProvider additionalInfoProvider) {
+        return new RomanticTraceableSqlStringFilter(actionMethod, additionalInfoProvider);
+    }
+
+    protected SqlResultHandler createHookSqlResultHandler() {
+        return newHookRomanticTraceableSqlResultHandler();
+    }
+
+    protected RomanticTraceableSqlResultHandler newHookRomanticTraceableSqlResultHandler() {
+        return new RomanticTraceableSqlResultHandler();
+    }
+
+    protected void clearHookCallbackContext() {
+        CallbackContext.clearSqlResultHandlerOnThread();
+        CallbackContext.clearSqlStringFilterOnThread();
+        CallbackContext.clearSqlFireHookOnThread();
+    }
+
+    // -----------------------------------------------------
+    //                                          Assist Logic
+    //                                          ------------
+    protected Method findHookMethod(Object hook, String methodName) {
+        final Method hookMethod = Stream.of(hook.getClass().getMethods()) // always public method
+                .filter(method -> method.getName().equals(methodName))
+                .findFirst()
+                .orElseThrow(() -> { // no way
+                    return new IllegalStateException("Not found the method in hook: " + methodName + ", " + hook);
+                });
+        return hookMethod;
     }
 
     // ===================================================================================
