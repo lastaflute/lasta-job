@@ -52,10 +52,12 @@ import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobErrorLog;
 import org.lastaflute.job.log.JobErrorResource;
 import org.lastaflute.job.log.JobErrorStackTracer;
+import org.lastaflute.job.log.JobHistoryHook;
 import org.lastaflute.job.log.JobHistoryResource;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentJobStopper;
+import org.lastaflute.job.subsidiary.CrossVMHook;
 import org.lastaflute.job.subsidiary.CrossVMState;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
 import org.lastaflute.job.subsidiary.ExecResultType;
@@ -418,9 +420,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
                 arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
-            arrangeHookCallbackContext(hookMethod, job);
+            arrangeHookCallbackContext(hook, hookMethod, job);
             try {
-                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp());
+                showCrossVMBeginning(job, hook);
                 return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
             } finally {
                 clearHookCallbackContext();
@@ -428,6 +430,14 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 clearHookThreadCacheContext();
             }
         });
+    }
+
+    protected void showCrossVMBeginning(Cron4jJob job, CrossVMHook hook) {
+        if (!hook.suppressesNoticeLog()) {
+            JobNoticeLog.log(getCrossVMHookNoticeLogLovel(job), () -> {
+                return "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp();
+            });
+        }
     }
 
     protected void crossVMEnding(Cron4jJob job, OptionalThing<CrossVMState> crossVMState, LocalDateTime endTime) {
@@ -440,9 +450,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
                 arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
-            arrangeHookCallbackContext(hookMethod, job);
+            arrangeHookCallbackContext(hook, hookMethod, job);
             try {
-                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp());
+                showCrossVMEnding(job, hook);
                 hook.hookEnding(job, crossVMState.get(), endTime);
             } finally {
                 clearHookCallbackContext();
@@ -450,6 +460,18 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 clearHookThreadCacheContext();
             }
         });
+    }
+
+    protected void showCrossVMEnding(Cron4jJob job, CrossVMHook hook) {
+        if (!hook.suppressesNoticeLog()) {
+            JobNoticeLog.log(getCrossVMHookNoticeLogLovel(job), () -> {
+                return "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp();
+            });
+        }
+    }
+
+    protected JobNoticeLogLevel getCrossVMHookNoticeLogLovel(Cron4jJob job) {
+        return job.getNoticeLogLevel(); // matches with job's one as default
     }
 
     // -----------------------------------------------------
@@ -466,8 +488,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
                 arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
-            arrangeHookCallbackContext(hookMethod, job);
+            arrangeHookCallbackContext(hook, hookMethod, job);
             try {
+                showJobHistoryHookRecording(job, hook);
                 hook.hookRecord(jobHistory, new JobHistoryResource(historyLimit));
             } finally {
                 clearHookCallbackContext();
@@ -530,6 +553,18 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return 300;
     }
 
+    protected void showJobHistoryHookRecording(Cron4jJob job, JobHistoryHook hook) {
+        if (!hook.suppressesNoticeLog()) {
+            JobNoticeLog.log(getJobHistoryHookNoticeLogLovel(job), () -> {
+                return "#flow #job ...hookRecording job history for the job: " + job.toIdentityDisp();
+            });
+        }
+    }
+
+    protected JobNoticeLogLevel getJobHistoryHookNoticeLogLovel(Cron4jJob job) {
+        return job.getNoticeLogLevel(); // matches with job's one as default
+    }
+
     // -----------------------------------------------------
     //                                             Error Log
     //                                             ---------
@@ -575,9 +610,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                       CallbackContext
     //                                       ---------------
-    protected void arrangeHookCallbackContext(Method hookMethod, Cron4jJob job) {
+    protected void arrangeHookCallbackContext(Object hook, Method hookMethod, Cron4jJob job) {
         CallbackContext.setSqlFireHookOnThread(createHookSqlFireHook());
-        CallbackContext.setSqlStringFilterOnThread(createHookSqlStringFilter(hookMethod, job));
+        CallbackContext.setSqlStringFilterOnThread(createHookSqlStringFilter(hook, hookMethod, job));
         CallbackContext.setSqlResultHandlerOnThread(createHookSqlResultHandler());
     }
 
@@ -589,12 +624,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return new RomanticTraceableSqlFireHook();
     }
 
-    protected SqlStringFilter createHookSqlStringFilter(Method hookMethod, Cron4jJob job) {
-        return newHookRomanticTraceableSqlStringFilter(hookMethod, () -> buildHookSqlMarkingAdditionalInfo(job));
+    protected SqlStringFilter createHookSqlStringFilter(Object hook, Method hookMethod, Cron4jJob job) {
+        return newHookRomanticTraceableSqlStringFilter(hookMethod, () -> buildHookSqlMarkingAdditionalInfo(hook, job));
     }
 
-    protected String buildHookSqlMarkingAdditionalInfo(Cron4jJob job) {
-        return job.getClass().getSimpleName();
+    protected String buildHookSqlMarkingAdditionalInfo(Object hook, Cron4jJob job) {
+        return "(" + hook.getClass().getSimpleName() + ", " + job.toIdentityDisp() + ")"; // concrete class + job identity
     }
 
     protected RomanticTraceableSqlStringFilter newHookRomanticTraceableSqlStringFilter(Method actionMethod,

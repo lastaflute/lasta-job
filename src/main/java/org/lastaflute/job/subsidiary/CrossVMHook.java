@@ -46,4 +46,12 @@ public interface CrossVMHook {
      * @param endTime The date-time of job ending. (NotNull)
      */
     void hookEnding(ReadableJobState jobState, CrossVMState crossVMState, LocalDateTime endTime);
+
+    /**
+     * Does it suppress notice log of the hook?
+     * @return The determination, true or false.
+     */
+    default boolean suppressesNoticeLog() { // as you like it
+        return false;
+    }
 }
