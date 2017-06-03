@@ -19,7 +19,7 @@ package org.lastaflute.job.exception.base;
  * @author jflute
  * @since 0.2.7 (2017/02/22 Wednesday)
  */
-public abstract class LaJobOperationException extends LaJobSystemException {
+public abstract class LaJobOperationException extends RuntimeException { // means not framework failure
 
     private static final long serialVersionUID = 1L;
 

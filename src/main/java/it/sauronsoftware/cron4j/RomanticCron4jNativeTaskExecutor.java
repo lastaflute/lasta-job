@@ -59,7 +59,10 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     protected static Field contextField; // cached
     protected TaskExecutionContext linkedContext;
 
+    protected static Field stoppedField; // cached
+
     protected static Method notifyExecutionTerminatedMethod; // cached
+    protected static Method notifyExecutionStoppingMethod; // cached
 
     // ===================================================================================
     //                                                                         Constructor
@@ -88,7 +91,9 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     }
 
     protected String buildThreadName(Object schedulerGuid, String executorGuid) {
-        return "cron4j::scheduler[" + schedulerGuid + "]::executor[" + executorGuid + "]"; // same as native
+        // because of too long, only executorGuid is unique
+        //return "cron4j::scheduler[" + schedulerGuid + "]::executor[" + executorGuid + "]"; // same as native
+        return "cron4j::" + Integer.toHexString(hashCode()); // simple, overridden by task later
     }
 
     protected void prepareThread(boolean daemon, String threadName) {
@@ -130,29 +135,42 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
     }
 
     // ===================================================================================
-    //                                                                 Reflection Festival
-    //                                                                 ===================
-    // -----------------------------------------------------
-    //                                                Notify
-    //                                                ------
-    protected void invokeNotifyExecutionTerminated(Throwable cause) {
-        readyNotifyExecutionTerminatedMethodIfNeeds();
-        DfReflectionUtil.invoke(notifyExecutionTerminatedMethod, this, new Object[] { cause });
-    }
-
-    protected void readyNotifyExecutionTerminatedMethodIfNeeds() {
-        if (notifyExecutionTerminatedMethod == null) {
-            synchronized (reflectionPartyLock) {
-                if (notifyExecutionTerminatedMethod == null) {
-                    final String methodName = "notifyExecutionTerminated";
-                    final Class<?>[] argTypes = new Class<?>[] { Throwable.class };
-                    notifyExecutionTerminatedMethod = DfReflectionUtil.getWholeMethod(getClass(), methodName, argTypes);
-                    notifyExecutionTerminatedMethod.setAccessible(true);
+    //                                                                           Stop Task
+    //                                                                           =========
+    @Override
+    public void stop() throws UnsupportedOperationException {
+        if (!canBeStopped()) {
+            throw new UnsupportedOperationException("Stop not supported");
+        }
+        setupLinkedLockIfNeeds();
+        synchronized (linkedLock) {
+            if (linkedThread != null && !isStopped()) {
+                registerStoppedAsTrue();
+                if (isPaused()) {
+                    resume();
                 }
+                invokeNotifyExecutionStopping();
+                linkedThread.interrupt();
             }
         }
+        // no wait to avoid deadlock of LaScheduledJob's lock between stopNow() thread and job thread
+        // in the first place, no need to wait thread ending here because stop is only request (no guarantee of stop)
+        //if (joinit) {
+        //    do {
+        //        try {
+        //            thread.join();
+        //            break;
+        //        } catch (InterruptedException e) {
+        //            continue;
+        //        }
+        //    } while (true);
+        //    thread = null;
+        //}
     }
 
+    // ===================================================================================
+    //                                                                 Reflection Festival
+    //                                                                 ===================
     // -----------------------------------------------------
     //                                                 Lock
     //                                                ------
@@ -260,6 +278,63 @@ public class RomanticCron4jNativeTaskExecutor extends TaskExecutor {
             synchronized (reflectionPartyLock) {
                 if (contextField == null) {
                     contextField = getAccessibleField("context");
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------
+    //                                               Stopped
+    //                                               -------
+    protected void registerStoppedAsTrue() {
+        readyStoppedFieldIfNeeds();
+        setFieldValue(stoppedField, true);
+    }
+
+    protected void readyStoppedFieldIfNeeds() {
+        if (stoppedField == null) {
+            synchronized (reflectionPartyLock) {
+                if (stoppedField == null) {
+                    stoppedField = getAccessibleField("stopped");
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------
+    //                                                Notify
+    //                                                ------
+    protected void invokeNotifyExecutionTerminated(Throwable cause) {
+        readyNotifyExecutionTerminatedMethodIfNeeds();
+        DfReflectionUtil.invoke(notifyExecutionTerminatedMethod, this, new Object[] { cause });
+    }
+
+    protected void readyNotifyExecutionTerminatedMethodIfNeeds() {
+        if (notifyExecutionTerminatedMethod == null) {
+            synchronized (reflectionPartyLock) {
+                if (notifyExecutionTerminatedMethod == null) {
+                    final String methodName = "notifyExecutionTerminated";
+                    final Class<?>[] argTypes = new Class<?>[] { Throwable.class };
+                    notifyExecutionTerminatedMethod = DfReflectionUtil.getWholeMethod(getClass(), methodName, argTypes);
+                    notifyExecutionTerminatedMethod.setAccessible(true);
+                }
+            }
+        }
+    }
+
+    protected void invokeNotifyExecutionStopping() {
+        readyNotifyExecutionStoppingMethodIfNeeds();
+        DfReflectionUtil.invoke(notifyExecutionStoppingMethod, this, new Object[] {});
+    }
+
+    protected void readyNotifyExecutionStoppingMethodIfNeeds() {
+        if (notifyExecutionStoppingMethod == null) {
+            synchronized (reflectionPartyLock) {
+                if (notifyExecutionStoppingMethod == null) {
+                    final String methodName = "notifyExecutionStopping";
+                    final Class<?>[] argTypes = new Class<?>[] {};
+                    notifyExecutionStoppingMethod = DfReflectionUtil.getWholeMethod(getClass(), methodName, argTypes);
+                    notifyExecutionStoppingMethod.setAccessible(true);
                 }
             }
         }

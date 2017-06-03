@@ -71,6 +71,8 @@ import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.TaskRunningState;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import it.sauronsoftware.cron4j.RomanticCron4jTaskExecutionContext;
 import it.sauronsoftware.cron4j.Task;
@@ -84,8 +86,9 @@ import it.sauronsoftware.cron4j.TaskExecutor;
 public class Cron4jTask extends Task { // unique per job in lasta job world
 
     // ===================================================================================
-    //                                                                           Attribute
-    //                                                                           =========
+    //                                                                          Definition
+    //                                                                          ==========
+    private static final Logger logger = LoggerFactory.getLogger(Cron4jTask.class);
     protected static final String LF = "\n";
 
     // ===================================================================================
@@ -98,6 +101,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected final LaJobRunner jobRunner; // not null, singleton
     protected final Cron4jNow cron4jNow; // not null
     protected final Supplier<LocalDateTime> currentTime; // not null
+    protected final boolean frameworkDebug;
     protected final TaskRunningState runningState; // not null
     protected final Object preparingLock = new Object(); // not null
     protected final Object runningLock = new Object(); // not null
@@ -107,7 +111,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                         Constructor
     //                                                                         ===========
     public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
-            Supplier<String> threadNaming, LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime) {
+            Supplier<String> threadNaming, LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime,
+            boolean frameworkDebug) {
         this.varyingCron = varyingCron;
         this.jobType = jobType;
         this.concurrentExec = concurrentExec;
@@ -115,6 +120,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
         this.currentTime = currentTime;
+        this.frameworkDebug = frameworkDebug;
         this.runningState = new TaskRunningState(currentTime);
     }
 
@@ -123,6 +129,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                  ==================
     @Override
     public void execute(TaskExecutionContext context) { // e.g. error handling
+        debugFw("...Beginning the cron4j task (before run): {}", jobType);
         final TaskExecutionContext nativeContext;
         final OptionalThing<LaunchNowOption> nowOption;
         if (context instanceof RomanticCron4jTaskExecutionContext) {
@@ -140,22 +147,28 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             RunnerResult runnerResult = null;
             Throwable controllerCause = null;
             try {
+                debugFw("...Calling doExecute() of task (before run)");
                 runnerResult = doExecute(job, nativeContext, nowOption); // not null
                 if (canTriggerNext(job, runnerResult)) {
+                    debugFw("...Calling triggerNext() of job in task (after run)");
                     job.triggerNext(); // should be after current job ending
                 }
             } catch (JobConcurrentlyExecutingException e) { // these catch statements are related to deriveRunnerExecResultType()
+                debugFw("...Calling catch clause of job concurrently executing exception: {}", e.getClass().getSimpleName());
                 final String msg = "Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName();
                 error(OptionalThing.of(job), msg, e);
                 controllerCause = e;
             } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
+                debugFw("...Calling catch clause of job controller's exception: {}", cause.getClass().getSimpleName());
                 final String msg = "Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName();
                 error(OptionalThing.of(job), msg, cause);
                 controllerCause = cause;
             }
             final OptionalThing<RunnerResult> optRunnerResult = optRunnerResult(runnerResult); // empty when error 
             final OptionalThing<LocalDateTime> endTime = deriveEndTime(optRunnerResult);
+            debugFw("...Calling recordJobHistory() of task (after run): {}, {}", optRunnerResult, endTime);
             recordJobHistory(nativeContext, job, jobThread, activationTime, optRunnerResult, endTime, optControllerCause(controllerCause));
+            debugFw("...Ending the cron4j task (after run): {}, {}", optRunnerResult, endTime);
         } catch (Throwable coreCause) { // controller dead
             final String msg = "Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName();
             error(OptionalThing.empty(), msg, coreCause);
@@ -189,11 +202,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         // ...may be hard to read, synchronized hell
         final String cronExp;
         final VaryingCronOption cronOption;
+        debugFw("...Locking varying lock (before run): {}", varyingLock);
         synchronized (varyingLock) {
             cronExp = varyingCron.getCronExp();
             cronOption = varyingCron.getCronOption();
         }
         final List<NeighborConcurrentGroup> neighborConcurrentGroupList = job.getNeighborConcurrentGroupList();
+        debugFw("...Locking preparing lock (before run): {}", preparingLock);
         synchronized (preparingLock) { // waiting for previous preparing end
             final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job);
             if (concurrentResult.isPresent()) { // e.g. quit, error
@@ -205,7 +220,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                         final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job, neighborConcurrentGroupList);
                         if (!result.isPresent()) { // no duplicate neighbor or duplicate as waiting
                             sleepForLockableLife(); // not to get running lock before previous thread in crevasse point
+                            debugFw("...Locking running lock (before run): {}", runningLock);
                             synchronized (runningLock) { // waiting for previous running end
+                                debugFw("...Locking running state in preparing and running lock (before run): {}", runningState);
                                 synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> { // also neighbor's running
                                     synchronized (runningState) { // to protect running state, begin() and end()
                                         // may be override by crevasse headache, but recover it later
@@ -223,6 +240,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         }
         // *here is first crevasse point
         // (really want to get running lock before returning preparing lock)
+        debugFw("...Locking running lock (before run): {}", runningLock);
         synchronized (runningLock) { // to make next thread wait for me (or waiting by crevasse headache)
             try { // *here is second crevasse point
                 return synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> {
@@ -236,8 +254,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     final RunnerResult runnerResult;
                     final LocalDateTime endTime;
                     try {
+                        debugFw("...Calling actuallyExecute() of task (before run): {}", job);
                         runnerResult = actuallyExecute(job, cronExp, cronOption, context, nowOption);
                     } finally {
+                        debugFw("...Calling finally clause of job execution (after run)");
                         endTime = currentTime.get();
                         crossVMEnding(job, crossVMState, endTime);
                     }
@@ -245,6 +265,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     return runnerResult;
                 });
             } finally {
+                debugFw("...Locking running state in running lock (after run): {}", runningState);
                 synchronized (runningState) { // running state is only my job so outside neighbor synchronization
                     if (runningState.getBeginTime().isPresent()) {
                         runningState.end(); // for controller dead
@@ -346,6 +367,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected RunnerResult runJob(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
             TaskExecutionContext cron4jContext, OptionalThing<LaunchNowOption> nowOption) {
         final LocalDateTime beginTime = runningState.getBeginTime().get(); // already begun here
+        debugFw("...Calling run() of job runner in task (before run): beginTime={}", beginTime);
         return jobRunner.run(jobType, () -> {
             return createCron4jRuntime(identityProvider, cronExp, cronOption, beginTime, cron4jContext, nowOption);
         }).acceptEndTime(currentTime.get());
@@ -358,7 +380,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final OptionalThing<LaJobUnique> jobUnique = identityProvider.getJobUnique();
         final Map<String, Object> parameterMap = prepareParameterMap(cronOption, nowOption);
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
-        return new Cron4jRuntime(jobKey, jobNote, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel, beginTime, cron4jContext);
+        return new Cron4jRuntime(jobKey, jobNote, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel // basic
+                , beginTime, isFrameworkDebug() // state
+                , cron4jContext); // cron4j
     }
 
     protected Map<String, Object> prepareParameterMap(VaryingCronOption cronOption, OptionalThing<LaunchNowOption> nowOption) {
@@ -710,6 +734,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 });
             }
         }
+    }
+
+    // ===================================================================================
+    //                                                                     Framework Debug
+    //                                                                     ===============
+    protected void debugFw(String msg, Object... args) {
+        if (isFrameworkDebug()) {
+            logger.info("#job #fw " + msg, args); // info level for production environment
+        }
+    }
+
+    protected boolean isFrameworkDebug() {
+        return frameworkDebug;
     }
 
     // ===================================================================================

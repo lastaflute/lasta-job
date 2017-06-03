@@ -63,8 +63,13 @@ public class MockJobRuntime implements LaJobRuntime {
         }).orElse(Collections.emptyMap());
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
         final LocalDateTime beginTime = LocalDateTime.now(); // allowed in mock
+        final boolean frameworkDebug = isFrameworkDebug();
         cron4jRuntime = new Cron4jRuntime(jobKey, cronOption.getJobNote(), cronOption.getJobUnique(), cronExp, jobType, parameterMap,
-                noticeLogLevel, beginTime, cron4jContext);
+                noticeLogLevel, beginTime, frameworkDebug, cron4jContext);
+    }
+
+    protected boolean determineFrameworkDebug() {
+        return false; // fixedly off because of mock (for UnitTest)
     }
 
     // -----------------------------------------------------
@@ -163,6 +168,11 @@ public class MockJobRuntime implements LaJobRuntime {
     @Override
     public LocalDateTime getBeginTime() {
         return cron4jRuntime.getBeginTime();
+    }
+
+    @Override
+    public boolean isFrameworkDebug() {
+        return cron4jRuntime.isFrameworkDebug();
     }
 
     @Override

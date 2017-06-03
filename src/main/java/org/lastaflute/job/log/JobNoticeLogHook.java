@@ -27,4 +27,8 @@ public interface JobNoticeLogHook {
     void hookRunning(LaJobRuntime runtime, String msg);
 
     void hookFinishing(LaJobRuntime runtime, String msg, OptionalThing<Throwable> cause);
+
+    default void hookStopped(LaJobRuntime runtime, String msg, OptionalThing<Throwable> cause) { // optional
+        // do nothing as default
+    }
 }
