@@ -47,6 +47,7 @@ import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableS
 import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlStringFilter;
 import org.lastaflute.db.jta.romanticist.SavedTransactionMemories;
 import org.lastaflute.db.jta.romanticist.TransactionMemoriesProvider;
+import org.lastaflute.job.exception.JobStoppedException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.log.JobErrorLog;
 import org.lastaflute.job.log.JobErrorLogHook;
@@ -57,6 +58,8 @@ import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogHook;
 import org.lastaflute.job.subsidiary.CrossVMHook;
 import org.lastaflute.job.subsidiary.RunnerResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author jflute
@@ -67,6 +70,7 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                          Definition
     //                                                                          ==========
+    private static final Logger logger = LoggerFactory.getLogger(LaJobRunner.class);
     protected static final String LF = "\n";
     protected static final String EX_IND = "  "; // indent for exception message
 
@@ -167,14 +171,18 @@ public class LaJobRunner {
     //                                                                               =====
     public RunnerResult run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         if (isPlainlyRun()) { // e.g. production, unit-test
-            return doRun(jobType, runtimeSupplier.get());
+            final LaJobRuntime runtime = runtimeSupplier.get();
+            debugFw(runtime, "...Calling doRun() of job runner plainly");
+            return doRun(jobType, runtime);
         }
         // e.g. local development (hot deploy)
         // no synchronization here because allow web and job to be executed concurrently
         //synchronized (HotdeployLock.class) {
         final ClassLoader originalLoader = startHotdeploy();
         try {
-            return doRun(jobType, runtimeSupplier.get());
+            final LaJobRuntime runtime = runtimeSupplier.get(); // no recycle to create hot deploy (just in case)
+            debugFw(runtime, "...Calling doRun() of job runner as hotdeploy: {}", originalLoader);
+            return doRun(jobType, runtime);
         } finally {
             stopHotdeploy(originalLoader);
         }
@@ -209,13 +217,17 @@ public class LaJobRunner {
         final long before = showRunning(runtime);
         Throwable cause = null;
         try {
+            debugFw(runtime, "...Calling try clause of job runner");
             hookBefore(runtime);
+            debugFw(runtime, "...Calling actuallyRun() of job runner");
             actuallyRun(jobType, runtime);
         } catch (Throwable e) {
+            debugFw(runtime, "...Calling catch clause of job runner: {}", e.getClass().getSimpleName());
             final Throwable filtered = filterCause(e);
             cause = filtered;
             showJobException(runtime, before, filtered);
         } finally {
+            debugFw(runtime, "...Calling finally clause of job runner");
             hookFinally(runtime, OptionalThing.ofNullable(cause, () -> {
                 throw new IllegalStateException("Not found the cause: " + runtime);
             }));
@@ -225,6 +237,7 @@ public class LaJobRunner {
             clearCallbackContext();
             clearThreadCacheContext();
         }
+        debugFw(runtime, "...Calling createRunnerResult() of job runner");
         return createRunnerResult(runtime, cause);
     }
 
@@ -449,7 +462,7 @@ public class LaJobRunner {
     //                                      ----------------
     protected String buildJobExceptionMessage(LaJobRuntime runtime, long before, Throwable cause) {
         final StringBuilder sb = new StringBuilder();
-        sb.append("Failed to run the job process: #flow #job");
+        sb.append("#flow #job Failed to run the job process:");
         sb.append(LF);
         sb.append("/= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =: ");
         sb.append(runtime.getJobType().getName());
@@ -536,11 +549,22 @@ public class LaJobRunner {
     //                                     Exception Logging
     //                                     -----------------
     protected void logJobException(LaJobRuntime runtime, String bigMsg, Throwable cause) { // bigMsg contains stack-trace
-        if (errorLogHook != null) {
-            final OptionalThing<LaScheduledJob> job = jobManager.findJobByKey(runtime.getJobKey());
-            errorLogHook.hookError(new JobErrorResource(job, OptionalThing.of(runtime), bigMsg, cause));
+        if (isBusinessStoppedException(cause)) {
+            JobNoticeLog.log(runtime.getNoticeLogLevel(), () -> bigMsg);
+            if (noticeLogHook != null) {
+                noticeLogHook.hookStopped(runtime, bigMsg, OptionalThing.of(cause));
+            }
+        } else {
+            if (errorLogHook != null) {
+                final OptionalThing<LaScheduledJob> job = jobManager.findJobByKey(runtime.getJobKey());
+                errorLogHook.hookError(new JobErrorResource(job, OptionalThing.of(runtime), bigMsg, cause));
+            }
+            JobErrorLog.log(bigMsg); // not use second argument here, same reason as logging filter
         }
-        JobErrorLog.log(bigMsg); // not use second argument here, same reason as logging filter
+    }
+
+    protected boolean isBusinessStoppedException(Throwable cause) {
+        return cause instanceof JobStoppedException; // from runtime.stopIfNeeds()
     }
 
     // ===================================================================================
@@ -565,6 +589,15 @@ public class LaJobRunner {
         return OptionalThing.ofNullable(ThreadCacheContext.findMailCounter(), () -> {
             throw new IllegalStateException("Not found the mail count in the thread cache.");
         });
+    }
+
+    // ===================================================================================
+    //                                                                     Framework Debug
+    //                                                                     ===============
+    protected void debugFw(LaJobRuntime runtime, String msg, Object... args) {
+        if (runtime.isFrameworkDebug() && logger.isInfoEnabled()) {
+            logger.info("#job #fw " + msg, args); // info level for production 
+        }
     }
 
     // ===================================================================================

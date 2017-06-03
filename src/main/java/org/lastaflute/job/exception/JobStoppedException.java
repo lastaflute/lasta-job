@@ -28,4 +28,8 @@ public class JobStoppedException extends LaJobOperationException {
     public JobStoppedException(String msg) {
         super(msg);
     }
+
+    public JobStoppedException(String msg, Throwable cause) {
+        super(msg, cause);
+    }
 }

@@ -39,4 +39,12 @@ public interface JobHistoryHook {
     default List<LaJobHistory> hookList(Supplier<List<LaJobHistory>> nativeSearcher) {
         return nativeSearcher.get(); // as default
     }
+
+    /**
+     * Does it suppress notice log of the hook?
+     * @return The determination, true or false.
+     */
+    default boolean suppressesNoticeLog() { // as you like it
+        return false;
+    }
 }

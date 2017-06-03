@@ -77,6 +77,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
     protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
+    protected final Object triggeredJobKeyLock = new Object(); // for minimum lock scope to avoid deadlock
 
     // these are same life-cycle (list to keep order for machine-gun synchronization)
     protected Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap; // null allowed if no neighbor
@@ -280,7 +281,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                        Next Trigger
     //                                                                        ============
     @Override
-    public synchronized void registerNext(LaJobKey triggeredJobKey) {
+    public void registerNext(LaJobKey triggeredJobKey) {
         verifyScheduledState();
         assertArgumentNotNull("triggeredJobKey", triggeredJobKey);
         // lazy check for initialization logic
@@ -290,23 +291,27 @@ public class Cron4jJob implements LaScheduledJob {
         if (triggeredJobKey.equals(jobKey)) { // myself
             throw new IllegalArgumentException("Cannot register myself job as next trigger: " + toIdentityDisp());
         }
-        if (triggeredJobKeyList == null) {
-            triggeredJobKeyList = new CopyOnWriteArraySet<LaJobKey>(); // just in case
+        synchronized (triggeredJobKeyLock) {
+            if (triggeredJobKeyList == null) {
+                triggeredJobKeyList = new CopyOnWriteArraySet<LaJobKey>(); // just in case
+            }
+            triggeredJobKeyList.add(triggeredJobKey);
         }
-        triggeredJobKeyList.add(triggeredJobKey);
     }
 
-    public synchronized void triggerNext() { // called in framework
+    public void triggerNext() { // called in framework
         verifyScheduledState();
-        if (triggeredJobKeyList == null) {
-            return;
-        }
-        final List<Cron4jJob> triggeredJobList = triggeredJobKeyList.stream().map(triggeredJobKey -> {
-            return findTriggeredJob(triggeredJobKey);
-        }).collect(Collectors.toList());
-        showPreparingNextTrigger(triggeredJobList);
-        for (Cron4jJob triggeredJob : triggeredJobList) { // expception if contains unscheduled
-            triggeredJob.launchNow();
+        synchronized (triggeredJobKeyLock) {
+            if (triggeredJobKeyList == null) {
+                return;
+            }
+            final List<Cron4jJob> triggeredJobList = triggeredJobKeyList.stream().map(triggeredJobKey -> {
+                return findTriggeredJob(triggeredJobKey);
+            }).collect(Collectors.toList());
+            showPreparingNextTrigger(triggeredJobList);
+            for (Cron4jJob triggeredJob : triggeredJobList) { // expception if contains unscheduled
+                triggeredJob.launchNow();
+            }
         }
     }
 
@@ -428,8 +433,10 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public synchronized Set<LaJobKey> getTriggeredJobKeySet() { // synchronized for varying
-        return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
+    public Set<LaJobKey> getTriggeredJobKeySet() {
+        synchronized (triggeredJobKeyLock) {
+            return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
+        }
     }
 
     @Override

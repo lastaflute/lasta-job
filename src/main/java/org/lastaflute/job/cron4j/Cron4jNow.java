@@ -61,6 +61,7 @@ public class Cron4jNow implements LaSchedulingNow {
     protected final Cron4jScheduler cron4jScheduler;
     protected final LaJobRunner jobRunner;
     protected final Supplier<LocalDateTime> currentTime;
+    protected final boolean frameworkDebug;
     protected final Map<LaJobKey, Cron4jJob> jobKeyJobMap = new ConcurrentHashMap<LaJobKey, Cron4jJob>();
     protected final List<Cron4jJob> jobOrderedList = new CopyOnWriteArrayList<Cron4jJob>(); // same lifecycle as jobKeyJobMap
     protected final Map<LaJobUnique, Cron4jJob> jobUniqueJobMap = new ConcurrentHashMap<LaJobUnique, Cron4jJob>();
@@ -71,10 +72,11 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    public Cron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner, Supplier<LocalDateTime> currentTime) {
+    public Cron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner, Supplier<LocalDateTime> currentTime, boolean frameworkDebug) {
         this.cron4jScheduler = cron4jScheduler;
         this.jobRunner = jobRunner;
         this.currentTime = currentTime;
+        this.frameworkDebug = frameworkDebug;
     }
 
     // ===================================================================================
@@ -216,7 +218,7 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     protected Cron4jCron createCron4jCron() {
-        return new Cron4jCron(cron4jScheduler, jobRunner, this, CronRegistrationType.CHANGE, currentTime);
+        return new Cron4jCron(cron4jScheduler, jobRunner, this, CronRegistrationType.CHANGE, currentTime, isFrameworkDebug());
     }
 
     // ===================================================================================
@@ -305,6 +307,13 @@ public class Cron4jNow implements LaSchedulingNow {
                 }
             }
         }).start();
+    }
+
+    // ===================================================================================
+    //                                                                     Framework Debug
+    //                                                                     ===============
+    protected boolean isFrameworkDebug() {
+        return frameworkDebug;
     }
 
     // ===================================================================================

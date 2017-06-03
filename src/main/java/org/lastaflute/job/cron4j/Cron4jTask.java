@@ -26,13 +26,22 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import org.dbflute.bhv.proposal.callback.TraceableSqlAdditionalInfoProvider;
 import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.hook.AccessContext;
+import org.dbflute.hook.CallbackContext;
+import org.dbflute.hook.SqlFireHook;
+import org.dbflute.hook.SqlResultHandler;
+import org.dbflute.hook.SqlStringFilter;
 import org.dbflute.optional.OptionalThing;
 import org.dbflute.util.DfTypeUtil;
+import org.lastaflute.core.magic.ThreadCacheContext;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextArranger;
 import org.lastaflute.db.dbflute.accesscontext.AccessContextResource;
 import org.lastaflute.db.dbflute.accesscontext.PreparedAccessContext;
+import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlFireHook;
+import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlResultHandler;
+import org.lastaflute.db.dbflute.callbackcontext.traceablesql.RomanticTraceableSqlStringFilter;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.exception.JobConcurrentlyExecutingException;
@@ -43,10 +52,12 @@ import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobErrorLog;
 import org.lastaflute.job.log.JobErrorResource;
 import org.lastaflute.job.log.JobErrorStackTracer;
+import org.lastaflute.job.log.JobHistoryHook;
 import org.lastaflute.job.log.JobHistoryResource;
 import org.lastaflute.job.log.JobNoticeLog;
 import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.ConcurrentJobStopper;
+import org.lastaflute.job.subsidiary.CrossVMHook;
 import org.lastaflute.job.subsidiary.CrossVMState;
 import org.lastaflute.job.subsidiary.EndTitleRoll;
 import org.lastaflute.job.subsidiary.ExecResultType;
@@ -60,6 +71,8 @@ import org.lastaflute.job.subsidiary.RunnerResult;
 import org.lastaflute.job.subsidiary.TaskRunningState;
 import org.lastaflute.job.subsidiary.VaryingCron;
 import org.lastaflute.job.subsidiary.VaryingCronOption;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import it.sauronsoftware.cron4j.RomanticCron4jTaskExecutionContext;
 import it.sauronsoftware.cron4j.Task;
@@ -73,8 +86,9 @@ import it.sauronsoftware.cron4j.TaskExecutor;
 public class Cron4jTask extends Task { // unique per job in lasta job world
 
     // ===================================================================================
-    //                                                                           Attribute
-    //                                                                           =========
+    //                                                                          Definition
+    //                                                                          ==========
+    private static final Logger logger = LoggerFactory.getLogger(Cron4jTask.class);
     protected static final String LF = "\n";
 
     // ===================================================================================
@@ -87,6 +101,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected final LaJobRunner jobRunner; // not null, singleton
     protected final Cron4jNow cron4jNow; // not null
     protected final Supplier<LocalDateTime> currentTime; // not null
+    protected final boolean frameworkDebug;
     protected final TaskRunningState runningState; // not null
     protected final Object preparingLock = new Object(); // not null
     protected final Object runningLock = new Object(); // not null
@@ -96,7 +111,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                         Constructor
     //                                                                         ===========
     public Cron4jTask(VaryingCron varyingCron, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
-            Supplier<String> threadNaming, LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime) {
+            Supplier<String> threadNaming, LaJobRunner jobRunner, Cron4jNow cron4jNow, Supplier<LocalDateTime> currentTime,
+            boolean frameworkDebug) {
         this.varyingCron = varyingCron;
         this.jobType = jobType;
         this.concurrentExec = concurrentExec;
@@ -104,6 +120,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
         this.currentTime = currentTime;
+        this.frameworkDebug = frameworkDebug;
         this.runningState = new TaskRunningState(currentTime);
     }
 
@@ -112,6 +129,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                                                  ==================
     @Override
     public void execute(TaskExecutionContext context) { // e.g. error handling
+        debugFw("...Beginning the cron4j task (before run): {}", jobType);
         final TaskExecutionContext nativeContext;
         final OptionalThing<LaunchNowOption> nowOption;
         if (context instanceof RomanticCron4jTaskExecutionContext) {
@@ -129,22 +147,28 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             RunnerResult runnerResult = null;
             Throwable controllerCause = null;
             try {
+                debugFw("...Calling doExecute() of task (before run)");
                 runnerResult = doExecute(job, nativeContext, nowOption); // not null
                 if (canTriggerNext(job, runnerResult)) {
+                    debugFw("...Calling triggerNext() of job in task (after run)");
                     job.triggerNext(); // should be after current job ending
                 }
             } catch (JobConcurrentlyExecutingException e) { // these catch statements are related to deriveRunnerExecResultType()
+                debugFw("...Calling catch clause of job concurrently executing exception: {}", e.getClass().getSimpleName());
                 final String msg = "Cannot execute the job task by concurrent execution: " + varyingCron + ", " + jobType.getSimpleName();
                 error(OptionalThing.of(job), msg, e);
                 controllerCause = e;
             } catch (Throwable cause) { // from framework part (exception in appilcation job are already handled)
+                debugFw("...Calling catch clause of job controller's exception: {}", cause.getClass().getSimpleName());
                 final String msg = "Failed to execute the job task: " + varyingCron + ", " + jobType.getSimpleName();
                 error(OptionalThing.of(job), msg, cause);
                 controllerCause = cause;
             }
             final OptionalThing<RunnerResult> optRunnerResult = optRunnerResult(runnerResult); // empty when error 
             final OptionalThing<LocalDateTime> endTime = deriveEndTime(optRunnerResult);
+            debugFw("...Calling recordJobHistory() of task (after run): {}, {}", optRunnerResult, endTime);
             recordJobHistory(nativeContext, job, jobThread, activationTime, optRunnerResult, endTime, optControllerCause(controllerCause));
+            debugFw("...Ending the cron4j task (after run): {}, {}", optRunnerResult, endTime);
         } catch (Throwable coreCause) { // controller dead
             final String msg = "Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName();
             error(OptionalThing.empty(), msg, coreCause);
@@ -178,11 +202,13 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         // ...may be hard to read, synchronized hell
         final String cronExp;
         final VaryingCronOption cronOption;
+        debugFw("...Locking varying lock (before run): {}", varyingLock);
         synchronized (varyingLock) {
             cronExp = varyingCron.getCronExp();
             cronOption = varyingCron.getCronOption();
         }
         final List<NeighborConcurrentGroup> neighborConcurrentGroupList = job.getNeighborConcurrentGroupList();
+        debugFw("...Locking preparing lock (before run): {}", preparingLock);
         synchronized (preparingLock) { // waiting for previous preparing end
             final OptionalThing<RunnerResult> concurrentResult = stopConcurrentJobIfNeeds(job);
             if (concurrentResult.isPresent()) { // e.g. quit, error
@@ -194,7 +220,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                         final OptionalThing<RunnerResult> result = stopNeighborConcurrentJobIfNeeds(job, neighborConcurrentGroupList);
                         if (!result.isPresent()) { // no duplicate neighbor or duplicate as waiting
                             sleepForLockableLife(); // not to get running lock before previous thread in crevasse point
+                            debugFw("...Locking running lock (before run): {}", runningLock);
                             synchronized (runningLock) { // waiting for previous running end
+                                debugFw("...Locking running state in preparing and running lock (before run): {}", runningState);
                                 synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> { // also neighbor's running
                                     synchronized (runningState) { // to protect running state, begin() and end()
                                         // may be override by crevasse headache, but recover it later
@@ -212,6 +240,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         }
         // *here is first crevasse point
         // (really want to get running lock before returning preparing lock)
+        debugFw("...Locking running lock (before run): {}", runningLock);
         synchronized (runningLock) { // to make next thread wait for me (or waiting by crevasse headache)
             try { // *here is second crevasse point
                 return synchronizedNeighborRunning(neighborConcurrentGroupList.iterator(), () -> {
@@ -225,8 +254,10 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     final RunnerResult runnerResult;
                     final LocalDateTime endTime;
                     try {
+                        debugFw("...Calling actuallyExecute() of task (before run): {}", job);
                         runnerResult = actuallyExecute(job, cronExp, cronOption, context, nowOption);
                     } finally {
+                        debugFw("...Calling finally clause of job execution (after run)");
                         endTime = currentTime.get();
                         crossVMEnding(job, crossVMState, endTime);
                     }
@@ -234,6 +265,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     return runnerResult;
                 });
             } finally {
+                debugFw("...Locking running state in running lock (after run): {}", runningState);
                 synchronized (runningState) { // running state is only my job so outside neighbor synchronization
                     if (runningState.getBeginTime().isPresent()) {
                         runningState.end(); // for controller dead
@@ -335,6 +367,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     protected RunnerResult runJob(JobIdentityAttr identityProvider, String cronExp, VaryingCronOption cronOption,
             TaskExecutionContext cron4jContext, OptionalThing<LaunchNowOption> nowOption) {
         final LocalDateTime beginTime = runningState.getBeginTime().get(); // already begun here
+        debugFw("...Calling run() of job runner in task (before run): beginTime={}", beginTime);
         return jobRunner.run(jobType, () -> {
             return createCron4jRuntime(identityProvider, cronExp, cronOption, beginTime, cron4jContext, nowOption);
         }).acceptEndTime(currentTime.get());
@@ -347,7 +380,9 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final OptionalThing<LaJobUnique> jobUnique = identityProvider.getJobUnique();
         final Map<String, Object> parameterMap = prepareParameterMap(cronOption, nowOption);
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
-        return new Cron4jRuntime(jobKey, jobNote, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel, beginTime, cron4jContext);
+        return new Cron4jRuntime(jobKey, jobNote, jobUnique, cronExp, jobType, parameterMap, noticeLogLevel // basic
+                , beginTime, isFrameworkDebug() // state
+                , cron4jContext); // cron4j
     }
 
     protected Map<String, Object> prepareParameterMap(VaryingCronOption cronOption, OptionalThing<LaunchNowOption> nowOption) {
@@ -404,16 +439,29 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                               -------
     protected OptionalThing<CrossVMState> crossVMBeginning(Cron4jJob job) {
         return jobRunner.getCrossVMHook().map(hook -> {
+            final Method hookMethod = findHookMethod(hook, "hookBeginning");
+            arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, "hookBeginning", job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
+            arrangeHookCallbackContext(hook, hookMethod, job);
             try {
-                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp());
+                showCrossVMBeginning(job, hook);
                 return hook.hookBeginning(job, runningState.getBeginTime().get()); // already begun here
             } finally {
+                clearHookCallbackContext();
                 clearHookPreparedAccessContext();
+                clearHookThreadCacheContext();
             }
         });
+    }
+
+    protected void showCrossVMBeginning(Cron4jJob job, CrossVMHook hook) {
+        if (!hook.suppressesNoticeLog()) {
+            JobNoticeLog.log(getCrossVMHookNoticeLogLovel(job), () -> {
+                return "#flow #job ...hookBeginning crossVM for the job: " + job.toIdentityDisp();
+            });
+        }
     }
 
     protected void crossVMEnding(Cron4jJob job, OptionalThing<CrossVMState> crossVMState, LocalDateTime endTime) {
@@ -421,16 +469,33 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             return;
         }
         jobRunner.getCrossVMHook().alwaysPresent(hook -> {
+            final Method hookMethod = findHookMethod(hook, "hookEnding");
+            arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, "hookEnding", job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
+            arrangeHookCallbackContext(hook, hookMethod, job);
             try {
-                JobNoticeLog.log(job.getNoticeLogLevel(), () -> "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp());
+                showCrossVMEnding(job, hook);
                 hook.hookEnding(job, crossVMState.get(), endTime);
             } finally {
+                clearHookCallbackContext();
                 clearHookPreparedAccessContext();
+                clearHookThreadCacheContext();
             }
         });
+    }
+
+    protected void showCrossVMEnding(Cron4jJob job, CrossVMHook hook) {
+        if (!hook.suppressesNoticeLog()) {
+            JobNoticeLog.log(getCrossVMHookNoticeLogLovel(job), () -> {
+                return "#flow #job ...hookEnding crossVM for the job: " + job.toIdentityDisp();
+            });
+        }
+    }
+
+    protected JobNoticeLogLevel getCrossVMHookNoticeLogLovel(Cron4jJob job) {
+        return job.getNoticeLogLevel(); // matches with job's one as default
     }
 
     // -----------------------------------------------------
@@ -442,13 +507,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         final Cron4jJobHistory jobHistory = prepareJobHistory(job, activationTime, runnerResult, endTime, controllerCause);
         final int historyLimit = getHistoryLimit();
         jobRunner.getHistoryHook().ifPresent(hook -> {
+            final Method hookMethod = findHookMethod(hook, "hookRecord");
+            arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, "hookRecord", job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
             });
+            arrangeHookCallbackContext(hook, hookMethod, job);
             try {
+                showJobHistoryHookRecording(job, hook);
                 hook.hookRecord(jobHistory, new JobHistoryResource(historyLimit));
             } finally {
+                clearHookCallbackContext();
                 clearHookPreparedAccessContext();
+                clearHookThreadCacheContext();
             }
         });
         Cron4jJobHistory.record(taskExecutor, jobHistory, historyLimit);
@@ -506,16 +577,47 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         return 300;
     }
 
+    protected void showJobHistoryHookRecording(Cron4jJob job, JobHistoryHook hook) {
+        if (!hook.suppressesNoticeLog()) {
+            JobNoticeLog.log(getJobHistoryHookNoticeLogLovel(job), () -> {
+                return "#flow #job ...hookRecording job history for the job: " + job.toIdentityDisp();
+            });
+        }
+    }
+
+    protected JobNoticeLogLevel getJobHistoryHookNoticeLogLovel(Cron4jJob job) {
+        return job.getNoticeLogLevel(); // matches with job's one as default
+    }
+
+    // -----------------------------------------------------
+    //                                             Error Log
+    //                                             ---------
+    protected void error(OptionalThing<ReadableJobAttr> jobAttr, String msg, Throwable cause) {
+        final String bigMsg = (msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause)).trim();
+        jobRunner.getErrorLogHook().ifPresent(hook -> {
+            hook.hookError(new JobErrorResource(jobAttr, OptionalThing.empty(), bigMsg, cause));
+        });
+        JobErrorLog.log(bigMsg);
+    }
+
+    // ===================================================================================
+    //                                                                        Hook Context
+    //                                                                        ============
+    // -----------------------------------------------------
+    //                                           ThreadCache
+    //                                           -----------
+    protected void arrangeHookThreadCacheContext() {
+        ThreadCacheContext.initialize();
+    }
+
+    protected void clearHookThreadCacheContext() {
+        ThreadCacheContext.clear();
+    }
+
     // -----------------------------------------------------
     //                                         AccessContext
     //                                         -------------
-    protected void arrangeHookPreparedAccessContext(AccessContextArranger arranger, Object hook, String methodName, Cron4jJob job) {
-        final Method hookMethod = Stream.of(hook.getClass().getMethods())
-                .filter(method -> method.getName().equals(methodName))
-                .findFirst()
-                .orElseThrow(() -> { // no way
-                    return new IllegalStateException("Not found the method in hook: " + methodName + ", " + hook);
-                });
+    protected void arrangeHookPreparedAccessContext(AccessContextArranger arranger, Object hook, Method hookMethod, Cron4jJob job) {
         final String moduleName = DfTypeUtil.toClassTitle(hook.getClass());
         final AccessContext context = arranger.arrangePreparedAccessContext(new AccessContextResource(moduleName, hookMethod));
         if (context == null) {
@@ -530,14 +632,60 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     }
 
     // -----------------------------------------------------
-    //                                             Error Log
-    //                                             ---------
-    protected void error(OptionalThing<ReadableJobAttr> jobAttr, String msg, Throwable cause) {
-        final String bigMsg = (msg + LF + new JobErrorStackTracer().buildExceptionStackTrace(cause)).trim();
-        jobRunner.getErrorLogHook().ifPresent(hook -> {
-            hook.hookError(new JobErrorResource(jobAttr, OptionalThing.empty(), bigMsg, cause));
-        });
-        JobErrorLog.log(bigMsg);
+    //                                       CallbackContext
+    //                                       ---------------
+    protected void arrangeHookCallbackContext(Object hook, Method hookMethod, Cron4jJob job) {
+        CallbackContext.setSqlFireHookOnThread(createHookSqlFireHook());
+        CallbackContext.setSqlStringFilterOnThread(createHookSqlStringFilter(hook, hookMethod, job));
+        CallbackContext.setSqlResultHandlerOnThread(createHookSqlResultHandler());
+    }
+
+    protected SqlFireHook createHookSqlFireHook() {
+        return newHookRomanticTraceableSqlFireHook();
+    }
+
+    protected RomanticTraceableSqlFireHook newHookRomanticTraceableSqlFireHook() {
+        return new RomanticTraceableSqlFireHook();
+    }
+
+    protected SqlStringFilter createHookSqlStringFilter(Object hook, Method hookMethod, Cron4jJob job) {
+        return newHookRomanticTraceableSqlStringFilter(hookMethod, () -> buildHookSqlMarkingAdditionalInfo(hook, job));
+    }
+
+    protected String buildHookSqlMarkingAdditionalInfo(Object hook, Cron4jJob job) {
+        return "(" + hook.getClass().getSimpleName() + ", " + job.toIdentityDisp() + ")"; // concrete class + job identity
+    }
+
+    protected RomanticTraceableSqlStringFilter newHookRomanticTraceableSqlStringFilter(Method actionMethod,
+            TraceableSqlAdditionalInfoProvider additionalInfoProvider) {
+        return new RomanticTraceableSqlStringFilter(actionMethod, additionalInfoProvider);
+    }
+
+    protected SqlResultHandler createHookSqlResultHandler() {
+        return newHookRomanticTraceableSqlResultHandler();
+    }
+
+    protected RomanticTraceableSqlResultHandler newHookRomanticTraceableSqlResultHandler() {
+        return new RomanticTraceableSqlResultHandler();
+    }
+
+    protected void clearHookCallbackContext() {
+        CallbackContext.clearSqlResultHandlerOnThread();
+        CallbackContext.clearSqlStringFilterOnThread();
+        CallbackContext.clearSqlFireHookOnThread();
+    }
+
+    // -----------------------------------------------------
+    //                                          Assist Logic
+    //                                          ------------
+    protected Method findHookMethod(Object hook, String methodName) {
+        final Method hookMethod = Stream.of(hook.getClass().getMethods()) // always public method
+                .filter(method -> method.getName().equals(methodName))
+                .findFirst()
+                .orElseThrow(() -> { // no way
+                    return new IllegalStateException("Not found the method in hook: " + methodName + ", " + hook);
+                });
+        return hookMethod;
     }
 
     // ===================================================================================
@@ -586,6 +734,19 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                 });
             }
         }
+    }
+
+    // ===================================================================================
+    //                                                                     Framework Debug
+    //                                                                     ===============
+    protected void debugFw(String msg, Object... args) {
+        if (isFrameworkDebug()) {
+            logger.info("#job #fw " + msg, args); // info level for production environment
+        }
+    }
+
+    protected boolean isFrameworkDebug() {
+        return frameworkDebug;
     }
 
     // ===================================================================================

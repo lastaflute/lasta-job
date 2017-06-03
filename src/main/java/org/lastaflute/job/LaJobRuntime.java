@@ -61,6 +61,8 @@ public interface LaJobRuntime {
     //                                                                           =========
     LocalDateTime getBeginTime();
 
+    boolean isFrameworkDebug();
+
     // ===================================================================================
     //                                                                      End-Title Roll
     //                                                                      ==============

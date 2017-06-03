@@ -59,17 +59,19 @@ public class Cron4jCron implements LaCron {
     protected final Cron4jNow cron4jNow;
     protected final CronRegistrationType registrationType;
     protected final Supplier<LocalDateTime> currentTime;
+    protected final boolean frameworkDebug;
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
     public Cron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner, Cron4jNow cron4jNow, CronRegistrationType registrationType,
-            Supplier<LocalDateTime> currentTime) {
+            Supplier<LocalDateTime> currentTime, boolean frameworkDebug) {
         this.cron4jScheduler = cron4jScheduler;
         this.jobRunner = jobRunner;
         this.cron4jNow = cron4jNow;
         this.registrationType = registrationType;
         this.currentTime = currentTime;
+        this.frameworkDebug = frameworkDebug;
     }
 
     public enum CronRegistrationType {
@@ -123,7 +125,7 @@ public class Cron4jCron implements LaCron {
             CronOption cronOption) {
         final VaryingCron varyingCron = createVaryingCron(cronExp, cronOption);
         final Supplier<String> threadNaming = prepareThreadNaming(cronOption);
-        return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow, currentTime); // adapter task
+        return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow, currentTime, frameworkDebug); // adapter task
     }
 
     protected VaryingCron createVaryingCron(String cronExp, VaryingCronOption cronOption) {

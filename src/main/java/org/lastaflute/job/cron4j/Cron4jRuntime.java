@@ -53,6 +53,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final Map<String, Object> parameterMap;
     protected final JobNoticeLogLevel noticeLogLevel;
     protected final LocalDateTime beginTime;
+    protected final boolean frameworkDebug;
     protected final TaskExecutionContext cron4jContext;
     protected EndTitleRoll endTitleRollData; // null allowed, specified by application in job
     protected boolean nextTriggerSuppressed;
@@ -62,7 +63,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     //                                                                         ===========
     public Cron4jRuntime(LaJobKey jobKey, OptionalThing<LaJobNote> jobNote, OptionalThing<LaJobUnique> jobUnique, String cronExp,
             Class<? extends LaJob> jobType, Map<String, Object> parameterMap, JobNoticeLogLevel noticeLogLevel, LocalDateTime beginTime,
-            TaskExecutionContext cron4jContext) {
+            boolean frameworkDebug, TaskExecutionContext cron4jContext) {
         this.jobKey = jobKey;
         this.jobNote = jobNote;
         this.jobUnique = jobUnique;
@@ -76,6 +77,7 @@ public class Cron4jRuntime implements LaJobRuntime {
         this.parameterMap = Collections.unmodifiableMap(parameterMap);
         this.noticeLogLevel = noticeLogLevel;
         this.beginTime = beginTime;
+        this.frameworkDebug = frameworkDebug;
         this.cron4jContext = cron4jContext;
     }
 
@@ -128,6 +130,11 @@ public class Cron4jRuntime implements LaJobRuntime {
     @Override
     public LocalDateTime getBeginTime() {
         return beginTime;
+    }
+
+    @Override
+    public boolean isFrameworkDebug() {
+        return frameworkDebug;
     }
 
     // ===================================================================================
