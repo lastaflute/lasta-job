@@ -63,7 +63,7 @@ public class MockJobRuntime implements LaJobRuntime {
         }).orElse(Collections.emptyMap());
         final JobNoticeLogLevel noticeLogLevel = cronOption.getNoticeLogLevel();
         final LocalDateTime beginTime = LocalDateTime.now(); // allowed in mock
-        final boolean frameworkDebug = isFrameworkDebug();
+        final boolean frameworkDebug = determineFrameworkDebug();
         cron4jRuntime = new Cron4jRuntime(jobKey, cronOption.getJobNote(), cronOption.getJobUnique(), cronExp, jobType, parameterMap,
                 noticeLogLevel, beginTime, frameworkDebug, cron4jContext);
     }
