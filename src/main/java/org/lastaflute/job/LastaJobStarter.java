@@ -67,7 +67,9 @@ public class LastaJobStarter {
         } finally {
             stopHotdeploy(originalLoader);
         }
-        startCron(cron4jScheduler); // out of Hotdeploy scope for launcher thread
+        // thread start is out of hot-deploy scope
+        // because launcher thread should not inherit hot-deploy class loader
+        startCron(cron4jScheduler);
         return cron4jNow;
     }
 
