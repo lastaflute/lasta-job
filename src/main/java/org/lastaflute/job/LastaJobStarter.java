@@ -52,21 +52,23 @@ public class LastaJobStarter {
     //                                                                               =====
     public LaSchedulingNow start() {
         final ClassLoader originalLoader = startHotdeploy();
+        final Cron4jScheduler cron4jScheduler;
+        final Cron4jNow cron4jNow;
         try {
             final LaJobScheduler appScheduler = findAppScheduler();
             inject(appScheduler);
             final LaJobRunner jobRunner = appScheduler.createRunner();
             inject(jobRunner);
-            final Cron4jScheduler cron4jScheduler = createCron4jScheduler(jobRunner);
-            final Cron4jNow cron4jNow = createCron4jNow(cron4jScheduler, jobRunner);
+            cron4jScheduler = createCron4jScheduler(jobRunner);
+            cron4jNow = createCron4jNow(cron4jScheduler, jobRunner);
             final Cron4jCron cron4jCron = createCron4jCron(cron4jScheduler, jobRunner, cron4jNow);
             appScheduler.schedule(cron4jCron);
             showBoot(appScheduler, jobRunner, cron4jScheduler, cron4jNow);
-            startCron(cron4jScheduler);
-            return cron4jNow;
         } finally {
             stopHotdeploy(originalLoader);
         }
+        startCron(cron4jScheduler); // out of Hotdeploy scope for launcher thread
+        return cron4jNow;
     }
 
     protected ClassLoader startHotdeploy() {
