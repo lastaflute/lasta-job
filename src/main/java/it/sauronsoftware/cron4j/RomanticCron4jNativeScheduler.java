@@ -53,7 +53,7 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
             if (!isStarted()) {
                 throw new IllegalStateException("Scheduler not started");
             }
-            return spawnExecutor(cron4jTask, OptionalThing.of(nowOption));
+            return doSpawnExecutor(cron4jTask, OptionalThing.of(nowOption));
         }
     }
 
@@ -61,14 +61,10 @@ public class RomanticCron4jNativeScheduler extends Scheduler {
     //                                                                      Spawn Executor
     //                                                                      ==============
     @Override
-    protected TaskExecutor spawnExecutor(Task task) { // called by run() and launch()
+    protected TaskExecutor spawnExecutor(Task task) { // called by run() (and unused launch())
         return doSpawnExecutor(task, OptionalThing.ofNullable(null, () -> {
             throw new IllegalStateException("Not found the launch-now option because of not launch-now.");
         }));
-    }
-
-    protected TaskExecutor spawnExecutor(Task task, OptionalThing<LaunchNowOption> nowOption) {
-        return doSpawnExecutor(task, nowOption);
     }
 
     protected TaskExecutor doSpawnExecutor(Task task, OptionalThing<LaunchNowOption> nowOption) {
