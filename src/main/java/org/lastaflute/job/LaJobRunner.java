@@ -280,6 +280,7 @@ public class LaJobRunner {
     @SuppressWarnings("unchecked")
     protected Class<? extends LaJob> reloadJobTypeByContextClassLoader(Class<? extends LaJob> jobType) {
         try {
+            // because the jobType is from the first hot-deploy class loader if hot-deploy
             final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             return (Class<? extends LaJob>) Class.forName(jobType.getName(), /*initialize*/true, contextClassLoader);
         } catch (ClassNotFoundException e) { // basically no way
