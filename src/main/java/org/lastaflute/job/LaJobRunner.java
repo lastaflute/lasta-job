@@ -204,7 +204,7 @@ public class LaJobRunner {
     }
 
     protected ClassLoader startHotdeploy() {
-        return ManagedHotdeploy.start(); // #thiking: cannot hotdeploy, why?
+        return ManagedHotdeploy.start();
     }
 
     protected void stopHotdeploy(ClassLoader originalLoader) {
