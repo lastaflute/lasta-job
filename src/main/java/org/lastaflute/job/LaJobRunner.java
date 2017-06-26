@@ -169,6 +169,9 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                                Run
     //                                                                               =====
+    // -----------------------------------------------------
+    //                                          Entry of Run
+    //                                          ------------
     public RunnerResult run(Class<? extends LaJob> jobType, Supplier<LaJobRuntime> runtimeSupplier) {
         if (isPlainlyRun()) { // e.g. production, unit-test
             final LaJobRuntime runtime = runtimeSupplier.get();
@@ -201,13 +204,16 @@ public class LaJobRunner {
     }
 
     protected ClassLoader startHotdeploy() {
-        return ManagedHotdeploy.start(); // #thiking: cannot hotdeploy, why?
+        return ManagedHotdeploy.start();
     }
 
     protected void stopHotdeploy(ClassLoader originalLoader) {
         ManagedHotdeploy.stop(originalLoader);
     }
 
+    // -----------------------------------------------------
+    //                                      Main Flow of Run
+    //                                      ----------------
     protected RunnerResult doRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
         // similar to async manager's process
         arrangeThreadCacheContext(runtime);
@@ -241,31 +247,61 @@ public class LaJobRunner {
         return createRunnerResult(runtime, cause);
     }
 
+    // -----------------------------------------------------
+    //                                           Hook Before
+    //                                           -----------
     protected void hookBefore(LaJobRuntime runtime) {
         // you can check your rule
     }
 
+    // -----------------------------------------------------
+    //                                          Actually Run
+    //                                          ------------
     protected void actuallyRun(Class<? extends LaJob> jobType, LaJobRuntime runtime) {
         final LaJob job = getJobComponent(jobType);
         job.run(runtime);
     }
 
+    // -----------------------------------------------------
+    //                                         Job Component
+    //                                         -------------
     protected LaJob getJobComponent(Class<? extends LaJob> jobType) {
-        return ContainerUtil.getComponent(jobType);
+        return ContainerUtil.getComponent(resolveJobType(jobType));
     }
 
+    protected Class<? extends LaJob> resolveJobType(Class<? extends LaJob> jobType) {
+        if (ManagedHotdeploy.isThreadContextHotdeploy()) { // means hot-deploy started
+            return reloadJobTypeByContextClassLoader(jobType);
+        } else { // e.g. cool-deploy
+            return jobType;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    protected Class<? extends LaJob> reloadJobTypeByContextClassLoader(Class<? extends LaJob> jobType) {
+        try {
+            // because the jobType is from the first hot-deploy class loader if hot-deploy
+            final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            return (Class<? extends LaJob>) Class.forName(jobType.getName(), /*initialize*/true, contextClassLoader);
+        } catch (ClassNotFoundException e) { // basically no way
+            throw new IllegalStateException("Not found the job: " + jobType, e);
+        }
+    }
+
+    // -----------------------------------------------------
+    //                                          Hook Finally
+    //                                          ------------
     protected void hookFinally(LaJobRuntime runtime, OptionalThing<Throwable> cause) {
         // you can check your rule
     }
 
+    // -----------------------------------------------------
+    //                                         Runner Result
+    //                                         -------------
     protected RunnerResult createRunnerResult(LaJobRuntime runtime, Throwable cause) {
         return RunnerResult.asExecuted(runtime.getBeginTime(), runtime.getEndTitleRoll(), OptionalThing.ofNullable(cause, () -> {
             throw new IllegalStateException("Not found the cause.");
         }), runtime.isNextTriggerSuppressed());
-    }
-
-    protected boolean isBusinessSuccess(LaJobRuntime runtime, Throwable cause) {
-        return cause == null; // simple as default
     }
 
     // ===================================================================================

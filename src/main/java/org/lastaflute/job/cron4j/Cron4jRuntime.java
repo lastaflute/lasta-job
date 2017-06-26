@@ -48,7 +48,7 @@ public class Cron4jRuntime implements LaJobRuntime {
     protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
     protected final String cronExp;
-    protected final Class<? extends LaJob> jobType;
+    protected final Class<? extends LaJob> jobType; // from the first hot-deploy class loader if hot-deploy
     protected final Method runMethod;
     protected final Map<String, Object> parameterMap;
     protected final JobNoticeLogLevel noticeLogLevel;
