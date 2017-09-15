@@ -78,7 +78,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
     protected volatile boolean disappeared;
-    protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
+    protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger, used in synchronized
     protected final Object triggeredJobKeyLock = new Object(); // for minimum lock scope to avoid deadlock
 
     // these are same life-cycle (list to keep order for machine-gun synchronization)
