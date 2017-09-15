@@ -73,7 +73,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final LaJobKey jobKey;
     protected final OptionalThing<LaJobNote> jobNote;
     protected final OptionalThing<LaJobUnique> jobUnique;
-    protected OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
+    protected volatile OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
     protected final Cron4jTask cron4jTask; // 1:1
     protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
@@ -137,7 +137,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public LaunchedProcess launchNow(LaunchNowOpCall opLambda) {
+    public synchronized LaunchedProcess launchNow(LaunchNowOpCall opLambda) {
         return doLaunchNow(opLambda);
     }
 
@@ -251,7 +251,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public synchronized boolean isUnscheduled() {
+    public boolean isUnscheduled() {
         return unscheduled;
     }
 
@@ -269,7 +269,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public synchronized boolean isDisappeared() {
+    public boolean isDisappeared() {
         return disappeared;
     }
 
@@ -290,7 +290,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     @Override
-    public synchronized boolean isNonCron() {
+    public boolean isNonCron() {
         return !cron4jId.isPresent();
     }
 
@@ -298,7 +298,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                        Next Trigger
     //                                                                        ============
     @Override
-    public void registerNext(LaJobKey triggeredJobKey) {
+    public void registerNext(LaJobKey triggeredJobKey) { // uses triggered lock instead of synchronize
         verifyCanScheduleState();
         assertArgumentNotNull("triggeredJobKey", triggeredJobKey);
         // lazy check for initialization logic
@@ -316,8 +316,11 @@ public class Cron4jJob implements LaScheduledJob {
         }
     }
 
-    public void triggerNext() { // called in framework
-        verifyCanScheduleState();
+    public void triggerNext() { // called in execution (at framework), so cannot synchronize with this
+        // needs to be able to execute even if unscheduled
+        // because job process that is already executed can be success
+        // (and this method is for framework so no worry about user call)
+        //verifyCanScheduleState();
         synchronized (triggeredJobKeyLock) {
             if (triggeredJobKeyList == null) {
                 return;
@@ -378,7 +381,7 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                        Assist Logic
     //                                                                        ============
-    protected void verifyCanScheduleState() {
+    protected synchronized void verifyCanScheduleState() {
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
         }
@@ -387,13 +390,13 @@ public class Cron4jJob implements LaScheduledJob {
         }
     }
 
-    protected void verifyCanRescheduleState() {
+    protected synchronized void verifyCanRescheduleState() {
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
         }
     }
 
-    protected void verifyCanUnscheduleState() {
+    protected synchronized void verifyCanUnscheduleState() {
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
         }
@@ -402,13 +405,13 @@ public class Cron4jJob implements LaScheduledJob {
         }
     }
 
-    protected void verifyCanDisappearState() {
+    protected synchronized void verifyCanDisappearState() {
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
         }
     }
 
-    protected void verifyCanStopState() {
+    protected synchronized void verifyCanStopState() {
         // everyday you can stop
     }
 
