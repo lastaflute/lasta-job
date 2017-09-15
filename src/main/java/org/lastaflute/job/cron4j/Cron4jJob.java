@@ -379,11 +379,11 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                        Assist Logic
     //                                                                        ============
     protected void verifyCanScheduleState() {
-        if (unscheduled) {
-            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
-        }
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
+        }
+        if (unscheduled) {
+            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
     }
 
@@ -394,11 +394,11 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     protected void verifyCanUnscheduleState() {
-        if (unscheduled) {
-            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
-        }
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
+        }
+        if (unscheduled) {
+            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
         }
     }
 
