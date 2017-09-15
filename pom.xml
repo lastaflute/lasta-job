@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.lastaflute.job</groupId>
 	<artifactId>lasta-job</artifactId>
-	<version>0.5.0</version>
+	<version>0.5.1-RC1</version>
 	<packaging>jar</packaging>
 
 	<name>Lasta Job</name>
@@ -16,7 +16,7 @@
 		<lastaflute.version>0.9.9</lastaflute.version>
 		<jta.version>1.2</jta.version>
 		<slf4j.version>1.7.12</slf4j.version>
-		<utflute.version>0.7.9</utflute.version>
+		<utflute.version>0.8.1</utflute.version>
 	</properties>
 
 	<licenses>

@@ -56,6 +56,11 @@ public interface ReadableJobState extends ReadableJobAttr { // for internal assi
     boolean isUnscheduled();
 
     /**
+     * @return true if the job is disappeared.
+     */
+    boolean isDisappeared();
+
+    /**
      * @return true if the job is non-cron.
      */
     boolean isNonCron();

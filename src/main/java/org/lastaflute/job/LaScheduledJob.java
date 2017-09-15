@@ -15,6 +15,7 @@
  */
 package org.lastaflute.job;
 
+import org.lastaflute.job.exception.JobAlreadyDisappearedException;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.subsidiary.LaunchNowOpCall;
@@ -38,6 +39,7 @@ public interface LaScheduledJob extends ReadableJobAttr, ReadableJobState, Regis
      * If executing job exists, the launched job is waiting for <br>
      * finishing the executing job. (you can change the behavior by option)
      * @return The launched process of the job. (NotNull)
+     * @throws JobAlreadyDisappearedException When the job is already disappeared.
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     LaunchedProcess launchNow();
@@ -49,6 +51,7 @@ public interface LaScheduledJob extends ReadableJobAttr, ReadableJobState, Regis
      * And you can set parameter by option, which launched job can directly use by runtime.
      * @param opLambda The callback for option of launch-now, e.g. parameter. (NotNull)
      * @return The launched process of the job. (NotNull)
+     * @throws JobAlreadyDisappearedException When the job is already disappeared.
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     LaunchedProcess launchNow(LaunchNowOpCall opLambda);
@@ -64,10 +67,21 @@ public interface LaScheduledJob extends ReadableJobAttr, ReadableJobState, Regis
     /**
      * Reschedule the job by the cron expression and options. <br>
      * If executing job exists, the process continues until finishing. <br>
-     * New cron schedule is used since next execution.
+     * The new cron schedule is used since next execution. <br>
+     * You can also reschedule from unscheduled job.
+     * <pre>
+     * x unschedule() to launched by, launchNow()
+     * o unschedule() to find...(), get...()
+     * o unschedule() to reschedule()
+     * o unschedule() to disappear()
+     * x disappear() to launched by, launchNow()
+     * x disappear() to find...(), get...()
+     * x disappear() to reschedule()
+     * x disappear() to unschedule()
+     * </pre>
      * @param cronExp The new cron expression of the job e.g. '10 * * * *' (NotNull)
      * @param opLambda The callback to setup varying option for e.g. parameter. (NotNull)
-     * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
+     * @throws JobAlreadyDisappearedException When the job is already disappeared.
      */
     void reschedule(String cronExp, VaryingCronOpCall opLambda);
 
@@ -75,16 +89,47 @@ public interface LaScheduledJob extends ReadableJobAttr, ReadableJobState, Regis
      * Unschedule the job, no more launched by cron and launghNow(). <br>
      * If the job is executing, the process continues until finishing. <br>
      * So call stopNow() if you want to stop it immediately. <br>
-     * And you cannot find the job after unscheduling.
+     * You can find the job after unscheduling, and can reschedule it.
+     * <pre>
+     * x unschedule() to launched by, launchNow()
+     * o unschedule() to find...(), get...()
+     * o unschedule() to reschedule()
+     * o unschedule() to disappear()
+     * x disappear() to launched by, launchNow()
+     * x disappear() to find...(), get...()
+     * x disappear() to reschedule()
+     * x disappear() to unschedule()
+     * </pre>
+     * @throws JobAlreadyDisappearedException When the job is already disappeared.
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void unschedule();
 
     /**
-     * This job becomes non-cron so the job will not executed by scheduler. <br>
+     * Disappear the job, no more launched by cron and launghNow() and reschedule. <br>
+     * If the job is executing, the process continues until finishing. <br>
+     * So call stopNow() if you want to stop it immediately. <br>
+     * You cannot find the job after unscheduling, and cannot reschedule it.
+     * <pre>
+     * x unschedule() to launched by, launchNow()
+     * o unschedule() to find...(), get...()
+     * o unschedule() to reschedule()
+     * o unschedule() to disappear()
+     * x disappear() to launched by, launchNow()
+     * x disappear() to find...(), get...()
+     * x disappear() to reschedule()
+     * x disappear() to unschedule()
+     * </pre>
+     * @throws JobAlreadyDisappearedException When the job is already disappeared.
+     */
+    void disappear();
+
+    /**
+     * This job becomes non-cron so the job will not be executed by scheduler. <br>
      * You can only execute by launchNow(). <br>
      * And you can restore the job as normal cron by reschedule(). <br>
      * Do nothing if already non-cron.
+     * @throws JobAlreadyDisappearedException When the job is already disappeared.
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void becomeNonCron();
@@ -95,6 +140,7 @@ public interface LaScheduledJob extends ReadableJobAttr, ReadableJobState, Regis
     /**
      * Register triggered job for success.
      * @param triggeredJob The job key of triggered job. (NotNull)
+     * @throws JobAlreadyDisappearedException When the job is already disappeared.
      * @throws JobAlreadyUnscheduleException When the job is already unscheduled.
      */
     void registerNext(LaJobKey triggeredJob);

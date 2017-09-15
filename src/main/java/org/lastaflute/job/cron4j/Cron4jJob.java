@@ -33,6 +33,7 @@ import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.LaScheduledJob;
+import org.lastaflute.job.exception.JobAlreadyDisappearedException;
 import org.lastaflute.job.exception.JobAlreadyUnscheduleException;
 import org.lastaflute.job.exception.JobTriggeredNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
@@ -76,6 +77,7 @@ public class Cron4jJob implements LaScheduledJob {
     protected final Cron4jTask cron4jTask; // 1:1
     protected final Cron4jNow cron4jNow; // n:1
     protected volatile boolean unscheduled;
+    protected volatile boolean disappeared;
     protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger
     protected final Object triggeredJobKeyLock = new Object(); // for minimum lock scope to avoid deadlock
 
@@ -140,7 +142,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     protected LaunchedProcess doLaunchNow(LaunchNowOpCall opLambda) {
-        verifyScheduledState();
+        verifyCanScheduleState();
         final LaunchNowOption option = createLaunchNowOption(opLambda);
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Launching now: {}, {}", option, this);
@@ -177,7 +179,8 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            Stop Now
     //                                                                            ========
     @Override
-    public synchronized void stopNow() { // can be called if unscheduled
+    public synchronized void stopNow() { // can be called if unscheduled, disappeared
+        verifyCanStopState();
         final List<TaskExecutor> executorList = findNativeExecutorList();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Stopping {} execution(s) now: {}", executorList.size(), toString());
@@ -196,7 +199,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void reschedule(String cronExp, VaryingCronOpCall opLambda) {
-        verifyScheduledState();
+        verifyCanRescheduleState();
         assertArgumentNotNull("cronExp", cronExp);
         assertArgumentNotNull("opLambda", opLambda);
         if (isNonCromExp(cronExp)) {
@@ -234,15 +237,14 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                          ==========
     @Override
     public synchronized void unschedule() {
-        verifyScheduledState();
+        verifyCanUnscheduleState();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Unscheduling {}", toString());
         }
+        unscheduled = true;
         cron4jId.ifPresent(id -> {
             cron4jNow.getCron4jScheduler().deschedule(id);
         });
-        cron4jNow.clearUnscheduleJob(); // immediately clear, executing process is kept
-        unscheduled = true;
     }
 
     @Override
@@ -250,10 +252,22 @@ public class Cron4jJob implements LaScheduledJob {
         return unscheduled;
     }
 
-    protected void verifyScheduledState() {
-        if (unscheduled) {
-            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
+    // ===================================================================================
+    //                                                                           Disappear
+    //                                                                           =========
+    @Override
+    public synchronized void disappear() {
+        verifyCanDisappearState();
+        if (JobChangeLog.isEnabled()) {
+            JobChangeLog.log("#job ...Disappearing {}", toString());
         }
+        disappeared = true; // should be before clearing
+        cron4jNow.clearDisappearedJob(); // immediately clear, executing process is kept
+    }
+
+    @Override
+    public synchronized boolean isDisappeared() {
+        return disappeared;
     }
 
     // ===================================================================================
@@ -261,7 +275,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            ========
     @Override
     public synchronized void becomeNonCron() {
-        verifyScheduledState();
+        verifyCanScheduleState();
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Becoming non-cron: {}", toString());
         }
@@ -282,7 +296,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                        ============
     @Override
     public void registerNext(LaJobKey triggeredJobKey) {
-        verifyScheduledState();
+        verifyCanScheduleState();
         assertArgumentNotNull("triggeredJobKey", triggeredJobKey);
         // lazy check for initialization logic
         //if (!cron4jNow.findJobByKey(triggeredJobKey).isPresent()) {
@@ -300,7 +314,7 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     public void triggerNext() { // called in framework
-        verifyScheduledState();
+        verifyCanScheduleState();
         synchronized (triggeredJobKeyLock) {
             if (triggeredJobKeyList == null) {
                 return;
@@ -341,7 +355,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                 Neighbor Concurrent
     //                                                                 ===================
     public synchronized void registerNeighborConcurrent(String groupName, NeighborConcurrentGroup neighborConcurrentGroup) {
-        verifyScheduledState();
+        verifyCanScheduleState();
         if (neighborConcurrentGroupMap == null) {
             neighborConcurrentGroupMap = new ConcurrentHashMap<String, NeighborConcurrentGroup>(); // just in case
             neighborConcurrentGroupList = new CopyOnWriteArrayList<NeighborConcurrentGroup>(); // just in case
@@ -356,6 +370,43 @@ public class Cron4jJob implements LaScheduledJob {
     public String toIdentityDisp() {
         final Class<? extends LaJob> jobType = cron4jTask.getJobType();
         return jobType.getSimpleName() + ":{" + jobUnique.map(uq -> uq + "(" + jobKey + ")").orElseGet(() -> jobKey.value()) + "}";
+    }
+
+    // ===================================================================================
+    //                                                                        Assist Logic
+    //                                                                        ============
+    protected void verifyCanScheduleState() {
+        if (unscheduled) {
+            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
+        }
+        if (disappeared) {
+            throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
+        }
+    }
+
+    protected void verifyCanRescheduleState() {
+        if (disappeared) {
+            throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
+        }
+    }
+
+    protected void verifyCanUnscheduleState() {
+        if (unscheduled) {
+            throw new JobAlreadyUnscheduleException("Already unscheduled the job: " + toString());
+        }
+        if (disappeared) {
+            throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
+        }
+    }
+
+    protected void verifyCanDisappearState() {
+        if (disappeared) {
+            throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
+        }
+    }
+
+    protected void verifyCanStopState() {
+        // everyday you can stop
     }
 
     // ===================================================================================
