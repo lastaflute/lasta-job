@@ -205,6 +205,9 @@ public class Cron4jJob implements LaScheduledJob {
         if (isNonCromExp(cronExp)) {
             throw new IllegalArgumentException("The cronExp for reschedule() should not be non-cron: " + toString());
         }
+        if (unscheduled) {
+            unscheduled = false; // can revive from unscheduled
+        }
         final String existingCronExp = cron4jTask.getVaryingCron().getCronExp();
         cron4jTask.switchCron(cronExp, createCronOption(opLambda));
         final Cron4jScheduler cron4jScheduler = cron4jNow.getCron4jScheduler();
