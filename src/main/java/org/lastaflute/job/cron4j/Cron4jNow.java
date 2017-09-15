@@ -306,6 +306,7 @@ public class Cron4jNow implements LaSchedulingNow {
                     logger.info(msg, jobKeyJobMap.size(), cron4jScheduler, e);
                 }
             }
+            Cron4jJobHistory.clear();
         }).start();
     }
 

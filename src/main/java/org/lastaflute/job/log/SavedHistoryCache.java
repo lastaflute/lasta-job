@@ -83,4 +83,12 @@ public class SavedHistoryCache {
     public synchronized List<LaJobHistory> list() {
         return new ArrayList<LaJobHistory>(historyMap.values());
     }
+
+    // -----------------------------------------------------
+    //                                                 Clear
+    //                                                 -----
+    public synchronized void clear() {
+        historyMap.clear();
+        historyKeyList.clear();
+    }
 }

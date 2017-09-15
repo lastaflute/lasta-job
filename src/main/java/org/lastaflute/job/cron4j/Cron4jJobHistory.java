@@ -55,6 +55,10 @@ public class Cron4jJobHistory implements LaJobHistory {
         return historyCache.list();
     }
 
+    public synchronized static void clear() {
+        historyCache.clear();
+    }
+
     protected static String generateHistoryKey(TaskExecutor taskExecutor) {
         return taskExecutor.getGuid(); // trust it
     }
