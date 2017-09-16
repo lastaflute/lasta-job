@@ -265,6 +265,9 @@ public class Cron4jJob implements LaScheduledJob {
             JobChangeLog.log("#job ...Disappearing {}", toString());
         }
         disappeared = true; // should be before clearing
+        cron4jId.ifPresent(id -> {
+            cron4jNow.getCron4jScheduler().deschedule(id);
+        });
         cron4jNow.clearDisappearedJob(); // immediately clear, executing process is kept
     }
 
@@ -487,6 +490,10 @@ public class Cron4jJob implements LaScheduledJob {
 
     public Cron4jTask getCron4jTask() { // for framework
         return cron4jTask;
+    }
+
+    public Cron4jNow getCron4jNow() { // for e.g. test
+        return cron4jNow;
     }
 
     @Override
