@@ -179,7 +179,7 @@ public class Cron4jJob implements LaScheduledJob {
     //                                                                            Stop Now
     //                                                                            ========
     @Override
-    public synchronized void stopNow() { // can be called if unscheduled, disappeared
+    public synchronized void stopNow() { // can be called if unscheduled, disappeared, so don't use mutable variable
         verifyCanStopState();
         final List<TaskExecutor> executorList = findNativeExecutorList();
         if (JobChangeLog.isEnabled()) {
@@ -215,13 +215,16 @@ public class Cron4jJob implements LaScheduledJob {
             if (JobChangeLog.isEnabled()) {
                 JobChangeLog.log("#job ...Rescheduling {} as cron from '{}' to '{}'", jobKey, existingCronExp, cronExp);
             }
-            cron4jScheduler.reschedule(id, cronExp);
+            if (isNativeScheduledId(cron4jScheduler, id)) {
+                cron4jScheduler.reschedule(id, cronExp);
+            } else { // after descheduled
+                cron4jId = scheduleNative(cronExp, cron4jScheduler);
+            }
         }).orElse(() -> {
             if (JobChangeLog.isEnabled()) {
                 JobChangeLog.log("#job ...Rescheduling {} as cron from non-cron to '{}'", jobKey, cronExp);
             }
-            final String generatedId = cron4jScheduler.schedule(cronExp, cron4jTask);
-            cron4jId = OptionalThing.of(Cron4jId.of(generatedId));
+            cron4jId = scheduleNative(cronExp, cron4jScheduler);
         });
     }
 
@@ -233,6 +236,15 @@ public class Cron4jJob implements LaScheduledJob {
         final VaryingCronOption option = new CronOption();
         opLambda.callback(option);
         return option;
+    }
+
+    protected boolean isNativeScheduledId(Cron4jScheduler cron4jScheduler, Cron4jId id) {
+        return cron4jScheduler.getNativeScheduler().getTask(id.value()) != null;
+    }
+
+    protected OptionalThing<Cron4jId> scheduleNative(String cronExp, Cron4jScheduler cron4jScheduler) {
+        final String generatedId = cron4jScheduler.schedule(cronExp, cron4jTask);
+        return OptionalThing.of(Cron4jId.of(generatedId));
     }
 
     // ===================================================================================
@@ -486,6 +498,10 @@ public class Cron4jJob implements LaScheduledJob {
     @Override
     public JobConcurrentExec getConcurrentExec() {
         return cron4jTask.getConcurrentExec();
+    }
+
+    public OptionalThing<Cron4jId> getCron4jId() {
+        return cron4jId;
     }
 
     public Cron4jTask getCron4jTask() { // for framework
