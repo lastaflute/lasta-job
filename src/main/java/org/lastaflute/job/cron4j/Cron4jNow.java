@@ -222,13 +222,13 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     // ===================================================================================
-    //                                                                          Closed Job
-    //                                                                          ==========
+    //                                                                           Clear Job
+    //                                                                           =========
     /**
-     * Clear unschedule jobs from job list if it exists.
+     * Clear disappeared jobs from job list if it exists.
      */
-    public synchronized void clearUnscheduleJob() {
-        getCron4jJobList().stream().filter(job -> job.isUnscheduled()).forEach(job -> {
+    public synchronized void clearDisappearedJob() {
+        getCron4jJobList().stream().filter(job -> job.isDisappeared()).forEach(job -> {
             final LaJobKey jobKey = job.getJobKey();
             jobKeyJobMap.remove(jobKey);
             jobOrderedList.remove(job);
@@ -306,6 +306,7 @@ public class Cron4jNow implements LaSchedulingNow {
                     logger.info(msg, jobKeyJobMap.size(), cron4jScheduler, e);
                 }
             }
+            Cron4jJobHistory.clear();
         }).start();
     }
 
