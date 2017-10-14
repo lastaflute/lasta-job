@@ -16,6 +16,8 @@
 package org.lastaflute.job;
 
 import java.lang.reflect.Method;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -73,6 +75,7 @@ public class LaJobRunner {
     private static final Logger logger = LoggerFactory.getLogger(LaJobRunner.class);
     protected static final String LF = "\n";
     protected static final String EX_IND = "  "; // indent for exception message
+    protected static final DateTimeFormatter beginTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
     // ===================================================================================
     //                                                                           Attribute
@@ -307,6 +310,9 @@ public class LaJobRunner {
     // ===================================================================================
     //                                                                            Show Job
     //                                                                            ========
+    // -----------------------------------------------------
+    //                                               Running
+    //                                               -------
     protected long showRunning(LaJobRuntime runtime) {
         JobNoticeLog.log(runtime.getNoticeLogLevel(), () -> buildRunningJobLogMessage(runtime));
         if (noticeLogHook != null) {
@@ -317,9 +323,16 @@ public class LaJobRunner {
     }
 
     protected String buildRunningJobLogMessage(LaJobRuntime runtime) {
-        return "#flow #job ...Running job: " + runtime.toCronMethodDisp();
+        final StringBuilder sb = new StringBuilder();
+        sb.append("#flow #job ...Running job: ");
+        sb.append(runtime.toCronMethodDisp());
+        buildProcessHashIfNeeds(sb);
+        return sb.toString();
     }
 
+    // -----------------------------------------------------
+    //                                             Finishing
+    //                                             ---------
     protected void showFinishing(LaJobRuntime runtime, long before, Throwable cause) {
         final String msg = buildFinishingMsg(runtime, before, cause); // also no use enabled
         if (noticeLogHook != null) {
@@ -334,13 +347,18 @@ public class LaJobRunner {
         final long after = System.currentTimeMillis();
         final StringBuilder sb = new StringBuilder();
         sb.append("#flow #job ...Finishing job: ").append(runtime.toRunMethodDisp());
+        buildProcessHashIfNeeds(sb);
         sb.append(LF).append("[Job Result]");
+        buildBeginTimeIfNeeds(sb);
         sb.append(LF).append(" performanceView: ").append(toPerformanceView(before, after));
-        extractSqlCount().ifPresent(counter -> {
+        extractSqlCounter().ifPresent(counter -> {
             sb.append(LF).append(" sqlCount: ").append(counter.toLineDisp());
         });
-        extractMailCount().ifPresent(counter -> {
+        extractMailCounter().ifPresent(counter -> {
             sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
+        });
+        extractRemoteApiCounter().ifPresent(counter -> {
+            sb.append(LF).append(" remoteApiCount: ").append(counter.get());
         });
         sb.append(LF).append(" runtime: ").append(runtime);
         buildTriggeredNextJobExp(runtime).ifPresent(exp -> {
@@ -362,6 +380,34 @@ public class LaJobRunner {
         }
         sb.append(LF).append(LF); // to separate from job logging
         return sb.toString();
+    }
+
+    // -----------------------------------------------------
+    //                                           Item Helper
+    //                                           -----------
+    protected void buildBeginTimeIfNeeds(StringBuilder sb) {
+        final Object beginTime = findBeginTime();
+        if (beginTime != null) {
+            sb.append(LF).append(" beginTime: ");
+            final String beginExp;
+            if (beginTime instanceof LocalDateTime) { // basically here
+                beginExp = beginTimeFormatter.format((LocalDateTime) beginTime);
+            } else { // no way, just in case
+                beginExp = beginTime.toString();
+            }
+            sb.append(beginExp);
+        }
+    }
+
+    protected void buildProcessHashIfNeeds(StringBuilder sb) {
+        final Object processHash = findProcessHash();
+        if (processHash != null) {
+            sb.append(" #").append(processHash);
+        }
+    }
+
+    protected String toPerformanceView(long before, long after) {
+        return DfTraceViewUtil.convertToPerformanceView(after - before);
     }
 
     protected OptionalThing<String> buildTriggeredNextJobExp(LaJobRuntime runtime) {
@@ -386,19 +432,55 @@ public class LaJobRunner {
         });
     }
 
-    protected String toPerformanceView(long before, long after) {
-        return DfTraceViewUtil.convertToPerformanceView(after - before);
-    }
-
     // ===================================================================================
     //                                                                        Thread Cache
     //                                                                        ============
+    // -----------------------------------------------------
+    //                                               Arrange
+    //                                               -------
     protected void arrangeThreadCacheContext(LaJobRuntime runtime) {
         ThreadCacheContext.initialize();
-        ThreadCacheContext.registerRequestPath(runtime.getJobType().getName());
-        ThreadCacheContext.registerEntryMethod(runtime.getRunMethod());
+
+        // core and basic items are used by e.g. remoteApi's send-receive logging
+        final LocalDateTime beginTime = runtime.getBeginTime();
+        registerBeginTime(beginTime);
+        registerProcessHash(generateProcessHash(beginTime));
+        ThreadCacheContext.registerRequestPath(buildRequestPath(runtime)); // e.g. SeaJob
+        ThreadCacheContext.registerEntryMethod(runtime.getRunMethod()); // e.g. SeaJob@run()
     }
 
+    protected String generateProcessHash(LocalDateTime beginTime) {
+        final String bestEffortUnique = beginTime.toString() + Thread.currentThread().getName();
+        return Integer.toHexString(bestEffortUnique.hashCode());
+    }
+
+    protected String buildRequestPath(LaJobRuntime runtime) {
+        return runtime.getJobType().getSimpleName(); // e.g. SeaJob
+    }
+
+    // -----------------------------------------------------
+    //                                         Expected Core
+    //                                         -------------
+    // expects LastaFlute-1.0.1
+    protected Object findBeginTime() {
+        return ThreadCacheContext.getObject("fw:beginTime");
+    }
+
+    protected void registerBeginTime(final LocalDateTime beginTime) {
+        ThreadCacheContext.setObject("fw:beginTime", beginTime);
+    }
+
+    protected Object findProcessHash() {
+        return ThreadCacheContext.getObject("fw:processHash");
+    }
+
+    protected void registerProcessHash(String processHash) {
+        ThreadCacheContext.setObject("fw:processHash", processHash);
+    }
+
+    // -----------------------------------------------------
+    //                                                 Clear
+    //                                                 -----
     protected void clearThreadCacheContext() {
         ThreadCacheContext.clear();
     }
@@ -510,6 +592,7 @@ public class LaJobRunner {
         setupExceptionMessageSqlCountIfExists(sb);
         setupExceptionMessageTransactionMemoriesIfExists(sb);
         setupExceptionMessageMailCountIfExists(sb);
+        setupExceptionMessageRemoteApiCountIfExists(sb);
         final long after = System.currentTimeMillis();
         final String performanceView = toPerformanceView(before, after);
         sb.append(LF);
@@ -538,7 +621,7 @@ public class LaJobRunner {
     }
 
     protected void setupExceptionMessageSqlCountIfExists(StringBuilder sb) {
-        extractSqlCount().ifPresent(counter -> {
+        extractSqlCounter().ifPresent(counter -> {
             sb.append(LF).append(EX_IND).append("; sqlCount=").append(counter.toLineDisp());
         });
     }
@@ -572,8 +655,14 @@ public class LaJobRunner {
     }
 
     protected void setupExceptionMessageMailCountIfExists(StringBuilder sb) {
-        extractMailCount().ifPresent(counter -> {
+        extractMailCounter().ifPresent(counter -> {
             sb.append(LF).append(EX_IND).append("; mailCount=").append(counter.toLineDisp());
+        });
+    }
+
+    protected void setupExceptionMessageRemoteApiCountIfExists(StringBuilder sb) {
+        extractRemoteApiCounter().ifPresent(counter -> {
+            sb.append(LF).append(EX_IND).append("; remoteApiCount=").append(counter.get());
         });
     }
 
@@ -604,9 +693,9 @@ public class LaJobRunner {
     }
 
     // ===================================================================================
-    //                                                                           SQL Count
-    //                                                                           =========
-    protected OptionalThing<ExecutedSqlCounter> extractSqlCount() {
+    //                                                                         SQL Counter
+    //                                                                         ===========
+    protected OptionalThing<ExecutedSqlCounter> extractSqlCounter() {
         final CallbackContext context = CallbackContext.getCallbackContextOnThread();
         if (context == null) {
             return OptionalThing.empty();
@@ -619,11 +708,21 @@ public class LaJobRunner {
     }
 
     // ===================================================================================
-    //                                                                          Mail Count
-    //                                                                          ==========
-    protected OptionalThing<PostedMailCounter> extractMailCount() {
+    //                                                                        Mail Counter
+    //                                                                        ============
+    protected OptionalThing<PostedMailCounter> extractMailCounter() {
         return OptionalThing.ofNullable(ThreadCacheContext.findMailCounter(), () -> {
-            throw new IllegalStateException("Not found the mail count in the thread cache.");
+            throw new IllegalStateException("Not found the mail counter in the thread cache.");
+        });
+    }
+
+    // ===================================================================================
+    //                                                                   RemoteApi Counter
+    //                                                                   =================
+    protected OptionalThing<Supplier<String>> extractRemoteApiCounter() {
+        final Supplier<String> counter = ThreadCacheContext.getObject("fw:remoteApiCounter"); // expectes LastaFlute-1.0.1
+        return OptionalThing.ofNullable(counter, () -> {
+            throw new IllegalStateException("Not found the remote-api counter in the thread cache.");
         });
     }
 

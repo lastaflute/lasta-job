@@ -15,11 +15,15 @@
  */
 package org.lastaflute.job;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.util.DfReflectionUtil;
+import org.dbflute.util.DfTypeUtil;
 import org.lastaflute.core.direction.FwAssistantDirector;
 import org.lastaflute.core.smartdeploy.ManagedHotdeploy;
 import org.lastaflute.core.time.TimeManager;
@@ -165,17 +169,20 @@ public class LastaJobStarter {
     }
 
     protected Cron4jNow createCron4jNow(Cron4jScheduler cron4jScheduler, LaJobRunner jobRunner) {
-        final TimeManager timeManager = getTimeManager();
-        return new Cron4jNow(cron4jScheduler, jobRunner, () -> {
-            return timeManager.currentDateTime();
-        }, isFrameworkDebug());
+        return new Cron4jNow(cron4jScheduler, jobRunner, prepareCurrentTimeProvider(), isFrameworkDebug());
     }
 
     protected Cron4jCron createCron4jCron(Cron4jScheduler cron4jScheduler, LaJobRunner runner, Cron4jNow cron4jNow) {
+        return new Cron4jCron(cron4jScheduler, runner, cron4jNow, CronRegistrationType.START, prepareCurrentTimeProvider(),
+                isFrameworkDebug());
+    }
+
+    protected Supplier<LocalDateTime> prepareCurrentTimeProvider() {
         final TimeManager timeManager = getTimeManager();
-        return new Cron4jCron(cron4jScheduler, runner, cron4jNow, CronRegistrationType.START, () -> {
-            return timeManager.currentDateTime();
-        }, isFrameworkDebug());
+        return () -> {
+            final Date flashDate = timeManager.flashDate(); // not depends on transaction so use flash date
+            return DfTypeUtil.toLocalDateTime(flashDate, timeManager.getBusinessTimeZone());
+        };
     }
 
     protected boolean isFrameworkDebug() {
