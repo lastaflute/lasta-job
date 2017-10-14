@@ -351,11 +351,14 @@ public class LaJobRunner {
         sb.append(LF).append("[Job Result]");
         buildBeginTimeIfNeeds(sb);
         sb.append(LF).append(" performanceView: ").append(toPerformanceView(before, after));
-        extractSqlCount().ifPresent(counter -> {
+        extractSqlCounter().ifPresent(counter -> {
             sb.append(LF).append(" sqlCount: ").append(counter.toLineDisp());
         });
-        extractMailCount().ifPresent(counter -> {
+        extractMailCounter().ifPresent(counter -> {
             sb.append(LF).append(" mailCount: ").append(counter.toLineDisp());
+        });
+        extractRemoteApiCounter().ifPresent(counter -> {
+            sb.append(LF).append(" remoteApiCount: ").append(counter.get());
         });
         sb.append(LF).append(" runtime: ").append(runtime);
         buildTriggeredNextJobExp(runtime).ifPresent(exp -> {
@@ -589,6 +592,7 @@ public class LaJobRunner {
         setupExceptionMessageSqlCountIfExists(sb);
         setupExceptionMessageTransactionMemoriesIfExists(sb);
         setupExceptionMessageMailCountIfExists(sb);
+        setupExceptionMessageRemoteApiCountIfExists(sb);
         final long after = System.currentTimeMillis();
         final String performanceView = toPerformanceView(before, after);
         sb.append(LF);
@@ -617,7 +621,7 @@ public class LaJobRunner {
     }
 
     protected void setupExceptionMessageSqlCountIfExists(StringBuilder sb) {
-        extractSqlCount().ifPresent(counter -> {
+        extractSqlCounter().ifPresent(counter -> {
             sb.append(LF).append(EX_IND).append("; sqlCount=").append(counter.toLineDisp());
         });
     }
@@ -651,8 +655,14 @@ public class LaJobRunner {
     }
 
     protected void setupExceptionMessageMailCountIfExists(StringBuilder sb) {
-        extractMailCount().ifPresent(counter -> {
+        extractMailCounter().ifPresent(counter -> {
             sb.append(LF).append(EX_IND).append("; mailCount=").append(counter.toLineDisp());
+        });
+    }
+
+    protected void setupExceptionMessageRemoteApiCountIfExists(StringBuilder sb) {
+        extractRemoteApiCounter().ifPresent(counter -> {
+            sb.append(LF).append(EX_IND).append("; remoteApiCount=").append(counter.get());
         });
     }
 
@@ -683,9 +693,9 @@ public class LaJobRunner {
     }
 
     // ===================================================================================
-    //                                                                           SQL Count
-    //                                                                           =========
-    protected OptionalThing<ExecutedSqlCounter> extractSqlCount() {
+    //                                                                         SQL Counter
+    //                                                                         ===========
+    protected OptionalThing<ExecutedSqlCounter> extractSqlCounter() {
         final CallbackContext context = CallbackContext.getCallbackContextOnThread();
         if (context == null) {
             return OptionalThing.empty();
@@ -698,11 +708,21 @@ public class LaJobRunner {
     }
 
     // ===================================================================================
-    //                                                                          Mail Count
-    //                                                                          ==========
-    protected OptionalThing<PostedMailCounter> extractMailCount() {
+    //                                                                        Mail Counter
+    //                                                                        ============
+    protected OptionalThing<PostedMailCounter> extractMailCounter() {
         return OptionalThing.ofNullable(ThreadCacheContext.findMailCounter(), () -> {
-            throw new IllegalStateException("Not found the mail count in the thread cache.");
+            throw new IllegalStateException("Not found the mail counter in the thread cache.");
+        });
+    }
+
+    // ===================================================================================
+    //                                                                   RemoteApi Counter
+    //                                                                   =================
+    protected OptionalThing<Supplier<String>> extractRemoteApiCounter() {
+        final Supplier<String> counter = ThreadCacheContext.getObject("fw:remoteApiCounter"); // expectes LastaFlute-1.0.1
+        return OptionalThing.ofNullable(counter, () -> {
+            throw new IllegalStateException("Not found the remote-api counter in the thread cache.");
         });
     }
 
