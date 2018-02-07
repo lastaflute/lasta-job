@@ -319,7 +319,6 @@ public class LaJobRunner {
             noticeLogHook.hookRunning(runtime, buildRunningJobLogMessage(runtime));
         }
         return System.currentTimeMillis();
-
     }
 
     protected String buildRunningJobLogMessage(LaJobRuntime runtime) {
