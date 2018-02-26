@@ -33,7 +33,7 @@ public class JobErrorStackTracer {
     public String buildExceptionStackTrace(Throwable cause) { // similar to logging filter
         final StringBuilder sb = new StringBuilder();
         final ByteArrayOutputStream out = new ByteArrayOutputStream(1024);
-        final String encoding = "UTF-8"; // for internal process
+        final String encoding = "UTF-8"; // for on-memory closed-scope I/O
         PrintStream ps = null;
         try {
             final boolean autoFlush = false; // the output stream does not need flush
