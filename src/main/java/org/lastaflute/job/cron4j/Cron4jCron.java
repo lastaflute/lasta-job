@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -135,7 +135,7 @@ public class Cron4jCron implements LaCron {
     protected Supplier<String> prepareThreadNaming(CronOption cronOption) {
         final OptionalThing<LaJobUnique> jobUnique = cronOption.getJobUnique();
         return () -> { // callback for current thread
-            return "job_" + jobUnique.map(uq -> uq.value()).orElseGet(() -> {
+            return THREAD_NAME_PREFIX + jobUnique.map(uq -> uq.value()).orElseGet(() -> {
                 return Integer.toHexString(Thread.currentThread().hashCode()); // task's threand
             });
         };
