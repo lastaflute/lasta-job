@@ -135,7 +135,7 @@ public class Cron4jCron implements LaCron {
     protected Supplier<String> prepareThreadNaming(CronOption cronOption) {
         final OptionalThing<LaJobUnique> jobUnique = cronOption.getJobUnique();
         return () -> { // callback for current thread
-            return "job_" + jobUnique.map(uq -> uq.value()).orElseGet(() -> {
+            return THREAD_NAME_PREFIX + jobUnique.map(uq -> uq.value()).orElseGet(() -> {
                 return Integer.toHexString(Thread.currentThread().hashCode()); // task's threand
             });
         };
