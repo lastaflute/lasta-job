@@ -40,6 +40,14 @@ public interface LaJobScheduler {
         return new LaJobRunner();
     }
 
+    /**
+     * Hook the process just after booting. <br>
+     * You cannot use JobManager here so use schedulingNow object.
+     * @param schedulingNow The container of scheduling objects. (NotNull)
+     */
+    default void hookJustAfterBooting(LaSchedulingNow schedulingNow) { // you can override
+    }
+
     // ===================================================================================
     //                                                                          Concurrent
     //                                                                          ==========
