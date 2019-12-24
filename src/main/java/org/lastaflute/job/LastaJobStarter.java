@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,8 +58,9 @@ public class LastaJobStarter {
         final ClassLoader originalLoader = startHotdeploy();
         final Cron4jScheduler cron4jScheduler;
         final Cron4jNow cron4jNow;
+        final LaJobScheduler appScheduler;
         try {
-            final LaJobScheduler appScheduler = findAppScheduler();
+            appScheduler = findAppScheduler();
             inject(appScheduler);
             final LaJobRunner jobRunner = appScheduler.createRunner();
             inject(jobRunner);
@@ -74,6 +75,7 @@ public class LastaJobStarter {
         // thread start is out of hot-deploy scope
         // because launcher thread should not inherit hot-deploy class loader
         startCron(cron4jScheduler);
+        appScheduler.hookJustAfterBooting(cron4jNow); // for e.g. launch at booting (so should be after starting cron)
         return cron4jNow;
     }
 

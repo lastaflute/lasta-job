@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -178,14 +178,20 @@ public class SimpleJobManager implements JobManager {
         public OptionalThing<? extends LaScheduledJob> findJobByKey(LaJobKey jobKey) {
             // air shot for job ending after destroy()
             //throwJobManagerNotInitializedYetException();
-            return OptionalThing.empty(); // unreachable
+            return createEmptyOptional();
         }
 
         @Override
         public OptionalThing<? extends LaScheduledJob> findJobByUniqueOf(LaJobUnique jobUnique) {
             // air shot for job ending after destroy()
             //throwJobManagerNotInitializedYetException();
-            return OptionalThing.empty(); // unreachable
+            return createEmptyOptional();
+        }
+
+        protected OptionalThing<LaScheduledJob> createEmptyOptional() { // may be called via JobManager before initialization
+            return OptionalThing.ofNullable(null, () -> {
+                throw new IllegalStateException("Not initialized yet, confirm Job initialization flow.");
+            });
         }
 
         @Override
