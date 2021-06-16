@@ -18,7 +18,9 @@ package org.lastaflute.job;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -501,7 +503,10 @@ public class LaJobRunner {
     }
 
     protected AccessContextResource createAccessContextResource(LaJobRuntime runtime) {
-        return new AccessContextResource(DfTypeUtil.toClassTitle(runtime.getJobType()), runtime.getRunMethod());
+        final String classTitle = DfTypeUtil.toClassTitle(runtime.getJobType());
+        final Method runMethod = runtime.getRunMethod();
+        final Map<String, Object> runtimeAttributeMap = new LinkedHashMap<>(runtime.getParameterMap());
+        return new AccessContextResource(classTitle, runMethod, runtimeAttributeMap);
     }
 
     protected void clearPreparedAccessContext() {
