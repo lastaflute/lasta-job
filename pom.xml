@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.lastaflute.job</groupId>
 	<artifactId>lasta-job</artifactId>
-	<version>0.5.5-A-SNAPSHOT</version>
+	<version>0.5.5-B-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>Lasta Job</name>
@@ -13,7 +13,7 @@
 	<inceptionYear>2015</inceptionYear>
 
 	<properties>
-		<lastaflute.version>1.2.1-I-SNAPSHOT</lastaflute.version> <!-- about one year old (from now) -->
+		<lastaflute.version>1.2.1-P-SNAPSHOT</lastaflute.version> <!-- about one year old (from now) -->
 		<jta.version>1.2</jta.version>
 		<slf4j.version>1.7.25</slf4j.version>
 		<utflute.version>0.9.2</utflute.version>
