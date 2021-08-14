@@ -167,7 +167,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             final OptionalThing<RunnerResult> optRunnerResult = optRunnerResult(runnerResult); // empty when error 
             final OptionalThing<LocalDateTime> endTime = deriveEndTime(optRunnerResult);
             debugFw("...Calling recordJobHistory() of task (after run): {}, {}", optRunnerResult, endTime);
-            recordJobHistory(nativeContext, job, jobThread, activationTime, optRunnerResult, endTime, optControllerCause(controllerCause));
+            recordJobHistory(nativeContext, job, jobThread, activationTime, optRunnerResult, endTime, optControllerCause(controllerCause),
+                    nowOption);
             debugFw("...Ending the cron4j task (after run): {}, {}", optRunnerResult, endTime);
         } catch (Throwable coreCause) { // controller dead
             final String msg = "Failed to control the job task: " + varyingCron + ", " + jobType.getSimpleName();
@@ -247,7 +248,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     if (!runningState.getBeginTime().isPresent()) { // almost no way, but may be crevasse headache
                         runningState.begin(); // just in case
                     }
-                    final OptionalThing<CrossVMState> crossVMState = crossVMBeginning(job);
+                    final OptionalThing<CrossVMState> crossVMState = crossVMBeginning(job, nowOption);
                     if (crossVMState.isPresent() && crossVMState.get().isQuit()) {
                         return RunnerResult.asQuitByConcurrent(); // quit by cross VM handling
                     }
@@ -259,7 +260,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
                     } finally {
                         debugFw("...Calling finally clause of job execution (after run)");
                         endTime = currentTime.get();
-                        crossVMEnding(job, crossVMState, endTime);
+                        crossVMEnding(job, crossVMState, endTime, nowOption);
                     }
                     runnerResult.acceptEndTime(endTime); // lazy load now
                     return runnerResult;
@@ -437,12 +438,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                               CrossVM
     //                                               -------
-    protected OptionalThing<CrossVMState> crossVMBeginning(Cron4jJob job) {
+    protected OptionalThing<CrossVMState> crossVMBeginning(Cron4jJob job, OptionalThing<LaunchNowOption> nowOption) {
         return jobRunner.getCrossVMHook().map(hook -> {
             final Method hookMethod = findHookMethod(hook, "hookBeginning");
             arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job, nowOption);
             });
             arrangeHookCallbackContext(hook, hookMethod, job);
             try {
@@ -464,7 +465,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
         }
     }
 
-    protected void crossVMEnding(Cron4jJob job, OptionalThing<CrossVMState> crossVMState, LocalDateTime endTime) {
+    protected void crossVMEnding(Cron4jJob job, OptionalThing<CrossVMState> crossVMState, LocalDateTime endTime,
+            OptionalThing<LaunchNowOption> nowOption) {
         if (!crossVMState.isPresent()) {
             return;
         }
@@ -472,7 +474,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             final Method hookMethod = findHookMethod(hook, "hookEnding");
             arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job, nowOption);
             });
             arrangeHookCallbackContext(hook, hookMethod, job);
             try {
@@ -502,7 +504,8 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     //                                           Job History
     //                                           -----------
     protected void recordJobHistory(TaskExecutionContext context, Cron4jJob job, Thread jobThread, LocalDateTime activationTime,
-            OptionalThing<RunnerResult> runnerResult, OptionalThing<LocalDateTime> endTime, OptionalThing<Throwable> controllerCause) {
+            OptionalThing<RunnerResult> runnerResult, OptionalThing<LocalDateTime> endTime, OptionalThing<Throwable> controllerCause,
+            OptionalThing<LaunchNowOption> nowOption) {
         final TaskExecutor taskExecutor = context.getTaskExecutor();
         final Cron4jJobHistory jobHistory = prepareJobHistory(job, activationTime, runnerResult, endTime, controllerCause);
         final int historyLimit = getHistoryLimit();
@@ -510,7 +513,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
             final Method hookMethod = findHookMethod(hook, "hookRecord");
             arrangeHookThreadCacheContext();
             jobRunner.getAccessContextArranger().ifPresent(arranger -> { // for DB control
-                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job);
+                arrangeHookPreparedAccessContext(arranger, hook, hookMethod, job, nowOption);
             });
             arrangeHookCallbackContext(hook, hookMethod, job);
             try {
@@ -617,9 +620,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world
     // -----------------------------------------------------
     //                                         AccessContext
     //                                         -------------
-    protected void arrangeHookPreparedAccessContext(AccessContextArranger arranger, Object hook, Method hookMethod, Cron4jJob job) {
+    protected void arrangeHookPreparedAccessContext(AccessContextArranger arranger, Object hook, Method hookMethod, Cron4jJob job,
+            OptionalThing<LaunchNowOption> nowOption) {
         final String moduleName = DfTypeUtil.toClassTitle(hook.getClass());
-        final AccessContext context = arranger.arrangePreparedAccessContext(new AccessContextResource(moduleName, hookMethod));
+        final Map<String, Object> parameterMap = nowOption.map(op -> op.getParameterMap()).orElseGet(() -> Collections.emptyMap());
+        final AccessContextResource resource = new AccessContextResource(moduleName, hookMethod, parameterMap);
+        final AccessContext context = arranger.arrangePreparedAccessContext(resource);
         if (context == null) {
             String msg = "Cannot return null from access context arranger: " + arranger + " job=" + job.toIdentityDisp();
             throw new IllegalStateException(msg);
