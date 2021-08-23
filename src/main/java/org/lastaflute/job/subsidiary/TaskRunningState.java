@@ -31,6 +31,7 @@ public class TaskRunningState {
     //                                                                           =========
     protected final Supplier<LocalDateTime> currentTime; // not null
     protected volatile LocalDateTime beginTime; // null allowed when no executing, volatile just in case
+    protected volatile boolean onceEnded; // for e.g. outlaw parallel
 
     // ===================================================================================
     //                                                                         Constructor
@@ -47,6 +48,7 @@ public class TaskRunningState {
     }
 
     public void end() {
+        this.onceEnded = true;
         this.beginTime = null;
     }
 
@@ -65,5 +67,9 @@ public class TaskRunningState {
         return OptionalThing.ofNullable(beginTime, () -> {
             throw new IllegalStateException("Not found the beginTime.");
         });
+    }
+
+    public boolean isOnceEnded() {
+        return onceEnded;
     }
 }

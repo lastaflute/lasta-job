@@ -342,12 +342,17 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    // basically for framework
     public Cron4jScheduler getCron4jScheduler() {
         return cron4jScheduler;
     }
 
     public LaJobRunner getJobRunner() {
         return jobRunner;
+    }
+
+    public Supplier<LocalDateTime> getCurrentTime() {
+        return currentTime;
     }
 
     public Map<LaJobKey, Cron4jJob> getJobKeyJobMap() {

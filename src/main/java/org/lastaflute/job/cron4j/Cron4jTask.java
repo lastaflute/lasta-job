@@ -805,6 +805,12 @@ public class Cron4jTask extends Task { // unique per job in lasta job world (exc
         }
     }
 
+    public boolean syncRunningOnceEnded() { // for e.g. outlaw parallel
+        synchronized (runningState) { // unneeded? just in case
+            return runningState.isOnceEnded();
+        }
+    }
+
     // ===================================================================================
     //                                                                     Framework Debug
     //                                                                     ===============

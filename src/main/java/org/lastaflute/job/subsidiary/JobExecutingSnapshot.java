@@ -44,6 +44,15 @@ public class JobExecutingSnapshot {
     }
 
     // ===================================================================================
+    //                                                                      Basic Override
+    //                                                                      ==============
+    @Override
+    public String toString() {
+        final String mainExp = mainExecState.map(state -> state.toString()).orElse("none");
+        return "snapshot:{" + executingCount + ", " + mainExp + ", " + outlawParallelExecStateList + "}";
+    }
+
+    // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
     public int getExecutingCount() {

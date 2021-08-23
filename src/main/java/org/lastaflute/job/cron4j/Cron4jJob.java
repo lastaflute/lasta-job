@@ -167,12 +167,6 @@ public class Cron4jJob implements LaScheduledJob {
         return beginTime;
     }
 
-    protected OptionalThing<LocalDateTime> extractRunningBeginTime(Cron4jTask task) {
-        return task.syncRunningCall(runningState -> {
-            return runningState.getBeginTime().get(); // locked so can get() safely
-        });
-    }
-
     // -----------------------------------------------------
     //                                    Executing Snapshot
     //                                    ------------------
@@ -265,8 +259,11 @@ public class Cron4jJob implements LaScheduledJob {
         final Cron4jTask nowTask;
         synchronized (outlawParallelLock) {
             // #for_now jflute this removing is not best timing but safety timing was not found (2021/08/22)
-            outlawParallelTaskList.removeIf(task -> !task.isRunningNow()); // purge old tasks
-
+            outlawParallelTaskList.removeIf(task -> {
+                // avoid near-beginning task delete so refers task state directly by jflute (2021/08/24)
+                // outlaw parallel task is one-time instance so once-ended task can be deleted
+                return task.syncRunningOnceEnded();
+            }); // purge old tasks
             // clone task instance for outlaw parallel to avoid concurrent control
             nowTask = cron4jTask.createOutlawParallelTask();
             outlawParallelTaskList.add(nowTask);
@@ -501,6 +498,18 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                        Assist Logic
     //                                                                        ============
+    // -----------------------------------------------------
+    //                                         Running State
+    //                                         -------------
+    protected OptionalThing<LocalDateTime> extractRunningBeginTime(Cron4jTask task) {
+        return task.syncRunningCall(runningState -> {
+            return runningState.getBeginTime().get(); // locked so can get() safely
+        });
+    }
+
+    // -----------------------------------------------------
+    //                                                Verify
+    //                                                ------
     protected synchronized void verifyCanScheduleState() {
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
@@ -638,6 +647,15 @@ public class Cron4jJob implements LaScheduledJob {
     public Set<LaJobKey> getTriggeredJobKeySet() {
         synchronized (triggeredJobLock) { // just in case
             return Collections.unmodifiableSet(triggeredJobKeySet);
+        }
+    }
+
+    // -----------------------------------------------------
+    //                                       Outlaw Parallel
+    //                                       ---------------
+    public List<Cron4jTask> getOutlawParallelTaskList() { // for framework
+        synchronized (outlawParallelLock) { // just in case
+            return Collections.unmodifiableList(outlawParallelTaskList);
         }
     }
 
