@@ -40,6 +40,7 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubI
     protected CronParamsSupplier paramsSupplier;
     protected List<LaJobKey> triggeringJobKeyList;
     protected JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
+    protected boolean outlawParallelGranted;
 
     // ===================================================================================
     //                                                                              Facade
@@ -111,6 +112,15 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubI
         return this;
     }
 
+    // -----------------------------------------------------
+    //                                       Outlaw Parallel
+    //                                       ---------------
+    @Override
+    public VaryingCronOption grantOutlawParallel() {
+        outlawParallelGranted = true;
+        return this;
+    }
+
     // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
@@ -153,5 +163,10 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubI
     @Override
     public JobNoticeLogLevel getNoticeLogLevel() {
         return noticeLogLevel;
+    }
+
+    @Override
+    public boolean isOutlawParallelGranted() {
+        return outlawParallelGranted;
     }
 }

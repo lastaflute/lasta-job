@@ -60,6 +60,9 @@ public interface ReadableJobAttr extends JobIdentityAttr { // for internal assis
      */
     Class<? extends LaJob> getJobType();
 
+    // ===================================================================================
+    //                                                                        Control Info
+    //                                                                        ============
     /**
      * @return The optional supplier of cron parameters. (NotNull, EmptyAllowed: if no parameter)
      */
@@ -74,6 +77,11 @@ public interface ReadableJobAttr extends JobIdentityAttr { // for internal assis
      * @return The execution type of concurrent. (NotNull)
      */
     JobConcurrentExec getConcurrentExec();
+
+    /**
+     * @return Is outlaw parallel granted?
+     */
+    boolean isOutlawParallelGranted();
 
     // ===================================================================================
     //                                                                        Next Trigger

@@ -33,10 +33,14 @@ public interface VaryingCronOption {
 
     VaryingCronOption changeNoticeLogToSuppressed();
 
+    VaryingCronOption grantOutlawParallel();
+
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
     OptionalThing<CronParamsSupplier> getParamsSupplier();
 
     JobNoticeLogLevel getNoticeLogLevel();
+
+    boolean isOutlawParallelGranted();
 }

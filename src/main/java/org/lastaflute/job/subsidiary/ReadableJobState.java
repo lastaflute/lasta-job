@@ -51,6 +51,12 @@ public interface ReadableJobState extends ReadableJobAttr { // for internal assi
     <RESULT> OptionalThing<RESULT> mapExecutingNow(Function<SnapshotExecState, RESULT> oneArgLambda);
 
     /**
+     * Take executing snapshot now for the job.
+     * @return The snapshot object that has executing information. (NotNull)
+     */
+    JobExecutingSnapshot takeSnapshotNow();
+
+    /**
      * @return true if the job is unscheduled.
      */
     boolean isUnscheduled();
