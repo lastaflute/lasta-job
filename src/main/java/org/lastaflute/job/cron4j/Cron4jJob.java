@@ -460,6 +460,9 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     protected void showPreparingNextTrigger(List<Cron4jJob> triggeredJobList) {
+        if (triggeredJobList.isEmpty()) {
+            return; // no needed if no trigger
+        }
         final List<String> expList = triggeredJobList.stream().map(triggeredJob -> {
             return triggeredJob.toIdentityDisp();
         }).collect(Collectors.toList());

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.dbflute.optional.OptionalThing;
+import org.dbflute.util.Srl;
 import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
@@ -122,10 +123,13 @@ public class Cron4jJobHistory implements LaJobHistory {
         sb.append(jobNote.map(title -> ", " + title).orElse(""));
         sb.append(jobUnique.map(uq -> ", " + uq).orElse(""));
         sb.append(cronExp.map(cron -> ", " + cron).orElse(""));
-        sb.append(", ").append(jobTypeFqcn);
+        sb.append(", ").append(Srl.substringLastRear(jobTypeFqcn, "."));
+        sb.append(", activation=").append(activationTime);
+        sb.append(", begin=").append(beginTime.map(time -> time.toString()).orElse("*no begin"));
+        sb.append(", end=").append(endTime.map(time -> time.toString()).orElse("*no end"));
         sb.append(", ").append(execResultType);
-        if (cause != null) {
-            sb.append(", ").append(cause.getClass().getSimpleName());
+        if (cause.isPresent()) {
+            sb.append(", ").append(cause.get().getClass().getSimpleName());
         }
         sb.append("}@").append(Integer.toHexString(hashCode()));
         return sb.toString();
