@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2019 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@
 package org.lastaflute.job.cron4j;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -44,6 +46,7 @@ import org.lastaflute.job.log.JobNoticeLogLevel;
 import org.lastaflute.job.subsidiary.CronOption;
 import org.lastaflute.job.subsidiary.CronParamsSupplier;
 import org.lastaflute.job.subsidiary.JobConcurrentExec;
+import org.lastaflute.job.subsidiary.JobExecutingSnapshot;
 import org.lastaflute.job.subsidiary.LaunchNowOpCall;
 import org.lastaflute.job.subsidiary.LaunchNowOption;
 import org.lastaflute.job.subsidiary.LaunchedProcess;
@@ -76,10 +79,17 @@ public class Cron4jJob implements LaScheduledJob {
     protected volatile OptionalThing<Cron4jId> cron4jId; // mutable for non-cron
     protected final Cron4jTask cron4jTask; // 1:1
     protected final Cron4jNow cron4jNow; // n:1
+
     protected volatile boolean unscheduled;
     protected volatile boolean disappeared;
-    protected Set<LaJobKey> triggeredJobKeyList; // null allowed if no next trigger, used in synchronized
-    protected final Object triggeredJobKeyLock = new Object(); // for minimum lock scope to avoid deadlock
+
+    // next trigger, used in synchronized but copy-on-write just in case
+    protected final Set<LaJobKey> triggeredJobKeySet = new CopyOnWriteArraySet<LaJobKey>(); // not null
+    protected final Object triggeredJobLock = new Object(); // for minimum lock scope to avoid deadlock
+
+    // outlaw parallel, used in synchronized but copy-on-write just in case
+    protected final List<Cron4jTask> outlawParallelTaskList = new CopyOnWriteArrayList<Cron4jTask>(); // not null
+    protected final Object outlawParallelLock = new Object(); // for minimum lock scope to avoid deadlock
 
     // these are same life-cycle (list to keep order for machine-gun synchronization)
     protected Map<String, NeighborConcurrentGroup> neighborConcurrentGroupMap; // null allowed if no neighbor
@@ -101,6 +111,9 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                       Executing Now
     //                                                                       =============
+    // -----------------------------------------------------
+    //                                          If Executing
+    //                                          ------------
     @Override
     public OptionalThingIfPresentAfter ifExecutingNow(Consumer<SnapshotExecState> oneArgLambda) {
         return mapExecutingNow(execState -> {
@@ -111,21 +124,67 @@ public class Cron4jJob implements LaScheduledJob {
         });
     }
 
+    // -----------------------------------------------------
+    //                                          Is Executing
+    //                                          ------------
     @Override
     public boolean isExecutingNow() {
-        return cron4jTask.isRunningNow();
+        return cron4jTask.isRunningNow() || isAnyOutlawParallelRunningNow();
     }
 
+    protected boolean isAnyOutlawParallelRunningNow() {
+        synchronized (outlawParallelLock) { // just in case
+            return outlawParallelTaskList.stream().anyMatch(task -> task.isRunningNow());
+        }
+    }
+
+    // -----------------------------------------------------
+    //                                         Map Executing
+    //                                         -------------
     @Override
     public <RESULT> OptionalThing<RESULT> mapExecutingNow(Function<SnapshotExecState, RESULT> oneArgLambda) {
-        final OptionalThing<LocalDateTime> beginTime = cron4jTask.syncRunningCall(runningState -> {
-            return runningState.getBeginTime().get(); // locked so can get() safely
-        });
-        return beginTime.flatMap(time -> {
+        return findRunningBeginTime().flatMap(time -> {
             return OptionalThing.ofNullable(oneArgLambda.apply(new SnapshotExecState(time)), () -> {
                 throw new IllegalStateException("Not found the result from your scope: job=" + toIdentityDisp() + "(" + time + ")");
             });
         });
+    }
+
+    protected OptionalThing<LocalDateTime> findRunningBeginTime() {
+        OptionalThing<LocalDateTime> beginTime = extractRunningBeginTime(cron4jTask);
+        if (!beginTime.isPresent()) {
+            synchronized (outlawParallelLock) { // just in case
+                final Optional<LocalDateTime> parallelTime = outlawParallelTaskList.stream()
+                        .map(task -> extractRunningBeginTime(task))
+                        .filter(optTime -> optTime.isPresent())
+                        .map(optTime -> optTime.get())
+                        .findFirst(); // may have many running tasks
+                if (parallelTime.isPresent()) {
+                    beginTime = OptionalThing.of(parallelTime.get());
+                }
+            }
+        }
+        return beginTime;
+    }
+
+    // -----------------------------------------------------
+    //                                    Executing Snapshot
+    //                                    ------------------
+    public JobExecutingSnapshot takeSnapshotNow() {
+        final OptionalThing<SnapshotExecState> mainExecState = extractRunningBeginTime(cron4jTask).map(beginTime -> {
+            return new SnapshotExecState(beginTime);
+        });
+        final List<SnapshotExecState> outlawParallelExecStateList; // running only
+        synchronized (outlawParallelLock) { // just in case
+            outlawParallelExecStateList = outlawParallelTaskList.stream()
+                    .map(task -> extractRunningBeginTime(task))
+                    .filter(optTime -> optTime.isPresent()) // running only
+                    .map(optTime -> optTime.get()) // to beginTime
+                    .map(beginTime -> new SnapshotExecState(beginTime)) // wrap
+                    .collect(Collectors.toList());
+        }
+        final int executingCount = (mainExecState.isPresent() ? 1 : 0) + outlawParallelExecStateList.size();
+        return new JobExecutingSnapshot(executingCount, mainExecState, outlawParallelExecStateList);
     }
 
     // ===================================================================================
@@ -147,11 +206,20 @@ public class Cron4jJob implements LaScheduledJob {
         if (JobChangeLog.isEnabled()) {
             JobChangeLog.log("#job ...Launching now: {}, {}", option, this);
         }
-        // if executed by cron here, duplicate execution occurs but task level synchronization exists
-        final TaskExecutor taskExecutor = cron4jNow.getCron4jScheduler().launchNow(cron4jTask, option);
+        final Cron4jTask nowTask;
+        if (option.isOutlawParallel()) { // rare case
+            nowTask = prepareOutlawParallelLaunch();
+        } else { // mainly here
+            // if executed by cron now, duplicate execution occurs but task level synchronization exists
+            nowTask = cron4jTask;
+        }
+        final TaskExecutor taskExecutor = cron4jNow.getCron4jScheduler().launchNow(nowTask, option);
         return createLaunchedProcess(taskExecutor);
     }
 
+    // -----------------------------------------------------
+    //                                      LaunchNow Option
+    //                                      ----------------
     protected LaunchNowOption createLaunchNowOption(LaunchNowOpCall opLambda) {
         final LaunchNowOption op = new LaunchNowOption();
         opLambda.callback(op);
@@ -175,6 +243,34 @@ public class Cron4jJob implements LaScheduledJob {
         return Cron4jJobHistory.find(taskExecutor);
     }
 
+    // -----------------------------------------------------
+    //                                 OutlawParallel Launch
+    //                                 ---------------------
+    protected Cron4jTask prepareOutlawParallelLaunch() {
+        if (!isOutlawParallelGranted()) {
+            // outlaw parallel is dangerous function so strict by jflute (2021/08/23)
+            // and simple exception message here for high-skill developer only
+            throw new IllegalStateException("The job is not allowed to use outlaw parallel: " + toIdentityDisp());
+        }
+        if (!isNonCron()) {
+            // #for_now jflute outlaw parallel logic is very difficult so launchNow() only (2021/08/23)
+            throw new IllegalStateException("Cannot use outlaw parallel when scheduled cron: " + toIdentityDisp());
+        }
+        final Cron4jTask nowTask;
+        synchronized (outlawParallelLock) {
+            // #for_now jflute this removing is not best timing but safety timing was not found (2021/08/22)
+            outlawParallelTaskList.removeIf(task -> {
+                // avoid near-beginning task delete so refers task state directly by jflute (2021/08/24)
+                // outlaw parallel task is one-time instance so once-ended task can be deleted
+                return task.syncRunningOnceEnded();
+            }); // purge old tasks
+            // clone task instance for outlaw parallel to avoid concurrent control
+            nowTask = cron4jTask.createOutlawParallelTask();
+            outlawParallelTaskList.add(nowTask);
+        }
+        return nowTask;
+    }
+
     // ===================================================================================
     //                                                                            Stop Now
     //                                                                            ========
@@ -191,7 +287,15 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     protected List<TaskExecutor> findNativeExecutorList() {
-        return cron4jNow.getCron4jScheduler().findExecutorList(cron4jTask);
+        final List<TaskExecutor> executorList = new ArrayList<>();
+        final Cron4jScheduler cron4jScheduler = cron4jNow.getCron4jScheduler();
+        executorList.addAll(cron4jScheduler.findExecutorList(cron4jTask)); // running only
+        synchronized (outlawParallelLock) { // just in case
+            outlawParallelTaskList.stream()
+                    .flatMap(task -> cron4jScheduler.findExecutorList(task).stream()) // me too
+                    .forEach(executor -> executorList.add(executor));
+        }
+        return executorList;
     }
 
     // ===================================================================================
@@ -208,8 +312,12 @@ public class Cron4jJob implements LaScheduledJob {
         if (unscheduled) {
             unscheduled = false; // can revive from unscheduled
         }
+
+        // cronExp in task is switched here, and synchronized in task
+        // while, outlaw parallel tasks are not target here because they are for only non-cron
         final String existingCronExp = cron4jTask.getVaryingCron().getCronExp();
         cron4jTask.switchCron(cronExp, createCronOption(opLambda));
+
         final Cron4jScheduler cron4jScheduler = cron4jNow.getCron4jScheduler();
         cron4jId.ifPresent(id -> {
             if (JobChangeLog.isEnabled()) {
@@ -298,7 +406,7 @@ public class Cron4jJob implements LaScheduledJob {
             JobChangeLog.log("#job ...Becoming non-cron: {}", toString());
         }
         cron4jId.ifPresent(id -> {
-            cron4jTask.becomeNonCrom();
+            cron4jTask.becomeNonCrom(); // without outlaw parallel tasks because they are for only non-cron
             cron4jNow.getCron4jScheduler().deschedule(id);
             cron4jId = OptionalThing.empty();
         });
@@ -323,11 +431,8 @@ public class Cron4jJob implements LaScheduledJob {
         if (triggeredJobKey.equals(jobKey)) { // myself
             throw new IllegalArgumentException("Cannot register myself job as next trigger: " + toIdentityDisp());
         }
-        synchronized (triggeredJobKeyLock) {
-            if (triggeredJobKeyList == null) {
-                triggeredJobKeyList = new CopyOnWriteArraySet<LaJobKey>(); // just in case
-            }
-            triggeredJobKeyList.add(triggeredJobKey);
+        synchronized (triggeredJobLock) { // just in case
+            triggeredJobKeySet.add(triggeredJobKey);
         }
     }
 
@@ -336,11 +441,8 @@ public class Cron4jJob implements LaScheduledJob {
         // because job process that is already executed can be success
         // (and this method is for framework so no worry about user call)
         //verifyCanScheduleState();
-        synchronized (triggeredJobKeyLock) {
-            if (triggeredJobKeyList == null) {
-                return;
-            }
-            final List<Cron4jJob> triggeredJobList = triggeredJobKeyList.stream().map(triggeredJobKey -> {
+        synchronized (triggeredJobLock) {
+            final List<Cron4jJob> triggeredJobList = triggeredJobKeySet.stream().map(triggeredJobKey -> {
                 return findTriggeredJob(triggeredJobKey);
             }).collect(Collectors.toList());
             showPreparingNextTrigger(triggeredJobList);
@@ -358,6 +460,9 @@ public class Cron4jJob implements LaScheduledJob {
     }
 
     protected void showPreparingNextTrigger(List<Cron4jJob> triggeredJobList) {
+        if (triggeredJobList.isEmpty()) {
+            return; // no needed if no trigger
+        }
         final List<String> expList = triggeredJobList.stream().map(triggeredJob -> {
             return triggeredJob.toIdentityDisp();
         }).collect(Collectors.toList());
@@ -396,6 +501,18 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                        Assist Logic
     //                                                                        ============
+    // -----------------------------------------------------
+    //                                         Running State
+    //                                         -------------
+    protected OptionalThing<LocalDateTime> extractRunningBeginTime(Cron4jTask task) {
+        return task.syncRunningCall(runningState -> {
+            return runningState.getBeginTime().get(); // locked so can get() safely
+        });
+    }
+
+    // -----------------------------------------------------
+    //                                                Verify
+    //                                                ------
     protected synchronized void verifyCanScheduleState() {
         if (disappeared) {
             throw new JobAlreadyDisappearedException("Already disappeared the job: " + toString());
@@ -457,6 +574,9 @@ public class Cron4jJob implements LaScheduledJob {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    // -----------------------------------------------------
+    //                                            Basic Info
+    //                                            ----------
     @Override
     public LaJobKey getJobKey() {
         return jobKey;
@@ -485,6 +605,9 @@ public class Cron4jJob implements LaScheduledJob {
         return cron4jTask.getJobType();
     }
 
+    // -----------------------------------------------------
+    //                                          Control Info
+    //                                          ------------
     @Override
     public OptionalThing<CronParamsSupplier> getParamsSupplier() {
         return cron4jTask.getVaryingCron().getCronOption().getParamsSupplier();
@@ -500,6 +623,14 @@ public class Cron4jJob implements LaScheduledJob {
         return cron4jTask.getConcurrentExec();
     }
 
+    @Override
+    public boolean isOutlawParallelGranted() {
+        return cron4jTask.getVaryingCron().getCronOption().isOutlawParallelGranted();
+    }
+
+    // -----------------------------------------------------
+    //                                      Framework Object
+    //                                      ----------------
     public OptionalThing<Cron4jId> getCron4jId() {
         return cron4jId;
     }
@@ -512,13 +643,28 @@ public class Cron4jJob implements LaScheduledJob {
         return cron4jNow;
     }
 
+    // -----------------------------------------------------
+    //                                          Next Trigger
+    //                                          ------------
     @Override
     public Set<LaJobKey> getTriggeredJobKeySet() {
-        synchronized (triggeredJobKeyLock) {
-            return triggeredJobKeyList != null ? Collections.unmodifiableSet(triggeredJobKeyList) : Collections.emptySet();
+        synchronized (triggeredJobLock) { // just in case
+            return Collections.unmodifiableSet(triggeredJobKeySet);
         }
     }
 
+    // -----------------------------------------------------
+    //                                       Outlaw Parallel
+    //                                       ---------------
+    public List<Cron4jTask> getOutlawParallelTaskList() { // for framework
+        synchronized (outlawParallelLock) { // just in case
+            return Collections.unmodifiableList(outlawParallelTaskList);
+        }
+    }
+
+    // -----------------------------------------------------
+    //                                   Neighbor Concurrent
+    //                                   -------------------
     @Override
     public synchronized List<NeighborConcurrentGroup> getNeighborConcurrentGroupList() {
         if (neighborConcurrentGroupList == null) {

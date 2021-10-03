@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2019 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubI
     protected CronParamsSupplier paramsSupplier;
     protected List<LaJobKey> triggeringJobKeyList;
     protected JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
+    protected boolean outlawParallelGranted;
 
     // ===================================================================================
     //                                                                              Facade
@@ -111,6 +112,15 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubI
         return this;
     }
 
+    // -----------------------------------------------------
+    //                                       Outlaw Parallel
+    //                                       ---------------
+    @Override
+    public VaryingCronOption grantOutlawParallel() {
+        outlawParallelGranted = true;
+        return this;
+    }
+
     // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
@@ -153,5 +163,10 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubI
     @Override
     public JobNoticeLogLevel getNoticeLogLevel() {
         return noticeLogLevel;
+    }
+
+    @Override
+    public boolean isOutlawParallelGranted() {
+        return outlawParallelGranted;
     }
 }

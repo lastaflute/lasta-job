@@ -13,55 +13,57 @@
  * either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package org.lastaflute.job.key;
+package org.lastaflute.job.subsidiary;
+
+import java.util.Collections;
+import java.util.List;
+
+import org.dbflute.optional.OptionalThing;
 
 /**
  * @author jflute
- * @since 0.2.0 (2016/01/11 Monday)
+ * @since 0.5.6 (2021/08/23 Monday at roppongi japanese)
  */
-public class LaJobUnique {
+public class JobExecutingSnapshot {
 
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected final String uniqueCode;
+    protected final int executingCount;
+    protected final OptionalThing<SnapshotExecState> mainExecState; // empty if no running
+    protected final List<SnapshotExecState> outlawParallelExecStateList; // running only, not null
 
     // ===================================================================================
     //                                                                         Constructor
     //                                                                         ===========
-    protected LaJobUnique(String uniqueCode) {
-        if (uniqueCode == null) {
-            throw new IllegalArgumentException("The argument 'uniqueCode' should not be null.");
-        }
-        this.uniqueCode = uniqueCode;
-    }
-
-    public static LaJobUnique of(String uniqueCode) {
-        return new LaJobUnique(uniqueCode);
+    public JobExecutingSnapshot(int executingCount, OptionalThing<SnapshotExecState> mainExecState,
+            List<SnapshotExecState> outlawParallelExecStateList) {
+        this.executingCount = executingCount;
+        this.mainExecState = mainExecState;
+        this.outlawParallelExecStateList = outlawParallelExecStateList;
     }
 
     // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
     @Override
-    public int hashCode() {
-        return uniqueCode.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj instanceof LaJobUnique && uniqueCode.equals(((LaJobUnique) obj).uniqueCode);
-    }
-
-    @Override
     public String toString() {
-        return uniqueCode;
+        final String mainExp = mainExecState.map(state -> state.toString()).orElse("none");
+        return "snapshot:{" + executingCount + ", " + mainExp + ", " + outlawParallelExecStateList + "}";
     }
 
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
-    public String value() {
-        return uniqueCode;
+    public int getExecutingCount() {
+        return executingCount;
+    }
+
+    public OptionalThing<SnapshotExecState> getMainExecState() {
+        return mainExecState;
+    }
+
+    public List<SnapshotExecState> getOutlawParallelExecStateList() {
+        return Collections.unmodifiableList(outlawParallelExecStateList); // just in case
     }
 }

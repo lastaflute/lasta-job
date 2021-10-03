@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2019 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,12 @@ public interface ReadableJobState extends ReadableJobAttr { // for internal assi
      * @return The optional result from the callback. (NotNull, EmptyAllowed: if no executing or returns null)
      */
     <RESULT> OptionalThing<RESULT> mapExecutingNow(Function<SnapshotExecState, RESULT> oneArgLambda);
+
+    /**
+     * Take executing snapshot now for the job.
+     * @return The snapshot object that has executing information. (NotNull)
+     */
+    JobExecutingSnapshot takeSnapshotNow();
 
     /**
      * @return true if the job is unscheduled.

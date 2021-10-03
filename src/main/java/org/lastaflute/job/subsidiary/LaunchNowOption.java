@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2019 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ public class LaunchNowOption {
     //                                                                           =========
     protected Map<String, Object> parameterMap; // lazy-loaded
     protected boolean priorParams;
+    protected boolean outlawParallel;
 
     // ===================================================================================
     //                                                                           Parameter
@@ -62,12 +63,25 @@ public class LaunchNowOption {
         return this;
     }
 
+    /**
+     * Set up as outlaw parallel launch, ignoring concurrent type setting of the job. <br>
+     * And this is for non-cron job only. You cannot schedule the job if you use this. <br>
+     * <span style="color: #AD4747; font-size: 120%">This is trial function, so be careful with your use.</span>
+     * @return this. (NotNull)
+     */
+    public LaunchNowOption asOutlawParallel() {
+        outlawParallel = true;
+        return this;
+    }
+
     // ===================================================================================
     //                                                                      Basic Override
     //                                                                      ==============
     @Override
     public String toString() {
-        return "option:{params=" + parameterMap + (priorParams ? ", priorParams" : "") + "}";
+        final String priorParamsExp = priorParams ? ", priorParams" : "";
+        final String outlawParallelExp = outlawParallel ? ", outlawParallel" : "";
+        return "option:{params=" + parameterMap + priorParamsExp + outlawParallelExp + "}";
     }
 
     // ===================================================================================
@@ -79,5 +93,9 @@ public class LaunchNowOption {
 
     public boolean isPriorParams() {
         return priorParams;
+    }
+
+    public boolean isOutlawParallel() {
+        return outlawParallel;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2019 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.LaCron;
 import org.lastaflute.job.LaJob;
 import org.lastaflute.job.LaJobRunner;
+import org.lastaflute.job.cron4j.Cron4jTask.JobThreadNaming;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobUnique;
 import org.lastaflute.job.log.JobChangeLog;
@@ -115,16 +116,22 @@ public class Cron4jCron implements LaCron {
         return saveJob(cron4jTask, cronOption, cron4jId);
     }
 
+    // -----------------------------------------------------
+    //                                            CronOption
+    //                                            ----------
     protected CronOption createCronOption(InitialCronOpCall opLambda) {
         final CronOption option = new CronOption();
         opLambda.callback(option);
         return option;
     }
 
+    // -----------------------------------------------------
+    //                                            Cron4jTask
+    //                                            ----------
     protected Cron4jTask createCron4jTask(String cronExp, Class<? extends LaJob> jobType, JobConcurrentExec concurrentExec,
             CronOption cronOption) {
         final VaryingCron varyingCron = createVaryingCron(cronExp, cronOption);
-        final Supplier<String> threadNaming = prepareThreadNaming(cronOption);
+        final JobThreadNaming threadNaming = prepareThreadNaming(cronOption);
         return new Cron4jTask(varyingCron, jobType, concurrentExec, threadNaming, jobRunner, cron4jNow, currentTime, frameworkDebug); // adapter task
     }
 
@@ -132,15 +139,31 @@ public class Cron4jCron implements LaCron {
         return new VaryingCron(cronExp, cronOption);
     }
 
-    protected Supplier<String> prepareThreadNaming(CronOption cronOption) {
+    protected JobThreadNaming prepareThreadNaming(CronOption cronOption) {
         final OptionalThing<LaJobUnique> jobUnique = cronOption.getJobUnique();
-        return () -> { // callback for current thread
-            return THREAD_NAME_PREFIX + jobUnique.map(uq -> uq.value()).orElseGet(() -> {
-                return Integer.toHexString(Thread.currentThread().hashCode()); // task's threand
-            });
+        return option -> { // callback for task's thread
+            final StringBuilder sb = new StringBuilder();
+            sb.append(THREAD_NAME_PREFIX);
+            if (jobUnique.isPresent()) {
+                sb.append(jobUnique.get());
+                if (option.isAlwaysHash()) {
+                    sb.append("_"); // basically uses underscore in thread name of LastaJob
+                    sb.append(buildThreadNameHashSuffix());
+                }
+            } else {
+                sb.append(buildThreadNameHashSuffix());
+            }
+            return sb.toString();
         };
     }
 
+    protected String buildThreadNameHashSuffix() {
+        return Integer.toHexString(Thread.currentThread().hashCode());
+    }
+
+    // -----------------------------------------------------
+    //                                      Show Registering
+    //                                      ----------------
     protected void showRegistering(Cron4jTask cron4jTask) {
         if (CronRegistrationType.CHANGE.equals(registrationType) && JobChangeLog.isEnabled()) {
             // only when change, because starter shows rich logging when start
@@ -148,6 +171,9 @@ public class Cron4jCron implements LaCron {
         }
     }
 
+    // -----------------------------------------------------
+    //                                         Schedule Task
+    //                                         -------------
     protected String scheduleIfNeeds(String cronExp, Cron4jTask cron4jTask) {
         final String cron4jId;
         if (cron4jTask.isNonCron()) {
@@ -158,6 +184,9 @@ public class Cron4jCron implements LaCron {
         return cron4jId;
     }
 
+    // -----------------------------------------------------
+    //                                              Save Job
+    //                                              --------
     protected Cron4jJob saveJob(Cron4jTask cron4jTask, CronOption cronOption, String cron4jId) {
         return cron4jNow.saveJob(cron4jTask, cronOption, cronOption.getTriggeringJobKeyList(), OptionalThing.ofNullable(cron4jId, () -> {
             throw new IllegalStateException("Not found the cron4jId: " + cron4jTask);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2019 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
  */
 package org.lastaflute.job.log;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.optional.OptionalThing;
@@ -53,10 +53,10 @@ public class SavedHistoryCache {
             br.addItem("History Key");
             br.addElement(historyKey);
             br.addItem("Existing Key");
-            if (!historyMap.isEmpty()) {
-                historyMap.forEach((key, value) -> {
-                    br.addElement(key + " = " + value);
-                });
+            if (!historyKeyList.isEmpty()) {
+                for (String existingKey : historyKeyList) { // using list for order
+                    br.addElement(existingKey + " = " + historyMap.get(existingKey));
+                }
             } else {
                 br.addElement("*No history");
             }
@@ -70,7 +70,7 @@ public class SavedHistoryCache {
     //                                                ------
     public synchronized void record(String historyKey, LaJobHistory jobHistory, int limit) {
         if (historyMap.size() >= limit) {
-            final String removedKey = historyKeyList.remove(0);
+            final String removedKey = historyKeyList.remove(0); // oldest
             historyMap.remove(removedKey);
         }
         historyMap.put(historyKey, jobHistory);
@@ -81,7 +81,9 @@ public class SavedHistoryCache {
     //                                                 List
     //                                                ------
     public synchronized List<LaJobHistory> list() {
-        return new ArrayList<LaJobHistory>(historyMap.values());
+        return historyKeyList.stream().map(key -> { // using list for order
+            return historyMap.get(key); // basically not null
+        }).collect(Collectors.toList());
     }
 
     // -----------------------------------------------------

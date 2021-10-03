@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2019 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import org.lastaflute.job.LaJobHistory;
 import org.lastaflute.job.LaJobRunner;
 import org.lastaflute.job.LaSchedulingNow;
 import org.lastaflute.job.cron4j.Cron4jCron.CronRegistrationType;
+import org.lastaflute.job.cron4j.Cron4jTask.TaskJobIdentity;
 import org.lastaflute.job.exception.JobNotFoundException;
 import org.lastaflute.job.key.LaJobKey;
 import org.lastaflute.job.key.LaJobNote;
@@ -65,7 +66,7 @@ public class Cron4jNow implements LaSchedulingNow {
     protected final Map<LaJobKey, Cron4jJob> jobKeyJobMap = new ConcurrentHashMap<LaJobKey, Cron4jJob>();
     protected final List<Cron4jJob> jobOrderedList = new CopyOnWriteArrayList<Cron4jJob>(); // same lifecycle as jobKeyJobMap
     protected final Map<LaJobUnique, Cron4jJob> jobUniqueJobMap = new ConcurrentHashMap<LaJobUnique, Cron4jJob>();
-    protected final Map<Cron4jTask, Cron4jJob> cron4jTaskJobMap = new ConcurrentHashMap<Cron4jTask, Cron4jJob>();
+    protected final Map<TaskJobIdentity, Cron4jJob> cron4jTaskJobMap = new ConcurrentHashMap<TaskJobIdentity, Cron4jJob>();
     protected final Map<String, NeighborConcurrentGroup> neighborConcurrentMap = new ConcurrentHashMap<String, NeighborConcurrentGroup>();
     protected int incrementedJobNumber;
 
@@ -101,7 +102,8 @@ public class Cron4jNow implements LaSchedulingNow {
             assertDuplicateUniqueCode(jobKey, uniqueCode);
             jobUniqueJobMap.put(uniqueCode, cron4jJob);
         });
-        cron4jTaskJobMap.put(cron4jTask, cron4jJob); // task is unique in lasta-job world
+        // task is unique in lasta-job world (except outlaw parallel so uses identity object)
+        cron4jTaskJobMap.put(cron4jTask.getTaskJobIdentity(), cron4jJob);
         return cron4jJob;
     }
 
@@ -162,8 +164,8 @@ public class Cron4jNow implements LaSchedulingNow {
     }
 
     protected void assertDuplicateTask(Cron4jTask cron4jTask) {
-        if (cron4jTaskJobMap.containsKey(cron4jTask)) { // no way just in case
-            throw new IllegalStateException("Duplicate task: " + cron4jTask + " existing=" + jobKeyJobMap);
+        if (cron4jTaskJobMap.containsKey(cron4jTask.getTaskJobIdentity())) { // no way just in case
+            throw new IllegalStateException("Duplicate task: " + cron4jTask + " existing=" + cron4jTaskJobMap);
         }
     }
 
@@ -175,7 +177,7 @@ public class Cron4jNow implements LaSchedulingNow {
         assertArgumentNotNull("jobKey", jobKey);
         final Cron4jJob found = jobKeyJobMap.get(jobKey);
         return OptionalThing.ofNullable(found, () -> {
-            String msg = "Not found the job by the key: " + jobKey + " existing=" + jobKeyJobMap.keySet();
+            String msg = "Not found the job by the key: " + jobKey + " existing=" + jobKeyJobMap;
             throw new JobNotFoundException(msg);
         });
     }
@@ -185,16 +187,16 @@ public class Cron4jNow implements LaSchedulingNow {
         assertArgumentNotNull("jobUnique", jobUnique);
         final Cron4jJob found = jobUniqueJobMap.get(jobUnique);
         return OptionalThing.ofNullable(found, () -> {
-            String msg = "Not found the job by the unique code: " + jobUnique + " existing=" + jobUniqueJobMap.keySet();
+            String msg = "Not found the job by the unique code: " + jobUnique + " existing=" + jobUniqueJobMap;
             throw new JobNotFoundException(msg);
         });
     }
 
-    public OptionalThing<Cron4jJob> findJobByTask(Cron4jTask task) {
-        assertArgumentNotNull("task", task);
-        final Cron4jJob found = cron4jTaskJobMap.get(task);
+    public OptionalThing<Cron4jJob> findJobByTask(TaskJobIdentity taskJobIdentity) {
+        assertArgumentNotNull("taskJobIdentity", taskJobIdentity);
+        final Cron4jJob found = cron4jTaskJobMap.get(taskJobIdentity);
         return OptionalThing.ofNullable(found, () -> {
-            String msg = "Not found the job by the task: " + task + " existing=" + cron4jTaskJobMap.keySet();
+            String msg = "Not found the job by the task: " + taskJobIdentity + " existing=" + cron4jTaskJobMap;
             throw new JobNotFoundException(msg);
         });
     }
@@ -233,7 +235,7 @@ public class Cron4jNow implements LaSchedulingNow {
             jobKeyJobMap.remove(jobKey);
             jobOrderedList.remove(job);
             job.getJobUnique().ifPresent(jobUnique -> jobUniqueJobMap.remove(jobUnique));
-            cron4jTaskJobMap.remove(job.getCron4jTask());
+            cron4jTaskJobMap.remove(job.getCron4jTask().getTaskJobIdentity());
         });
     }
 
@@ -340,12 +342,17 @@ public class Cron4jNow implements LaSchedulingNow {
     // ===================================================================================
     //                                                                            Accessor
     //                                                                            ========
+    // basically for framework
     public Cron4jScheduler getCron4jScheduler() {
         return cron4jScheduler;
     }
 
     public LaJobRunner getJobRunner() {
         return jobRunner;
+    }
+
+    public Supplier<LocalDateTime> getCurrentTime() {
+        return currentTime;
     }
 
     public Map<LaJobKey, Cron4jJob> getJobKeyJobMap() {
@@ -356,7 +363,7 @@ public class Cron4jNow implements LaSchedulingNow {
         return Collections.unmodifiableMap(jobUniqueJobMap);
     }
 
-    public Map<Cron4jTask, Cron4jJob> getTaskJobMap() {
+    public Map<TaskJobIdentity, Cron4jJob> getTaskJobMap() {
         return Collections.unmodifiableMap(cron4jTaskJobMap);
     }
 }
