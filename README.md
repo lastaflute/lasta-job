@@ -19,7 +19,11 @@ Apache License 2.0
 comming soon...
 
 # Thanks, Friends
+LastaJob uses:  
+- Cron4j: https://www.sauronsoftware.it/projects/cron4j/
+
 LastaJob is used by:  
 - Fess: https://github.com/codelibs/fess (from version10)
+- (and various business services)
 
 Deeply Thanks!
