@@ -8,7 +8,7 @@ Job Scheduling for LastaFlute
 <dependency>
     <groupId>org.lastaflute.job</groupId>
     <artifactId>lasta-job</artifactId>
-    <version>0.5.6</version>
+    <version>0.5.7</version>
 </dependency>
 ```
 
@@ -18,8 +18,15 @@ Apache License 2.0
 ## Official site
 comming soon...
 
+# Thanks, Frameworks
+LastaJob uses:  
+- Cron4j: https://www.sauronsoftware.it/projects/cron4j/
+
+Deeply Thanks!
+
 # Thanks, Friends
 LastaJob is used by:  
 - Fess: https://github.com/codelibs/fess (from version10)
+- (and various business services)
 
 Deeply Thanks!
