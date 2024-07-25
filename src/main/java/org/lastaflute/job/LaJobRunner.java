@@ -25,8 +25,6 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
 import org.dbflute.bhv.proposal.callback.ExecutedSqlCounter;
 import org.dbflute.bhv.proposal.callback.TraceableSqlAdditionalInfoProvider;
 import org.dbflute.hook.AccessContext;
@@ -64,6 +62,8 @@ import org.lastaflute.job.subsidiary.CrossVMHook;
 import org.lastaflute.job.subsidiary.RunnerResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jakarta.annotation.Resource;
 
 /**
  * @author jflute

@@ -19,9 +19,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
-
 import org.dbflute.helper.message.ExceptionMessageBuilder;
 import org.dbflute.optional.OptionalThing;
 import org.lastaflute.job.key.LaJobKey;
@@ -31,6 +28,9 @@ import org.lastaflute.job.subsidiary.JobConcurrentExec;
 import org.lastaflute.web.servlet.filter.bowgun.BowgunCurtainBefore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 
 /**
  * @author jflute
