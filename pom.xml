@@ -13,10 +13,10 @@
 	<inceptionYear>2015</inceptionYear>
 
 	<properties>
-		<lastaflute.version>2.0.0-SNAPSHOT</lastaflute.version> <!-- about one year old (from now) -->
+		<lastaflute.version>2.0.0-A-SNAPSHOT</lastaflute.version> <!-- about one year old (from now) -->
 		<jta.version>2.0.1</jta.version>
-		<slf4j.version>1.7.36</slf4j.version>
-		<utflute.version>0.9.6-A-SNAPSHOT</utflute.version>
+		<slf4j.version>1.7.25</slf4j.version>
+		<utflute.version>0.9.6</utflute.version>
 	</properties>
 
 	<licenses>
