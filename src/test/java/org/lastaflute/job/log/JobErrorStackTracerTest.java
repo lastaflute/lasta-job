@@ -15,11 +15,7 @@
  */
 package org.lastaflute.job.log;
 
-import java.lang.reflect.Field;
-import java.nio.charset.Charset;
-
 import org.dbflute.utflute.core.PlainTestCase;
-import org.dbflute.util.DfReflectionUtil;
 import org.dbflute.util.Srl;
 
 /**
@@ -54,9 +50,7 @@ public class JobErrorStackTracerTest extends PlainTestCase {
         String windowsEcoding = "MS932";
         String originally = System.getProperty(systemEncodingKey);
         System.setProperty(systemEncodingKey, windowsEcoding);
-        forcedlySetDefaultCharset(Charset.forName(windowsEcoding));
-        log("originally={}, currentEncoding={}, defaultCharset={}", originally, System.getProperty(systemEncodingKey),
-                Charset.defaultCharset());
+        log("originally={}, currentEncoding={}, defaultCharset={}", originally, System.getProperty(systemEncodingKey));
         try {
             JobErrorStackTracer tracer = new JobErrorStackTracer();
             String msg = "Japanese: 日本語";
@@ -72,12 +66,12 @@ public class JobErrorStackTracerTest extends PlainTestCase {
             assertContains(exp, "JobErrorStackTracerTest.test_buildExceptionStackTrace_Japanese_windows");
         } finally {
             System.setProperty(systemEncodingKey, originally);
-            forcedlySetDefaultCharset(Charset.forName(originally));
         }
     }
 
-    private void forcedlySetDefaultCharset(Charset charset) {
-        Field defaultCharsetField = DfReflectionUtil.getWholeField(Charset.class, "defaultCharset");
-        DfReflectionUtil.setValueForcedly(defaultCharsetField, null, charset);
-    }
+    // quit force reflection for java21 environment, and originally this was non-critical logic
+    //private void forcedlySetDefaultCharset(Charset charset) {
+    //    Field defaultCharsetField = DfReflectionUtil.getWholeField(Charset.class, "defaultCharset");
+    //    DfReflectionUtil.setValueForcedly(defaultCharsetField, null, charset);
+    //}
 }
