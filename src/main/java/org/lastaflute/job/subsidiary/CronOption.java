@@ -34,12 +34,12 @@ public class CronOption implements InitialCronOption, VaryingCronOption, JobSubI
     // ===================================================================================
     //                                                                           Attribute
     //                                                                           =========
-    protected String jobTitle;
-    protected String jobDesc;
-    protected LaJobUnique jobUnique;
-    protected CronParamsSupplier paramsSupplier;
-    protected List<LaJobKey> triggeringJobKeyList;
-    protected JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO;
+    protected String jobTitle; // null allowed: not required
+    protected String jobDesc; // me too
+    protected LaJobUnique jobUnique; // me too
+    protected CronParamsSupplier paramsSupplier; // me too
+    protected List<LaJobKey> triggeringJobKeyList; // me too, and lazy loaded
+    protected JobNoticeLogLevel noticeLogLevel = JobNoticeLogLevel.INFO; // not null
     protected boolean outlawParallelGranted;
 
     // ===================================================================================

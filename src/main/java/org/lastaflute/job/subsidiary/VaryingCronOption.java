@@ -27,6 +27,21 @@ public interface VaryingCronOption {
     // ===================================================================================
     //                                                                              Facade
     //                                                                              ======
+    // params()'s supplier should be executed just before the job execution as user specification
+    // because, for example, users may use TimeManager@currentDate() in this callback
+    /**
+     * Set up job parameters to change job's behavior. <br>
+     * For example, target date-time, search condition, option boolean.
+     * <pre>
+     * op.params(() -&gt; {
+     *      return DfCollectionUtil.newHashMap("celebration", "plaza");
+     * }));
+     * </pre>
+     * <p>The callback is executed just before the job execution.</p>
+     * 
+     * @param noArgLambda The callback to supply parameter map. (NotNull)
+     * @return this. (NotNull)
+     */
     VaryingCronOption params(CronParamsSupplier noArgLambda);
 
     VaryingCronOption changeNoticeLogToDebug();

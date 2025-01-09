@@ -455,6 +455,7 @@ public class Cron4jTask extends Task { // unique per job in lasta job world (exc
     }
 
     protected Map<String, Object> extractParameterMap(VaryingCronOption cronOption) {
+        // params()'s supplier should be executed just before the job execution as user specification
         return cronOption.getParamsSupplier().map(supplier -> supplier.supply()).orElse(Collections.emptyMap());
     }
 
